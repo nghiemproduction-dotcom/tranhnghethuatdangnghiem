@@ -1,12 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { LogOut, LogIn, Loader2, User } from 'lucide-react';
-// Import supabase (Check lại đường dẫn cho đúng máy ông)
-import { supabase } from '../../ThuVien/ketNoiSupabase'; 
+import { LogOut, LogIn, Loader2, User, MoreHorizontal } from 'lucide-react';
+import { supabase } from '@/app/ThuVien/ketNoiSupabase'; 
 
 interface Props {
-  currentUser?: any; // Có dấu ? để không bị lỗi nếu lỡ không truyền
+  currentUser?: any; 
 }
 
 export default function ChanThanhBen({ currentUser }: Props) {
@@ -15,30 +14,14 @@ export default function ChanThanhBen({ currentUser }: Props) {
   const xuLyDangXuat = async () => {
     try {
       setDangTai(true);
-      
-      // 1. GỌI SUPABASE (Cứ gọi để đảm bảo sạch session phía server nếu có)
       await supabase.auth.signOut();
-
-      // 2. DỌN DẸP BỘ NHỚ TRÌNH DUYỆT (QUAN TRỌNG)
       if (typeof window !== 'undefined') {
-          // 🟢 QUAN TRỌNG: Thu hồi thẻ bài Admin cứng
           localStorage.removeItem('LA_ADMIN_CUNG');
-          
-          // Xóa thông tin user tạm nếu có
+          localStorage.removeItem('USER_ROLE'); // Xóa luôn quyền
           localStorage.removeItem('user_info');
-          
-          // Xóa các rác khác của Supabase
-          Object.keys(localStorage).forEach((key) => {
-              if (key.startsWith('sb-')) localStorage.removeItem(key);
-          });
       }
-
-      // 3. ĐÁ VỀ TRANG ĐĂNG NHẬP
       window.location.href = '/GiaoDienTong/CongDangNhap';
-      
     } catch (error) {
-      console.error('Lỗi đăng xuất:', error);
-      // Dù lỗi cũng force reload về trang đăng nhập để an toàn
       window.location.href = '/GiaoDienTong/CongDangNhap';
     }
   };
@@ -47,43 +30,57 @@ export default function ChanThanhBen({ currentUser }: Props) {
       window.location.href = '/GiaoDienTong/CongDangNhap';
   };
 
-  return (
-    <div className="flex-none mt-auto p-4 border-t border-white/5 bg-[#0E0E0F]">
-       
-       {/* HIỂN THỊ THÔNG TIN USER */}
-       {currentUser && (
-         <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-600 to-blue-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
-              {currentUser.ho_ten ? currentUser.ho_ten.charAt(0).toUpperCase() : <User size={18}/>}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">
-                {currentUser.ho_ten || currentUser.email || 'Admin System'}
-              </p>
-              <p className="text-xs text-gray-500 truncate uppercase">
-                {currentUser.vi_tri || 'Quản trị viên'}
-              </p>
-            </div>
-         </div>
-       )}
+  // Helper: Lấy chữ cái đầu của tên
+  const layChuCaiDau = (name: string) => {
+      return name ? name.charAt(0).toUpperCase() : 'U';
+  };
 
-       {/* NÚT ĐĂNG XUẤT / ĐĂNG NHẬP */}
+  return (
+    <div className="flex-none p-4 border-t border-white/5 bg-[#0E0E0F]">
+       
        {currentUser ? (
-           <button
-             onClick={xuLyDangXuat}
-             disabled={dangTai}
-             className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-red-500/20 text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors text-sm font-medium disabled:opacity-50"
-           >
-             {dangTai ? <Loader2 size={16} className="animate-spin"/> : <LogOut size={16} />}
-             <span>{dangTai ? 'Đang thoát...' : 'Đăng xuất'}</span>
-           </button>
+         <div className="group relative">
+             {/* THẺ USER */}
+             <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-colors cursor-pointer">
+                {/* Avatar */}
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-inner shrink-0 border border-white/10">
+                  {layChuCaiDau(currentUser.ten_hien_thi || currentUser.ho_ten || currentUser.email)}
+                </div>
+                
+                {/* Thông tin Text */}
+                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                  <p className="text-sm font-semibold text-gray-200 truncate leading-tight">
+                    {/* 🟢 Ưu tiên hiển thị: Tên hiển thị -> Họ tên -> Email */}
+                    {currentUser.ten_hien_thi || currentUser.ho_ten || currentUser.email?.split('@')[0]}
+                  </p>
+                  <p className="text-[10px] text-gray-500 truncate uppercase font-bold tracking-wide mt-0.5">
+                    {currentUser.vi_tri || 'Thành Viên'}
+                  </p>
+                </div>
+
+                {/* Icon 3 chấm (Option) */}
+                <MoreHorizontal size={16} className="text-gray-600 group-hover:text-gray-400" />
+             </div>
+
+             {/* MENU POPUP KHI HOVER (Đăng xuất) */}
+             <div className="absolute bottom-full left-0 w-full pb-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 translate-y-2 group-hover:translate-y-0">
+                 <button
+                    onClick={xuLyDangXuat}
+                    disabled={dangTai}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-[#1A1A1C] border border-white/10 text-red-400 hover:bg-red-500/10 hover:text-red-300 hover:border-red-500/30 transition-all shadow-xl"
+                 >
+                    {dangTai ? <Loader2 size={18} className="animate-spin"/> : <LogOut size={18} />}
+                    <span className="text-sm font-medium">{dangTai ? 'Đang thoát...' : 'Đăng xuất'}</span>
+                 </button>
+             </div>
+         </div>
        ) : (
            <button
              onClick={xuLyDangNhap}
-             className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors text-sm font-medium"
+             className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all text-sm font-bold shadow-lg shadow-blue-900/20"
            >
-             <LogIn size={16} />
-             <span>Đăng nhập</span>
+             <LogIn size={18} />
+             <span>Đăng nhập ngay</span>
            </button>
        )}
     </div>
