@@ -3,20 +3,24 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { GripVertical, Minus, Plus, Users, Briefcase, FileText, X } from 'lucide-react';
 
-// 1. IMPORT CÁC MODULE CON VÀO ĐÂY
-// (Ông nhớ chỉnh đường dẫn '../' cho đúng vị trí thư mục nhé)
 import BangNhanSu from '@/app/phongdemo/modulephongdemo/bangnhansu/BangNhanSu'; 
 
 interface Props {
   id: string;
   doRong: number;
   data: any[];
+  isAdmin: boolean;
   onThayDoiDoRong: (id: string, thayDoi: number) => void;
+  onXoaModule: (id: string) => void;
 }
 
-export default function KhoiDon({ id, doRong, data, onThayDoiDoRong }: Props) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+export default function KhoiDon({ id, doRong, data, isAdmin, onThayDoiDoRong, onXoaModule }: Props) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
+    id,
+    disabled: !isAdmin 
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -25,52 +29,42 @@ export default function KhoiDon({ id, doRong, data, onThayDoiDoRong }: Props) {
     zIndex: isDragging ? 999 : 'auto',
   };
 
-  const getTitle = () => {
-    if (id === 'nhan_su') return '👥 Quản Lý Nhân Sự'; // Đổi tên cho ngầu
-    if (id === 'khach_hang') return '🤝 Khách Hàng';
-    if (id === 'viec_mau') return '🎨 Việc Mẫu';
-    return id;
+  const getHeaderInfo = () => {
+    switch (id) {
+        case 'nhan_su': return { title: 'QUẢN LÝ NHÂN SỰ', icon: <Users size={16} className="text-yellow-600" /> };
+        case 'khach_hang': return { title: 'KHÁCH HÀNG', icon: <Briefcase size={16} className="text-yellow-500" /> };
+        case 'viec_mau': return { title: 'VIỆC MẪU', icon: <FileText size={16} className="text-[#D4C4B7]" /> };
+        default: return { title: id.toUpperCase(), icon: <FileText size={16} className="text-[#D4C4B7]" /> };
+    }
   };
 
-  // 2. HÀM RENDER NỘI DUNG THÔNG MINH
-  // Hàm này quyết định xem sẽ vẽ cái gì bên trong khối
-  const renderNoiDung = () => {
-      
-      // TRƯỜNG HỢP ĐẶC BIỆT: NẾU LÀ KHỐI NHÂN SỰ
-      if (id === 'nhan_su') {
-          return (
-             // Gọi Module BangNhanSu vào đây
-             // Lưu ý: Ta bọc div để reset lại style nếu cần thiết
-             <div className="h-full w-full overflow-hidden">
-                 <BangNhanSu />
-             </div>
-          );
-      }
+  const { title, icon } = getHeaderInfo();
 
-      // TRƯỜNG HỢP MẶC ĐỊNH: HIỂN THỊ BẢNG DỮ LIỆU CŨ (Cho các khối chưa có module riêng)
+  const renderNoiDung = () => {
+      if (id === 'nhan_su') {
+          return <div className="h-full w-full overflow-hidden bg-black"><BangNhanSu /></div>;
+      }
       return (
-        <div className="flex-1 overflow-auto p-3 scrollbar-custom text-xs">
+        <div className="flex-1 overflow-auto p-0 scrollbar-hide bg-black">
             {(!data || data.length === 0) ? (
-                <div className="h-full flex items-center justify-center text-gray-700 italic">Trống...</div>
+                <div className="h-full flex flex-col items-center justify-center text-[#D4C4B7]/30">
+                    <span className="text-4xl mb-2 opacity-50">∅</span><span className="text-xs">Chưa có dữ liệu</span>
+                </div>
             ) : (
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="text-gray-500 border-b border-gray-800 text-[10px] uppercase tracking-wider">
-                            <th className="py-2 pl-1 font-normal">ID</th>
-                            <th className="py-2 font-normal">Nội dung</th>
-                            <th className="py-2 font-normal text-right pr-1">Ngày</th>
+                <table className="w-full text-left border-collapse text-xs">
+                    <thead className="sticky top-0 bg-[#111] z-10">
+                        <tr className="text-[#D4C4B7]">
+                            <th className="py-2 pl-4 font-semibold w-12">ID</th>
+                            <th className="py-2 font-semibold">NỘI DUNG</th>
+                            <th className="py-2 pr-4 text-right font-semibold">NGÀY</th>
                         </tr>
                     </thead>
-                    <tbody className="text-gray-400">
+                    <tbody className="text-[#D4C4B7]">
                         {data.slice(0, 50).map((item, index) => (
-                            <tr key={index} className="border-b border-gray-800/40 hover:bg-blue-500/5 hover:text-blue-200 transition-colors">
-                                <td className="py-2 pl-1 truncate max-w-[40px] opacity-50">#{item.id}</td>
-                                <td className="py-2 font-medium truncate max-w-[140px]">
-                                    {item.ten || item.ho_ten || item.ten_khach_hang || item.noi_dung || 'N/A'}
-                                </td>
-                                <td className="py-2 text-right pr-1 opacity-60">
-                                    {item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN', {day:'2-digit', month:'2-digit'}) : '-'}
-                                </td>
+                            <tr key={index} className={`hover:bg-[#D4C4B7]/10 transition-colors group/row ${index % 2 === 0 ? 'bg-black' : 'bg-[#050505]'}`}>
+                                <td className="py-2 pl-4 font-mono text-[#D4C4B7]/50 group-hover/row:text-[#D4C4B7] transition-colors">#{item.id}</td>
+                                <td className="py-2 font-medium truncate max-w-[150px]">{item.ten || item.ho_ten || item.ten_khach_hang || item.noi_dung || 'N/A'}</td>
+                                <td className="py-2 pr-4 text-right text-[#D4C4B7]/50 text-[10px]">{item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN', {day:'2-digit', month:'2-digit'}) : '-'}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -86,56 +80,57 @@ export default function KhoiDon({ id, doRong, data, onThayDoiDoRong }: Props) {
       style={style} 
       className={`
         group relative flex flex-col
-        rounded-xl border border-gray-800 bg-[#111] 
-        text-gray-200 overflow-hidden
+        
+        // 🟢 rounded-sm (Bo nhẹ) + bg-black (Đen thui)
+        rounded-sm 
+        bg-black 
+        shadow-lg
+        
         transition-all duration-300 ease-in-out
-        ${isDragging ? 'opacity-50 ring-2 ring-blue-500 shadow-2xl' : 'hover:border-gray-700 hover:bg-[#161616]'}
+        max-md:!col-span-1 max-md:!w-full max-md:!h-[350px]
+        
+        ${isAdmin ? 'cursor-default' : ''} 
+        ${isDragging ? 'opacity-80 ring-2 ring-yellow-600 shadow-2xl scale-[1.02] z-50' : ''}
       `}
     >
-      {/* Header Module (Tay cầm để kéo thả) */}
+      {/* HEADER */}
       <div 
         {...attributes} 
         {...listeners}
-        className="h-11 bg-gray-900/50 border-b border-gray-800 flex items-center justify-between px-4 cursor-grab active:cursor-grabbing select-none shrink-0"
+        className={`h-9 bg-[#0A0A0A] flex items-center justify-between px-3 select-none shrink-0 ${isAdmin ? 'cursor-grab active:cursor-grabbing' : ''}`}
       >
-        <span className="font-bold text-sm text-blue-400 flex items-center gap-2">
-            {getTitle()} 
-            {/* Ẩn số lượng nếu là module custom vì nó tự quản lý */}
-            {id !== 'nhan_su' && (
-                <span className="text-gray-600 text-[10px] bg-gray-800 px-1.5 py-0.5 rounded-full">{data?.length || 0}</span>
-            )}
-        </span>
-        
-        {/* Nút chỉnh độ rộng */}
-        <div 
-           className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-           onPointerDown={(e) => e.stopPropagation()} 
-        >
-             <button onClick={() => onThayDoiDoRong(id, -1)} disabled={doRong <= 1} className="w-6 h-6 flex items-center justify-center bg-gray-800 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors">-</button>
-             <span className="text-[10px] text-gray-500 flex items-center px-1">Size:{doRong}</span>
-             <button onClick={() => onThayDoiDoRong(id, 1)} className="w-6 h-6 flex items-center justify-center bg-gray-800 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors">+</button>
+        <div className="flex items-center gap-2.5 flex-1 justify-center relative">
+            {isAdmin && <span className="opacity-50 group-hover:opacity-100 transition-opacity absolute left-0"><GripVertical size={14} className="text-[#D4C4B7]" /></span>}
+            <div className="flex items-center gap-2">
+                {icon}
+                <span className="font-bold text-[11px] tracking-wider text-[#D4C4B7] uppercase">{title}</span>
+            </div>
+            {id !== 'nhan_su' && <span className="text-[9px] text-[#D4C4B7]/70 bg-[#D4C4B7]/10 px-1.5 py-0.5 rounded-sm">{data?.length || 0}</span>}
         </div>
+        
+        {isAdmin && (
+            <div 
+                className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-x-2 group-hover:translate-x-0 absolute right-3"
+                onPointerDown={(e) => e.stopPropagation()} 
+            >
+                <div className="flex items-center bg-[#3A322C] rounded-sm overflow-hidden">
+                    <button onClick={() => onThayDoiDoRong(id, -1)} disabled={doRong <= 1} className="w-5 h-5 flex items-center justify-center hover:bg-[#D4C4B7]/10 text-[#D4C4B7]/60 hover:text-[#D4C4B7] disabled:opacity-30 transition-colors"><Minus size={10} /></button>
+                    <span className="text-[9px] font-mono text-[#D4C4B7] w-3 text-center bg-[#D4C4B7]/5 h-5 leading-5">{doRong}</span>
+                    <button onClick={() => onThayDoiDoRong(id, 1)} className="w-5 h-5 flex items-center justify-center hover:bg-[#D4C4B7]/10 text-[#D4C4B7]/60 hover:text-[#D4C4B7] transition-colors"><Plus size={10} /></button>
+                </div>
+
+                <button onClick={() => { if(confirm(`Xóa module ${title} khỏi màn hình?`)) onXoaModule(id); }} className="w-5 h-5 flex items-center justify-center rounded-sm bg-red-900/20 text-red-400/80 hover:bg-red-900/50 hover:text-red-400 transition-all" title="Xóa module">
+                    <X size={12} />
+                </button>
+            </div>
+        )}
       </div>
 
-      {/* 3. GỌI HÀM RENDER NỘI DUNG Ở ĐÂY */}
       {renderNoiDung()}
 
-      {/* CSS Scrollbar */}
-      <style jsx>{`
-        .scrollbar-custom::-webkit-scrollbar {
-          width: 5px;
-          height: 5px;
-        }
-        .scrollbar-custom::-webkit-scrollbar-track {
-          background: transparent; 
-        }
-        .scrollbar-custom::-webkit-scrollbar-thumb {
-          background: #333; 
-          border-radius: 10px;
-        }
-        .scrollbar-custom::-webkit-scrollbar-thumb:hover {
-          background: #555; 
-        }
+      <style jsx global>{` 
+        .scrollbar-hide::-webkit-scrollbar { display: none; } 
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; } 
       `}</style>
     </div>
   );

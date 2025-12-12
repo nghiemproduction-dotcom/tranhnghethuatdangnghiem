@@ -1,11 +1,10 @@
 'use client';
 import React from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { useNgonNgu } from '@/app/context/NgonNguContext';
 
 interface Props {
   id: string;
-  labelKey: string;
+  label: string;
   value: string;
   onChange: (val: string) => void;
   type?: string;
@@ -15,48 +14,48 @@ interface Props {
 }
 
 export default function ONhapLieu({ 
-  id, labelKey, value, onChange, type = 'text', 
+  id, label, value, onChange, type = 'text', 
   showEye = false, isPasswordVisible = false, onToggleEye 
 }: Props) {
   
-  const { t } = useNgonNgu();
-  const label = t(labelKey);
-
   const inputType = showEye ? (isPasswordVisible ? 'text' : 'password') : type;
 
   return (
-    <div className="group relative">
-      <input 
-          id={id}
-          type={inputType} 
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          // 🟢 QUAN TRỌNG: text-base trên mobile (chống zoom), text-sm trên desktop (cho tinh tế)
-          // Tăng py-3 để dễ bấm trên điện thoại
-          className="peer w-full bg-transparent text-gray-200 text-base md:text-sm py-3 md:py-2 border-b border-gray-800 focus:border-yellow-600/50 outline-none transition-colors placeholder-transparent pr-8"
-          placeholder={label}
-          required
-          autoComplete="off"
-      />
+    <div className="group relative w-full">
+      {/* Label nằm hẳn ra ngoài và to rõ */}
       <label 
           htmlFor={id}
-          className="absolute left-0 top-3 md:top-2 text-gray-600 text-xs uppercase tracking-widest transition-all 
-                     peer-focus:-top-4 peer-focus:text-[10px] peer-focus:text-yellow-600
-                     peer-[&:not(:placeholder-shown)]:-top-4 peer-[&:not(:placeholder-shown)]:text-[10px]"
+          className="block text-white/80 text-xs font-bold uppercase tracking-[0.2em] mb-2 drop-shadow-md ml-1"
       >
           {label}
       </label>
-      
-      {showEye && (
-        <button 
-            type="button"
-            onClick={onToggleEye}
-            // Chỉnh lại vị trí nút mắt cho khớp với padding mới
-            className="absolute right-0 top-3 md:top-2 text-gray-600 hover:text-yellow-600 transition-colors"
-        >
-            {isPasswordVisible ? <EyeOff size={18} /> : <Eye size={18} />}
-        </button>
-      )}
+
+      <div className="relative">
+          <input 
+              id={id}
+              type={inputType} 
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              // 🟢 GIAO DIỆN MỚI: Có nền, có viền, bo tròn, chữ đậm
+              className="w-full bg-black/40 hover:bg-black/60 focus:bg-black/80 
+                         text-white text-xl font-bold tracking-wider
+                         border border-white/20 focus:border-yellow-500
+                         rounded-xl px-5 py-4 
+                         outline-none transition-all duration-300
+                         placeholder-transparent shadow-lg"
+              autoComplete="off"
+          />
+          
+          {showEye && (
+            <button 
+                type="button"
+                onClick={onToggleEye}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors p-2"
+            >
+                {isPasswordVisible ? <EyeOff size={24} /> : <Eye size={24} />}
+            </button>
+          )}
+      </div>
     </div>
   );
 }
