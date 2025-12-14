@@ -38,3 +38,34 @@ body {
   background-color: #12100E; /* Màu nền tối chủ đạo của ông */
   color: #D4C4B7;
 }
+@layer base {
+  /* Ép tất cả tiêu đề trên mobile phải to rõ */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold tracking-tight;
+  }
+  
+  /* Mobile: Tiêu đề H1, H2 to hơn hẳn */
+  h1 { @apply text-3xl md:text-2xl; }
+  h2 { @apply text-2xl md:text-xl; }
+  
+  /* Ép input và button không được bé quá trên mobile */
+  input, select, textarea, button {
+    @apply text-base md:text-sm; 
+  }
+}
+
+/* Tùy chỉnh thanh cuộn cho gọn (Option) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #1a1a1a; 
+}
+::-webkit-scrollbar-thumb {
+  background: #333; 
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #555; 
+}
