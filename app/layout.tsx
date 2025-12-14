@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from "next";
+import type { Metadata, Viewport } from "next"; // 👈 Nhớ import Viewport
 import { Inter } from "next/font/google";
 import "./globals.css";
 
@@ -6,17 +6,16 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "ArtSpace ERP",
-  description: "Hệ thống quản trị ArtSpace",
-  manifest: "/manifest.json",
+  description: "Quản trị hệ thống",
 };
 
-// 🟢 CHÌA KHÓA ĐỂ MOBILE NHẬN DIỆN (Copy đoạn này)
+// 🟢 ĐÂY LÀ ĐOẠN MÀY ĐANG THIẾU HOẶC SAI
+// Nó bắt buộc phải nằm RIÊNG BIỆT, không được nhét vào trong metadata
 export const viewport: Viewport = {
-  width: "device-width",     // Chiều rộng bằng thiết bị
-  initialScale: 1,           // Tỷ lệ ban đầu 1:1 (Không zoom out)
-  maximumScale: 1,           // Không cho zoom to quá mức
-  userScalable: false,       // Chặn ngón tay zoom (tạo cảm giác Native App)
-  viewportFit: "cover",      // Tràn viền (cho iPhone tai thỏ)
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false, // Chặn người dùng zoom bằng 2 ngón tay (tạo cảm giác App thật)
 };
 
 export default function RootLayout({
