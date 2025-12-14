@@ -1,27 +1,38 @@
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
-import './globals.css';
-import KhungGiaoDienTong from './GiaoDienTong/KhungGiaoDienTong';
+import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Art Space - Tranh Nghệ Thuật Đăng Nghiêm',
-  description: 'Hệ thống quản lý và trưng bày',
+  title: "ArtSpace ERP",
+  description: "Hệ thống quản trị ArtSpace",
+  manifest: "/manifest.json", // Nếu ông có file manifest
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "ArtSpace",
+  },
+};
+
+// 🟢 QUAN TRỌNG: Cấu hình Viewport chuẩn Mobile App
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false, // Chặn zoom bằng 2 ngón tay
+  viewportFit: "cover", // Tràn viền (xử lý tai thỏ)
 };
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <html lang="vi">
-      {/* Thêm suppressHydrationWarning để tránh lỗi khớp giao diện */}
-      <body className={`${inter.className} bg-black text-white`} suppressHydrationWarning={true}>
-        <KhungGiaoDienTong>
-            {children}
-        </KhungGiaoDienTong>
+      <body className={`${inter.className} bg-[#12100E] text-[#D4C4B7] overscroll-none`}>
+        {children}
       </body>
     </html>
   );

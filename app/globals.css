@@ -90,3 +90,32 @@ body {
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* ... (Code cũ giữ nguyên) ... */
+
+/* --- MOBILE APP OPTIMIZATION --- */
+
+/* Ẩn thanh cuộn cho toàn bộ App (Tạo cảm giác Native) */
+::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
+
+/* Xử lý vùng an toàn (Tai thỏ iPhone) */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  height: 100vh; /* Bắt buộc full chiều cao */
+  overflow: hidden; /* Chặn cuộn body, chỉ cuộn phần nội dung */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Class tiện ích để ẩn scrollbar nhưng vẫn cuộn được */
+.no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
