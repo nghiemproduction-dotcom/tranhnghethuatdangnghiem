@@ -1,139 +1,164 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDroppable } from '@dnd-kit/core';
-import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import KhoiDon from './KhoiDon';
-import { Minus, Plus, Trash2, Database } from 'lucide-react';
-import { ModuleConfig } from './KieuDuLieuModule';
+import { GripVertical, Plus, Settings, Trash2, X } from 'lucide-react';
 
-interface Props {
+interface HangLuoiProps {
   id: string;
-  soCot: number;
-  chieuCao: number;
   items: string[];
   duLieuModule: { [key: string]: { doRong: number } };
-  duLieuThat: any;
+  duLieuThat: { [key: string]: any[] };
   isAdmin: boolean;
-  onDoiSoCotHang: (rowId: string, thayDoi: number) => void;
-  onDoiDoRongModule: (moduleId: string, thayDoi: number) => void;
-  onThayDoiChieuCao: (rowId: string, chieuCaoMoi: number) => void;
-  onXoaHang: (idHang: string) => void;
-  onXoaModule: (idModule: string) => void;
-  onSuaModule?: (id: string, currentConfig: ModuleConfig) => void;
-  onThemModule?: () => void;
+  soCot: number;
+  chieuCao: number;
+  onDoiSoCotHang: (id: string, thayDoi: number) => void;
+  onDoiDoRongModule: (id: string, thayDoi: number) => void;
+  onThayDoiChieuCao: (id: string, chieuCao: number) => void;
+  onXoaHang: (id: string) => void;
+  onXoaModule: (id: string) => void;
+  onSuaModule: (id: string, config: any) => void;
+  onThemModule: () => void;
 }
 
-export default function HangLuoi({
-  id, soCot, chieuCao, items = [], duLieuModule, duLieuThat, isAdmin,
-  onDoiSoCotHang, onDoiDoRongModule, onThayDoiChieuCao, onXoaHang, onXoaModule, 
-  onSuaModule, onThemModule
-}: Props) {
-  
+// Component con để bọc từng Module (Xử lý Drag & Drop)
+function SortableItem({ id, children, width, isAdmin, isMobile }: any) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+    
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        // 🟢 QUAN TRỌNG: Nếu là Mobile thì luôn 100%, ngược lại thì theo tính toán
+        width: isMobile ? '100%' : width, 
+        zIndex: isDragging ? 50 : 'auto',
+        opacity: isDragging ? 0.5 : 1,
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} className="relative group/module h-full transition-all duration-300">
+            {children}
+            {isAdmin && (
+                <div className="absolute top-0 right-0 p-1 opacity-0 group-hover/module:opacity-100 transition-opacity flex gap-1 z-50 bg-black/50 rounded-bl-lg backdrop-blur-sm" {...attributes} {...listeners}>
+                    <GripVertical size={14} className="text-white cursor-grab active:cursor-grabbing" />
+                </div>
+            )}
+        </div>
+    );
+}
+
+export default function HangLuoi({ id, items, duLieuModule, duLieuThat, isAdmin, soCot, chieuCao, onDoiSoCotHang, onDoiDoRongModule, onThayDoiChieuCao, onXoaHang, onXoaModule, onSuaModule, onThemModule }: HangLuoiProps) {
   const { setNodeRef } = useDroppable({ id });
-  const [isResizing, setIsResizing] = useState(false);
+  const [rect, setRect] = useState<DOMRect | null>(null);
 
-  // --- LOGIC KÉO GIÃN (DRAG RESIZE) - ĐÃ KHÔI PHỤC ---
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!isAdmin) return;
-    e.preventDefault();
-    setIsResizing(true);
+  // 🟢 LOGIC MỚI: Tự động phát hiện Mobile
+  const [isMobile, setIsMobile] = useState(false);
 
-    const startY = e.clientY;
-    const startHeight = chieuCao;
+  useEffect(() => {
+      const checkMobile = () => {
+          setIsMobile(window.innerWidth < 768); // Dưới 768px coi là Mobile
+      };
+      
+      // Chạy ngay lần đầu
+      checkMobile();
+      
+      // Lắng nghe khi resize cửa sổ
+      window.addEventListener('resize', checkMobile);
+      const observer = new ResizeObserver((entries) => {
+          for (const entry of entries) { setRect(entry.contentRect as DOMRect); }
+      });
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const currentY = moveEvent.clientY;
-      const deltaY = currentY - startY;
-      const newHeight = Math.max(100, startHeight + deltaY);
-      onThayDoiChieuCao(id, newHeight);
-    };
+      return () => {
+          window.removeEventListener('resize', checkMobile);
+          observer.disconnect();
+      };
+  }, [id]);
 
-    const handleMouseUp = () => {
-      setIsResizing(false);
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-  };
+  // Tính chiều rộng (Chỉ áp dụng cho Desktop)
+  // Nếu chưa có rect (lần đầu render), mặc định chia đều
+  const containerWidth = rect ? rect.width : 1200; 
+  // Trừ đi khoảng cách gap (gap-2 = 8px)
+  const gapTotal = (soCot - 1) * 8;
+  const widthPerCol = (containerWidth - gapTotal) / soCot;
 
   return (
-    <div className={`relative group/hang transition-all duration-300 ease-in-out mt-4 mb-2 ${isResizing ? 'select-none z-50' : ''}`}>
-      
-      {/* THANH CÔNG CỤ (Admin Only) */}
+    <div 
+        id={id} 
+        ref={setNodeRef} 
+        className={`
+            relative group/hang transition-all duration-300 rounded-lg 
+            ${isAdmin ? 'border border-dashed border-white/10 hover:border-white/30 bg-white/[0.02]' : ''}
+            p-2
+        `}
+        style={{ 
+            // 🟢 Mobile: Chiều cao tự động (auto) để nội dung dài ra
+            // 🟢 Desktop: Chiều cao cố định theo cấu hình
+            height: isMobile ? 'auto' : (items && items.length > 0 ? chieuCao : 'auto'),
+            minHeight: isMobile ? '100px' : (items && items.length > 0 ? 'auto' : '150px')
+        }}
+    >
+      {/* HEADER CỦA HÀNG (Chỉ hiện khi Admin) */}
       {isAdmin && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 opacity-0 group-hover/hang:opacity-100 transition-opacity duration-200">
-            {/* Nút Thêm Module (Tính năng mới) */}
-            <button 
-                onClick={onThemModule}
-                className="bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1 px-2 py-0.5 rounded-full shadow-lg border border-blue-400/30 transition-colors mr-1"
-                title="Thêm Module"
-            >
-                <Database size={10} /> <span className="text-[9px] font-bold">THÊM</span>
-            </button>
-
-            {/* Các nút chỉnh cột cũ (Tính năng cũ) */}
-            <div className="flex items-center bg-[#2A2420] border border-[#D4C4B7]/20 rounded-full px-2 py-0.5 shadow-lg">
-                <button onClick={() => onDoiSoCotHang(id, -1)} disabled={soCot <= 1} className="p-1 hover:text-white text-gray-400 disabled:opacity-30"><Minus size={12}/></button>
-                <span className="text-[10px] font-bold text-[#D4C4B7] mx-2 min-w-[40px] text-center">{soCot} CỘT</span>
-                <button onClick={() => onDoiSoCotHang(id, 1)} className="p-1 hover:text-white text-gray-400"><Plus size={12}/></button>
-            </div>
-
-            <button onClick={() => { if(confirm("Xóa hàng này?")) onXoaHang(id); }} className="bg-red-900/80 hover:bg-red-600 text-white p-1.5 rounded-full shadow-lg border border-red-500/30 transition-colors ml-1">
-                <Trash2 size={12} />
-            </button>
+        <div className="absolute -top-3 left-4 flex items-center gap-2 bg-[#1A1A1A] border border-white/20 px-2 py-0.5 rounded-full z-10 opacity-0 group-hover/hang:opacity-100 transition-opacity shadow-xl">
+           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Khu vực {soCot} cột</span>
+           <div className="h-3 w-[1px] bg-white/20"></div>
+           <button onClick={() => onDoiSoCotHang(id, -1)} className="hover:text-white text-gray-400 px-1 text-[10px] font-mono font-bold">-</button>
+           <span className="text-[10px] text-blue-400 font-bold">{soCot}</span>
+           <button onClick={() => onDoiSoCotHang(id, 1)} className="hover:text-white text-gray-400 px-1 text-[10px] font-mono font-bold">+</button>
+           <div className="h-3 w-[1px] bg-white/20"></div>
+           <button onClick={() => onThayDoiChieuCao(id, chieuCao - 50)} className="hover:text-white text-gray-400 px-1 text-[10px] font-mono font-bold">H-</button>
+           <span className="text-[10px] text-green-400 font-bold">{chieuCao}</span>
+           <button onClick={() => onThayDoiChieuCao(id, chieuCao + 50)} className="hover:text-white text-gray-400 px-1 text-[10px] font-mono font-bold">H+</button>
+           <div className="h-3 w-[1px] bg-white/20"></div>
+           <button onClick={() => onXoaHang(id)} className="text-red-500 hover:text-red-400 p-1"><Trash2 size={10} /></button>
         </div>
       )}
 
-      {/* LƯỚI GRID (Responsive + Drag Height) */}
-      <div 
-        ref={setNodeRef}
-        className={`
-            grid gap-2 w-full transition-all duration-75 ease-linear border-b border-transparent
-            max-sm:!grid-cols-1 max-md:!grid-cols-2 max-md:!h-auto max-md:!min-h-[200px]
-            ${isAdmin ? 'border border-dashed border-[#D4C4B7]/10 bg-white/[0.01] rounded-sm' : ''}
-            ${isResizing ? 'ring-1 ring-blue-500/30' : ''} 
-        `}
-        style={{
-            gridTemplateColumns: `repeat(${soCot}, minmax(0, 1fr))`,
-            // 🟢 QUAN TRỌNG: Dùng minHeight để hỗ trợ kéo giãn và nội dung dài
-            minHeight: `${chieuCao}px`
-        }}
-      >
-        <SortableContext items={items} strategy={rectSortingStrategy}>
-          {items.map((itemId) => (
-            <KhoiDon
-              key={itemId}
-              id={itemId}
-              doRong={duLieuModule[itemId]?.doRong || 1}
-              data={duLieuThat[itemId] || []}
-              isAdmin={isAdmin}
-              onThayDoiDoRong={onDoiDoRongModule}
-              onXoaModule={onXoaModule}
-              onSuaModule={onSuaModule}
-            />
-          ))}
+      {/* 🟢 CONTAINER CHÍNH */}
+      {/* Mobile: flex-col (xếp dọc) | Desktop: flex-row (xếp ngang) */}
+      <div className="flex flex-col md:flex-row gap-2 h-full w-full">
+        <SortableContext items={items || []} strategy={horizontalListSortingStrategy}>
+          {items && items.map((itemId) => {
+            const doRongModule = duLieuModule[itemId]?.doRong || 1;
+            // Tính width cho Desktop
+            const calculatedWidth = (widthPerCol * doRongModule) + ((doRongModule - 1) * 8);
+            
+            return (
+              <SortableItem key={itemId} id={itemId} width={calculatedWidth} isAdmin={isAdmin} isMobile={isMobile}>
+                <div className="relative w-full h-full">
+                   {isAdmin && (
+                       <div className="absolute top-1 left-1 z-50 flex gap-1 opacity-0 group-hover/module:opacity-100 transition-opacity">
+                           <button onClick={() => onXoaModule(itemId)} className="bg-red-500/80 p-1 rounded-md text-white hover:bg-red-600"><X size={10} /></button>
+                           <button onClick={() => onSuaModule(itemId, duLieuThat[itemId]?.[0])} className="bg-blue-500/80 p-1 rounded-md text-white hover:bg-blue-600"><Settings size={10} /></button>
+                           {/* Nút chỉnh độ rộng Module (Chỉ hiện trên Desktop) */}
+                           <div className="hidden md:flex bg-black/50 rounded-md items-center px-1">
+                               <button onClick={(e) => { e.stopPropagation(); onDoiDoRongModule(itemId, -1); }} className="text-white text-[10px] px-1 hover:text-blue-400 font-bold">-</button>
+                               <span className="text-[8px] text-gray-300 font-mono">W:{doRongModule}</span>
+                               <button onClick={(e) => { e.stopPropagation(); onDoiDoRongModule(itemId, 1); }} className="text-white text-[10px] px-1 hover:text-blue-400 font-bold">+</button>
+                           </div>
+                       </div>
+                   )}
+                   <KhoiDon id={itemId} data={duLieuThat[itemId] || []} doRong={doRongModule} isAdmin={isAdmin} onThayDoiDoRong={() => {}} onXoaModule={() => {}} />
+                </div>
+              </SortableItem>
+            );
+          })}
         </SortableContext>
         
-        {items.length === 0 && isAdmin && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <span className="text-[#D4C4B7]/20 text-xs font-bold uppercase tracking-widest">Kéo thả module vào đây</span>
+        {/* Nút thêm Module (Chỉ hiện khi Admin) */}
+        {isAdmin && (
+            <div className={`
+                flex items-center justify-center rounded-lg border-2 border-dashed border-white/5 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all cursor-pointer group/add
+                ${items && items.length === 0 ? 'w-full h-[100px]' : 'w-10 min-w-[40px] md:h-full h-10'}
+            `} onClick={onThemModule}>
+                <Plus size={18} className="text-white/20 group-hover/add:text-blue-500 transition-colors" />
             </div>
         )}
       </div>
-
-      {/* 🟢 THANH KÉO TỐI GIẢN (INVISIBLE RESIZER) - Đã trả lại */}
-      {isAdmin && (
-        <div 
-            onMouseDown={handleMouseDown}
-            className="absolute -bottom-1 left-0 w-full h-3 cursor-row-resize z-20 group/resizer flex items-end"
-        >
-            {/* Chỉ hiện 1 vạch mỏng màu xanh khi hover đúng vào mép */}
-            <div className="w-full h-[2px] bg-transparent group-hover/resizer:bg-blue-500/50 transition-colors"></div>
-        </div>
-      )}
     </div>
   );
 }

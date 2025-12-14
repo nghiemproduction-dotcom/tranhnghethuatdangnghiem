@@ -6,29 +6,20 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "ArtSpace ERP",
-  description: "Hệ thống quản trị ArtSpace",
-  manifest: "/manifest.json", // Nếu ông có file manifest
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "ArtSpace",
-  },
+  description: "Quản trị ArtSpace",
+  manifest: "/manifest.json",
 };
 
-// 🟢 QUAN TRỌNG: Cấu hình Viewport chuẩn Mobile App
+// 🟢 CHÌA KHÓA QUAN TRỌNG NHẤT:
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false, // Chặn zoom bằng 2 ngón tay
-  viewportFit: "cover", // Tràn viền (xử lý tai thỏ)
+  userScalable: false, // Chặn zoom -> Giống App thật
+  viewportFit: "cover",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi">
       <body className={`${inter.className} bg-[#12100E] text-[#D4C4B7] overscroll-none`}>

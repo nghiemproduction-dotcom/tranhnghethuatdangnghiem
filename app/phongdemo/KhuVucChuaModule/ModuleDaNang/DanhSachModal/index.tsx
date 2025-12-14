@@ -35,9 +35,7 @@ export function DanhSachModal({
         if (config.modalViewType) setViewMode(config.modalViewType);
     }, [config.modalViewType]);
 
-    // 🟢 LUÔN DÙNG CỘT 'hinh_anh' CHO GALLERY
     const detectedImageCol = 'hinh_anh'; 
-
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
 
@@ -71,8 +69,11 @@ export function DanhSachModal({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-sm flex items-center justify-center p-0 md:p-4 animate-in fade-in duration-200" onClick={(e) => e.stopPropagation()}>
-            <div className="w-full h-full md:w-[98vw] md:h-[97vh] bg-[#0E0E0E] rounded-none md:rounded-2xl shadow-2xl flex flex-col overflow-hidden relative" onClick={(e) => e.stopPropagation()}>
+        // 🟢 FIX RESPONSIVE: z-[100] để đè lên Header/Footer của BangChinh
+        <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-200" onClick={(e) => e.stopPropagation()}>
+            
+            {/* 🟢 CONTAINER: Full màn hình trên Mobile (rounded-none), Có viền trên Desktop */}
+            <div className="w-full h-full md:w-[98vw] md:h-[97vh] bg-[#121212] rounded-none md:rounded-2xl shadow-2xl flex flex-col overflow-hidden relative border-none md:border md:border-white/10" onClick={(e) => e.stopPropagation()}>
                 
                 <HeaderToolbar 
                     title={config.title} tableName={config.tableName} totalRecords={data.length}
@@ -85,7 +86,7 @@ export function DanhSachModal({
                     currentViewMode={viewMode} onViewModeChange={setViewMode}
                 />
 
-                <div className="flex-1 overflow-auto custom-dark-scrollbar bg-[#0E0E0E] relative">
+                <div className="flex-1 overflow-auto custom-dark-scrollbar bg-[#0E0E0E] relative p-1 md:p-0">
                     {displayData.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full text-gray-600"><AlertCircle size={64} className="mb-4 opacity-20"/><span className="text-lg font-light">Không tìm thấy dữ liệu.</span></div>
                     ) : (

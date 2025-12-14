@@ -9,16 +9,27 @@ import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import HangLuoi from '@/app/phongdemo/KhuVucChuaModule/HangLuoi';
 import KhoiDon from './KhoiDon';
 import { 
-    Loader2, LayoutTemplate, 
-    Menu, Search, Bell, MessageCircle, Home, LayoutGrid, Users 
+    Search, Plus, QrCode, 
+    MessageCircle, UsersRound, Compass, Clock, UserCircle, // Icon nghệ thuật hơn
+    Settings, LogOut, Loader2, LayoutTemplate, 
+    BellRing, Sparkles 
 } from 'lucide-react';
 
 import { ModalTaoModule } from './ModalTaoModule';
 import { ModuleConfig } from './KieuDuLieuModule';
-import MobileBottomNav from './MobileBottomNav'; 
-import Sidebar from './Sidebar'; // 🟢 Import Sidebar mới
+
+// 🟢 BẢNG MÀU DARK MODE HIỆN ĐẠI
+const THEME = {
+    bg_main: '#121212',       // Nền chính tối sâu
+    bg_sidebar: '#1E1E1E',    // Nền sidebar sáng hơn chút
+    border: 'rgba(255,255,255,0.08)', // Viền siêu mỏng
+    active: '#0068FF',        // Xanh Zalo
+    text_main: '#E4E6EB',
+    text_sub: '#B0B3B8'
+};
 
 export default function BangChinh() {
+  // --- STATE ---
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [dbData, setDbData] = useState<{ [key: string]: any[] }>({ nhan_su: [], khach_hang: [], viec_mau: [] });
@@ -26,15 +37,26 @@ export default function BangChinh() {
   const [cauHinhHang, setCauHinhHang] = useState<any[]>([]);
   const [cauHinhModule, setCauHinhModule] = useState<{ [key: string]: { doRong: number } }>({});
   const [moduleConfigs, setModuleConfigs] = useState<Record<string, ModuleConfig>>({});
+  
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingModule, setEditingModule] = useState<ModuleConfig | undefined>(undefined);
   const [targetRowId, setTargetRowId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('home'); 
+  
+  // Tab mặc định
+  const [activeTab, setActiveTab] = useState('message'); 
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 
+  // --- LOAD DATA ---
   useEffect(() => {
+    const getUser = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        setCurrentUser(user);
+    };
+    getUser();
+
     const checkQuyen = () => {
         if (typeof window === 'undefined') return false;
         const isHardAdmin = localStorage.getItem('LA_ADMIN_CUNG') === 'true';
@@ -52,14 +74,15 @@ export default function BangChinh() {
             setCauHinhModule(config.cauHinhModule || {});
             setModuleConfigs(config.moduleConfigs || {});
         } else {
-            setItems({ hang_1: ['nhan_su'] });
-            setCauHinhHang([{ id: 'hang_1', soCot: 3, chieuCao: 400 }]);
-            setCauHinhModule({ 'nhan_su': { doRong: 2 } });
+            const newId = `hang_${Date.now()}`;
+            setItems({ [newId]: [] });
+            setCauHinhHang([{ id: newId, soCot: 3, chieuCao: 400 }]);
         }
     };
     fetchData();
   }, []);
 
+  // --- AUTO SAVE ---
   useEffect(() => { 
       if (!isAdmin || cauHinhHang.length === 0) return; 
       const timer = setTimeout(async () => { 
@@ -70,26 +93,11 @@ export default function BangChinh() {
       return () => clearTimeout(timer); 
   }, [items, cauHinhHang, cauHinhModule, moduleConfigs, isAdmin]);
 
-  const handleCreateModule = (config: ModuleConfig) => { 
-      setModuleConfigs(prev => ({ ...prev, [config.id]: config })); 
-      if (editingModule) { setShowAddModal(false); setEditingModule(undefined); return; } 
-      const destRow = targetRowId || cauHinhHang[0]?.id; 
-      if (destRow) { 
-          setItems(prev => ({ ...prev, [destRow]: [...(prev[destRow] || []), config.id] })); 
-          let defaultWidth = 1; 
-          if (config.viewType === 'kanban' || config.viewType.startsWith('button')) defaultWidth = 3; 
-          setCauHinhModule(prev => ({ ...prev, [config.id]: { doRong: defaultWidth } })); 
-      } else { 
-          const newRowId = `hang_${Date.now()}`; 
-          setCauHinhHang([{ id: newRowId, soCot: 3, chieuCao: 400 }]); 
-          setItems({ [newRowId]: [config.id] }); 
-          setCauHinhModule({ [config.id]: { doRong: 1 } }); 
-      } 
-      setShowAddModal(false); setTargetRowId(null); 
-  };
+  // --- HANDLERS ---
+  const handleLogout = async () => { await supabase.auth.signOut(); window.location.href = '/login'; };
+  const handleCreateModule = (config: ModuleConfig) => { setModuleConfigs(prev => ({ ...prev, [config.id]: config })); if (editingModule) { setShowAddModal(false); setEditingModule(undefined); return; } const destRow = targetRowId || cauHinhHang[0]?.id; if (destRow) { setItems(prev => ({ ...prev, [destRow]: [...(prev[destRow] || []), config.id] })); let defaultWidth = 1; if (config.viewType === 'kanban' || config.viewType.startsWith('button')) defaultWidth = 3; setCauHinhModule(prev => ({ ...prev, [config.id]: { doRong: defaultWidth } })); } else { const newRowId = `hang_${Date.now()}`; setCauHinhHang([{ id: newRowId, soCot: 3, chieuCao: 400 }]); setItems({ [newRowId]: [config.id] }); setCauHinhModule({ [config.id]: { doRong: 1 } }); } setShowAddModal(false); setTargetRowId(null); };
   const handleOpenAddModal = (rowId: string) => { setTargetRowId(rowId); setEditingModule(undefined); setShowAddModal(true); };
   const handleEditModule = (id: string, currentConfig: ModuleConfig) => { setEditingModule(currentConfig); setShowAddModal(true); };
-
   const xuLyThemHang = () => { const idMoi = `hang_${Date.now()}`; setCauHinhHang(prev => [...prev, { id: idMoi, soCot: 3, chieuCao: 250 }]); setItems(prev => ({ ...prev, [idMoi]: [] })); };
   const xuLyXoaHang = (idHang: string) => { setCauHinhHang(prev => prev.filter(h => h.id !== idHang)); setItems(prev => { const copy = { ...prev }; delete copy[idHang]; return copy; }); };
   const xuLyDoiSoCotHang = (rowId: string, thayDoi: number) => { setCauHinhHang((prev) => prev.map((hang) => hang.id === rowId ? { ...hang, soCot: Math.max(1, hang.soCot + thayDoi) } : hang)); };
@@ -102,119 +110,166 @@ export default function BangChinh() {
   const handleDragEnd = (event: DragEndEvent) => { if (!isAdmin) return; const { active, over } = event; const { id } = active; const overId = over?.id; if (overId) { const activeContainer = findContainer(id as string); const overContainer = findContainer(overId as string); if (activeContainer && overContainer && activeContainer === overContainer) { const activeIndex = items[activeContainer].indexOf(id as string); const overIndex = items[overContainer].indexOf(overId as string); if (activeIndex !== overIndex) { setItems((items) => ({ ...items, [activeContainer]: arrayMove(items[activeContainer], activeIndex, overIndex) })); } } } setActiveId(null); };
 
   return (
-    // 🟢 LAYOUT CHÍNH: Flex Row cho Desktop (Sidebar + Main)
-    <div className="flex h-screen w-full bg-[#12100E] text-[#D4C4B7] overflow-hidden relative font-sans">
+    <div className="flex h-screen w-full bg-[#121212] text-[#E4E6EB] overflow-hidden font-sans">
       
-      {/* 1. SIDEBAR (Chỉ hiện trên Tablet & Desktop) */}
-      <Sidebar />
-
-      {/* 2. KHU VỰC NỘI DUNG CHÍNH (Chiếm hết phần còn lại) */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+      {/* ============================== */}
+      {/* 🟢 1. DESKTOP SIDEBAR (Tối giản & Nghệ thuật) */}
+      {/* ============================== */}
+      <aside className="hidden md:flex flex-col w-[72px] bg-[#1E1E1E] border-r border-white/5 items-center py-6 gap-6 z-50 shrink-0">
           
-          {/* A. MOBILE HEADER (2 TẦNG - Chỉ hiện trên Mobile) */}
-          <div className="md:hidden shrink-0 z-50 bg-[#1A1A1A] border-b border-white/10 shadow-md">
-              <div className="flex items-center justify-between px-4 h-14">
-                  <h1 className="font-black text-xl tracking-tighter text-white">ArtSpace<span className="text-blue-500">.</span></h1>
-                  <div className="flex items-center gap-3">
-                      <button className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 active:scale-95 transition-all"><Search size={18}/></button>
-                      <button className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 active:scale-95 transition-all relative">
-                          <MessageCircle size={18}/>
-                          <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#1A1A1A]"></span>
-                      </button>
-                  </div>
-              </div>
-              <div className="flex items-center justify-around h-12 px-2">
-                  <button onClick={() => setActiveTab('home')} className={`flex-1 h-full flex items-center justify-center border-b-2 transition-all ${activeTab === 'home' ? 'border-blue-500 text-blue-500' : 'border-transparent text-gray-500 hover:bg-white/5'}`}><Home size={24} strokeWidth={activeTab === 'home' ? 2.5 : 2} /></button>
-                  <button onClick={() => setActiveTab('modules')} className={`flex-1 h-full flex items-center justify-center border-b-2 transition-all ${activeTab === 'modules' ? 'border-blue-500 text-blue-500' : 'border-transparent text-gray-500 hover:bg-white/5'}`}><LayoutGrid size={24} strokeWidth={activeTab === 'modules' ? 2.5 : 2} /></button>
-                  <button onClick={() => setActiveTab('users')} className={`flex-1 h-full flex items-center justify-center border-b-2 transition-all ${activeTab === 'users' ? 'border-blue-500 text-blue-500' : 'border-transparent text-gray-500 hover:bg-white/5'}`}><Users size={24} strokeWidth={activeTab === 'users' ? 2.5 : 2} /></button>
-                  <button onClick={() => setActiveTab('notifications')} className={`flex-1 h-full flex items-center justify-center border-b-2 transition-all ${activeTab === 'notifications' ? 'border-blue-500 text-blue-500' : 'border-transparent text-gray-500 hover:bg-white/5'}`}><Bell size={24} strokeWidth={activeTab === 'notifications' ? 2.5 : 2} /></button>
-                  <button onClick={() => setActiveTab('menu')} className={`flex-1 h-full flex items-center justify-center border-b-2 transition-all ${activeTab === 'menu' ? 'border-blue-500 text-blue-500' : 'border-transparent text-gray-500 hover:bg-white/5'}`}><Menu size={24} strokeWidth={activeTab === 'menu' ? 2.5 : 2} /></button>
-              </div>
+          {/* Avatar (Có viền Active) */}
+          <div className="relative group cursor-pointer">
+            <div className="w-10 h-10 rounded-full border-2 border-[#0068FF] overflow-hidden shadow-lg shadow-blue-500/20">
+                <img src={currentUser?.user_metadata?.avatar_url || "https://github.com/shadcn.png"} alt="User" className="w-full h-full object-cover"/>
+            </div>
+            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[#1E1E1E]"></div>
           </div>
 
-          {/* B. DESKTOP HEADER (1 TẦNG - Chỉ hiện trên Tablet/Desktop) */}
-          <div className="hidden md:flex shrink-0 h-16 bg-[#1A1A1A] border-b border-white/10 items-center justify-between px-6 z-30">
-              <div className="flex items-center gap-4">
-                  <h2 className="text-lg font-bold text-white uppercase tracking-wide">Dashboard Tổng Quan</h2>
-                  <div className="h-6 w-[1px] bg-white/10"></div>
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <span>Chào mừng quay lại,</span>
-                      <span className="font-bold text-white">Tommy</span>
-                  </div>
-              </div>
-              <div className="flex items-center gap-4">
-                  <div className="relative">
-                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"/>
-                      <input type="text" placeholder="Tìm kiếm nhanh..." className="bg-[#12100E] border border-white/10 rounded-full py-2 pl-9 pr-4 text-sm text-white w-64 focus:w-80 focus:border-blue-500 transition-all outline-none"/>
-                  </div>
-                  <button className="w-10 h-10 rounded-full bg-[#12100E] border border-white/10 flex items-center justify-center hover:text-white transition-colors relative">
-                      <Bell size={18}/>
-                      <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full"></span>
-                  </button>
-                  <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center font-bold text-white shadow-lg cursor-pointer hover:ring-2 ring-blue-500/50 transition-all">TM</div>
-              </div>
+          {/* Icons Menu (Nét mảnh - Minimalist) */}
+          <div className="flex flex-col gap-4 w-full items-center">
+              {[
+                { id: 'message', icon: MessageCircle },
+                { id: 'contact', icon: UsersRound },
+                { id: 'apps', icon: Compass }, // Thay Grid bằng Compass cho nghệ thuật
+                { id: 'diary', icon: Clock }
+              ].map(item => (
+                <button 
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id)} 
+                    className={`
+                        p-3 rounded-xl transition-all duration-300 relative group
+                        ${activeTab === item.id ? 'bg-[#0068FF] text-white shadow-lg shadow-blue-900/40' : 'text-gray-400 hover:bg-white/5 hover:text-white'}
+                    `}
+                >
+                    <item.icon size={22} strokeWidth={1.5} />
+                    {/* Tooltip nhỏ bên cạnh */}
+                    <span className="absolute left-full ml-3 px-2 py-1 bg-black/80 text-xs rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity">
+                        {item.id}
+                    </span>
+                </button>
+              ))}
           </div>
 
-          {/* C. SCROLLABLE CONTENT (Phần Lưới - Dùng chung) */}
-          <div className="flex-1 overflow-y-auto no-scrollbar p-2 md:p-6 pb-24 md:pb-10 relative scroll-smooth bg-[#12100E]">
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-                <div className="flex flex-col gap-2 w-full mx-auto max-w-[1600px]">
-                  {cauHinhHang.map((hang) => (
-                    <HangLuoi
-                      key={hang.id} id={hang.id} soCot={hang.soCot} chieuCao={hang.chieuCao}
-                      items={items[hang.id]} duLieuModule={cauHinhModule} 
-                      duLieuThat={{
-                          ...dbData,
-                          ...Object.keys(moduleConfigs).reduce((acc, key) => {
-                              acc[key] = [moduleConfigs[key]]; 
-                              return acc;
-                          }, {} as any)
-                      }}
-                      isAdmin={isAdmin}
-                      onDoiSoCotHang={xuLyDoiSoCotHang} onDoiDoRongModule={xuLyDoiDoRongModule}
-                      onThayDoiChieuCao={xuLyDoiChieuCaoHang} onXoaHang={xuLyXoaHang}
-                      onXoaModule={xuLyXoaModule}
-                      onSuaModule={handleEditModule}
-                      onThemModule={() => handleOpenAddModal(hang.id)} 
-                    />
-                  ))}
+          {/* Bottom Actions */}
+          <div className="mt-auto flex flex-col gap-4 text-gray-400 w-full items-center mb-2">
+              <button className="hover:text-white hover:bg-white/5 p-3 rounded-xl transition-all"><Sparkles size={22} strokeWidth={1.5} /></button>
+              <button className="hover:text-white hover:bg-white/5 p-3 rounded-xl transition-all"><Settings size={22} strokeWidth={1.5} /></button>
+              <div className="h-[1px] w-8 bg-white/10"></div>
+              <button onClick={handleLogout} className="hover:text-red-400 hover:bg-red-500/10 p-3 rounded-xl transition-all" title="Đăng xuất"><LogOut size={22} strokeWidth={1.5} /></button>
+          </div>
+      </aside>
 
-                  {isAdmin && (
-                    <div className="flex gap-1 mt-4 px-1 pb-10">
-                        <button onClick={xuLyThemHang} className="w-full py-4 md:py-6 border-2 border-dashed border-[#D4C4B7]/10 bg-white/[0.01] hover:bg-white/[0.03] rounded-xl text-[#D4C4B7]/30 hover:text-[#D4C4B7] transition-all flex items-center justify-center gap-3 text-xs md:text-sm uppercase tracking-widest font-bold group">
-                            <span className="p-2 bg-white/5 rounded-full group-hover:bg-blue-600 group-hover:text-white transition-colors"><LayoutTemplate size={18} /></span>
-                            THÊM KHU VỰC LÀM VIỆC MỚI
-                        </button>
+      {/* ============================== */}
+      {/* 🟢 2. MAIN CONTENT AREA */}
+      {/* ============================== */}
+      <div className="flex-1 flex flex-col h-full relative overflow-hidden bg-[#121212]">
+          
+          {/* 🟢 MOBILE HEADER (Glassmorphism & Tối giản) */}
+          <header className="md:hidden h-14 bg-[#1E1E1E]/95 backdrop-blur-md flex items-center justify-between px-4 shrink-0 z-50 border-b border-white/5">
+              <div className="flex items-center gap-3 flex-1">
+                  <Search className="text-gray-400" size={20} strokeWidth={1.5} />
+                  <input type="text" placeholder="Tìm kiếm tin nhắn..." className="bg-transparent border-none outline-none text-white placeholder:text-gray-600 text-sm w-full" />
+              </div>
+              <div className="flex items-center gap-5 text-gray-300">
+                  <QrCode size={20} strokeWidth={1.5} />
+                  <Plus size={26} strokeWidth={1.5} onClick={() => isAdmin && xuLyThemHang()} />
+              </div>
+          </header>
+
+          {/* 🟢 SCROLLABLE CONTENT */}
+          <div className="flex-1 overflow-y-auto no-scrollbar p-2 md:p-8 pb-24 md:pb-10 relative scroll-smooth">
+              {activeTab === 'message' ? (
+                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
+                    <div className="flex flex-col gap-3 md:gap-6 w-full mx-auto max-w-[1600px]">
+                      {cauHinhHang.map((hang) => (
+                        <HangLuoi
+                          key={hang.id} id={hang.id} soCot={hang.soCot} chieuCao={hang.chieuCao}
+                          items={items[hang.id]} duLieuModule={cauHinhModule} 
+                          duLieuThat={{...dbData, ...Object.keys(moduleConfigs).reduce((acc, k) => { acc[k] = [moduleConfigs[k]]; return acc; }, {} as any)}}
+                          isAdmin={isAdmin}
+                          onDoiSoCotHang={xuLyDoiSoCotHang} onDoiDoRongModule={xuLyDoiDoRongModule}
+                          onThayDoiChieuCao={xuLyDoiChieuCaoHang} onXoaHang={xuLyXoaHang}
+                          onXoaModule={xuLyXoaModule}
+                          onSuaModule={handleEditModule}
+                          onThemModule={() => handleOpenAddModal(hang.id)} 
+                        />
+                      ))}
+                      {isAdmin && (
+                        <div className="flex gap-1 mt-4 px-1 pb-10">
+                            <button onClick={xuLyThemHang} className="w-full py-6 border border-dashed border-white/10 rounded-2xl text-gray-600 hover:text-blue-500 hover:border-blue-500/30 hover:bg-blue-500/5 transition-all flex items-center justify-center gap-3 text-xs font-bold uppercase tracking-widest">
+                                <LayoutTemplate size={18} strokeWidth={1.5} /> Thêm Khu Vực Mới
+                            </button>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-
-                <DragOverlay adjustScale={true}>
-                  {activeId ? <KhoiDon id={activeId} data={dbData[activeId] || []} doRong={cauHinhModule[activeId]?.doRong || 1} isAdmin={true} onThayDoiDoRong={() => {}} onXoaModule={() => {}} /> : null}
-                </DragOverlay>
-              </DndContext>
+                    <DragOverlay adjustScale>{activeId ? <KhoiDon id={activeId} data={[]} doRong={1} isAdmin={true} onThayDoiDoRong={() => {}} onXoaModule={() => {}} /> : null}</DragOverlay>
+                  </DndContext>
+              ) : activeTab === 'me' ? (
+                  // TAB CÁ NHÂN (Minimalist Dark)
+                  <div className="flex flex-col items-center pt-16 text-white animate-in slide-in-from-bottom-5 fade-in duration-500">
+                      <div className="w-24 h-24 rounded-full p-1 border border-white/10 mb-4 bg-[#1E1E1E]">
+                          <img src={currentUser?.user_metadata?.avatar_url || "https://github.com/shadcn.png"} alt="User" className="w-full h-full object-cover rounded-full"/>
+                      </div>
+                      <h2 className="text-2xl font-bold tracking-tight mb-1">{currentUser?.email?.split('@')[0] || "Người dùng"}</h2>
+                      <p className="text-gray-500 text-sm mb-10 font-mono opacity-60">{currentUser?.email}</p>
+                      
+                      <div className="w-full max-w-sm flex flex-col gap-3">
+                          <button className="flex items-center justify-between w-full bg-[#1E1E1E] p-4 rounded-xl border border-white/5 hover:border-blue-500/30 transition-all">
+                              <span className="flex items-center gap-3 text-sm font-medium"><UserCircle size={20} className="text-blue-500"/> Hồ sơ cá nhân</span>
+                              <span className="text-gray-600 text-xs">Chỉnh sửa</span>
+                          </button>
+                          <button className="flex items-center justify-between w-full bg-[#1E1E1E] p-4 rounded-xl border border-white/5 hover:border-blue-500/30 transition-all">
+                              <span className="flex items-center gap-3 text-sm font-medium"><BellRing size={20} className="text-yellow-500"/> Cài đặt thông báo</span>
+                          </button>
+                          <button onClick={handleLogout} className="flex items-center justify-center w-full bg-red-900/10 text-red-500 p-4 rounded-xl border border-red-500/10 hover:bg-red-500/20 transition-all mt-4 font-bold text-sm gap-2">
+                              <LogOut size={18} /> Đăng xuất
+                          </button>
+                      </div>
+                  </div>
+              ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-600">
+                      <Compass size={64} strokeWidth={1} className="mb-4 opacity-20"/>
+                      <p className="text-sm font-light tracking-wide">Tính năng đang phát triển</p>
+                  </div>
+              )}
           </div>
+
+          {/* 🟢 MOBILE FOOTER (Minimalist, No Labels) */}
+          <footer className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#1E1E1E]/95 backdrop-blur-md border-t border-white/5 flex justify-around items-center z-50 pb-safe">
+              {[
+                  { id: 'message', icon: MessageCircle },
+                  { id: 'contact', icon: UsersRound },
+                  { id: 'apps', icon: Compass },
+                  { id: 'diary', icon: Clock },
+                  { id: 'me', icon: UserCircle },
+              ].map((item) => (
+                  <button 
+                    key={item.id} 
+                    onClick={() => setActiveTab(item.id)}
+                    className="flex items-center justify-center w-full h-full relative group"
+                  >
+                      {/* Active Indicator (Glow) */}
+                      {activeTab === item.id && (
+                          <div className="absolute inset-0 bg-blue-500/5 blur-xl rounded-full"></div>
+                      )}
+                      
+                      <item.icon 
+                        size={24} 
+                        strokeWidth={activeTab === item.id ? 2 : 1.5} 
+                        className={`transition-all duration-300 ${activeTab === item.id ? 'text-[#0068FF] scale-110' : 'text-gray-500'}`}
+                      />
+                  </button>
+              ))}
+          </footer>
       </div>
 
-      {/* D. MOBILE BOTTOM NAV (Chỉ hiện trên Mobile) */}
-      <MobileBottomNav onAddModule={() => setShowAddModal(true)} />
-
-      {/* Admin Badge (Chỉ Desktop) */}
-      {isAdmin && (
-          <div className="hidden md:flex fixed bottom-6 right-6 z-50 items-center gap-2 px-4 py-2 bg-[#1A1A1A] border border-white/10 rounded-full text-xs font-bold text-gray-400 shadow-2xl backdrop-blur-md">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-              <span>Admin Mode</span>
-              {isSaving && <span className="text-yellow-500 flex items-center gap-1 ml-2"><Loader2 className="animate-spin" size={12} /> Saving...</span>}
+      <ModalTaoModule isOpen={showAddModal} onClose={() => { setShowAddModal(false); setEditingModule(undefined); }} onCreate={handleCreateModule} initialData={editingModule} />
+      
+      {isAdmin && isSaving && (
+          <div className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-[60] bg-[#1E1E1E] border border-white/10 text-gray-300 px-4 py-2 rounded-full text-xs flex items-center gap-2 shadow-2xl">
+              <Loader2 className="animate-spin text-blue-500" size={14}/> Saving changes...
           </div>
       )}
-
-      {/* Modal */}
-      <ModalTaoModule 
-          isOpen={showAddModal} 
-          onClose={() => { setShowAddModal(false); setEditingModule(undefined); }}
-          onCreate={handleCreateModule}
-          initialData={editingModule} 
-      />
     </div>
   );
 }
