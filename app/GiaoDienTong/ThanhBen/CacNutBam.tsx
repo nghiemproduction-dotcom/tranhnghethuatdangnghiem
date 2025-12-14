@@ -33,7 +33,7 @@ export default function CacNutBam({ onClose }: Props) {
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto py-6 px-3 space-y-1 custom-scrollbar select-none">
+    <div className="flex-1 overflow-y-auto py-6 px-3 space-y-1   select-none">
       
      
 

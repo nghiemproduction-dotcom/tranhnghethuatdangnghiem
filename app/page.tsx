@@ -13,34 +13,53 @@ export default function TrangChaoMung() {
   const [hienPopupLogin, setHienPopupLogin] = useState(false);
 
   const baseUrl = SUPABASE_URL ? BASE_IMG_URL : '';
-  const bgMobile = `${baseUrl}/login-mobile.jpg`;
-  const bgTablet = `${baseUrl}/login-tablet.jpg`;
-  const bgDesktop = `${baseUrl}/login-desktop.jpg`;
+  
+  // 🟢 THÊM: ?v=1 để ép điện thoại tải ảnh mới, tránh việc nó nhớ cái ảnh lỗi cũ trong bộ nhớ đệm
+  const bgMobile = `${baseUrl}/login-mobile.jpg?v=1`;
+  const bgTablet = `${baseUrl}/login-tablet.jpg?v=1`;
+  const bgDesktop = `${baseUrl}/login-desktop.jpg?v=1`;
 
   return (
-    <div className="relative h-[100dvh] w-full bg-[#050505] text-[#F5F5F5] overflow-hidden font-sans">
+    <div className="relative h-[100dvh] w-full bg-[#050505] text-[#F5F5F5] overflow-hidden font-sans flex flex-col">
       
-      {/* 1. LAYER NỀN */}
-      <div className="absolute inset-0 w-full h-full z-0 pointer-events-none">
+      {/* 1. LAYER NỀN (SỬ DỤNG THẺ IMG THAY VÌ BACKGROUND CSS) */}
+      <div className="absolute inset-0 w-full h-full z-0 pointer-events-none select-none">
           {SUPABASE_URL && (
             <>
-              <div className="absolute inset-0 bg-cover bg-center bg-no-repeat md:hidden transition-opacity duration-1000" style={{ backgroundImage: `url('${bgMobile}')` }} />
-              <div className="absolute inset-0 bg-cover bg-center bg-no-repeat hidden md:block lg:hidden transition-opacity duration-1000" style={{ backgroundImage: `url('${bgTablet}')` }} />
-              <div className="absolute inset-0 bg-cover bg-center bg-no-repeat hidden lg:block transition-opacity duration-1000" style={{ backgroundImage: `url('${bgDesktop}')` }} />
+              {/* 🟢 1. Ảnh Mobile (Chỉ hiện khi màn hình nhỏ) */}
+              <img 
+                src={bgMobile} 
+                alt="Background Mobile"
+                className="absolute inset-0 w-full h-full object-cover md:hidden"
+                loading="eager" // Bắt buộc tải ngay lập tức
+              />
+
+              {/* 🟢 2. Ảnh Tablet */}
+              <img 
+                className="absolute inset-0 w-full h-full object-cover hidden md:block lg:hidden"
+               loading="eager"
+              />
+
+              {/* 🟢 3. Ảnh Desktop */}
+              <img 
+                src={bgDesktop} 
+                alt="Background Desktop"
+                className="absolute inset-0 w-full h-full object-cover hidden lg:block"
+                loading="eager"
+              />
             </>
           )}
           
-          {/* 🟢 SỬA: GRADIENT LAN TỎA (DƯỚI ĐẬM - TRÊN NHẠT) */}
-          {/* from-black (100% đen ở đáy) -> via-black/60 (60% đen ở giữa) -> to-transparent (trong suốt ở đỉnh) */}
+          {/* Lớp phủ Gradient (Dưới đậm - Trên nhạt) */}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
       </div>
 
       <GoogleDich />
 
-      {/* 2. CONTAINER NỘI DUNG (CHIẾM ĐÚNG 50% CHIỀU CAO DƯỚI) */}
+      {/* 2. CONTAINER NỘI DUNG (CHIẾM 50% DƯỚI) */}
       <div className="absolute bottom-0 left-0 w-full h-[55%] flex flex-col justify-end items-center pb-6 md:pb-10 px-4 z-10 animate-fade-in-up">
             
-            {/* CỤM CHỮ (Dồn xuống sát nút bấm) */}
+            {/* CỤM CHỮ */}
             <div className="text-center space-y-3 md:space-y-4 mb-6 md:mb-8">
                 <div className="flex items-center justify-center gap-2 text-[10px] md:text-xs font-bold tracking-[0.3em] text-white uppercase mb-1 drop-shadow-md">
                     <MapPin size={12} className="text-yellow-500" />
@@ -67,7 +86,7 @@ export default function TrangChaoMung() {
                 </div>
             </div>
 
-            {/* CỤM NÚT BẤM (Nằm sát đáy container) */}
+            {/* CỤM NÚT BẤM */}
             <div className="flex flex-row items-center justify-center gap-4 md:gap-16 w-full mb-2">
                 
                 {/* Nút KHÁCH */}
@@ -81,7 +100,6 @@ export default function TrangChaoMung() {
                     </div>
                 </Link>
 
-                {/* Gạch dọc */}
                 <div className="w-[1px] h-8 md:h-10 bg-white/20" />
 
                 {/* Nút NỘI BỘ */}
@@ -110,7 +128,7 @@ export default function TrangChaoMung() {
             0% { opacity: 0; transform: translateY(20px); } 
             100% { opacity: 1; transform: translateY(0); } 
         }
-        .animate-fade-in-up { animation: fade-in-up 1s ease-out forwards; }
+        .animate-fade-in-up { animation: fade-in-up 1.5s ease-out forwards; }
 
         .super-text-shadow {
             text-shadow: 
