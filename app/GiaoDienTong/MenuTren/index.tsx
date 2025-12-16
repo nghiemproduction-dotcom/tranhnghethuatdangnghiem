@@ -1,12 +1,21 @@
 'use client';
+
 import React from 'react';
+import { usePathname } from 'next/navigation'; // 🟢 1. Import hook đường dẫn
 import { Search, MessageCircle, Bell, PlusCircle, Menu as MenuIcon } from 'lucide-react';
 import NutIcon from './NutIcon';
 
 export default function MenuTren({ currentUser }: { currentUser: any }) {
+  const pathname = usePathname(); // 🟢 2. Lấy đường dẫn hiện tại
+
+  // 🟢 3. Nếu là trang chủ ('/') thì ẩn luôn
+  if (pathname === '/') {
+    return null;
+  }
+
   return (
     // Mobile: cao 64px (h-16). Desktop: cao 48px (md:h-12)
-    <header className="sticky top-0 z-[999] bg-[#1A1A1A] border-b border-white/10 h-16 md:h-12 px-4 md:px-6 flex items-center justify-between shadow-lg transition-all">
+    <header className="sticky top-0 z-[900] bg-[#1A1A1A] border-b border-white/10 h-16 md:h-12 px-4 md:px-6 flex items-center justify-between shadow-lg transition-all">
       
       {/* 1. LOGO & TÊN (Bên trái) */}
       <div className="flex items-center gap-3">

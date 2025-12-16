@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { Star, MapPin, ArrowRight } from 'lucide-react'; 
-import CongDangNhap from '@/app/GiaoDienTong/CongDangNhap/CongDangNhap';
+import CongDangNhap from '@/app/CongDangNhap/CongDangNhap';
 import GoogleDich from '@/app/ThuVien/GoogleDich'; 
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;

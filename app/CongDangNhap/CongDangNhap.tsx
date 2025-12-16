@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '../../ThuVien/ketNoiSupabase'; 
+import { supabase } from '../ThuVien/ketNoiSupabase'; 
 import { X } from 'lucide-react';
 
 import NenHieuUng from './NenHieuUng';
