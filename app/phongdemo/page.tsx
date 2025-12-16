@@ -2,5 +2,6 @@
 import DashboardBuilder from '@/app/GiaoDienTong/DashboardBuilder';
 
 export default function PhongDemo() {
-  return <DashboardBuilder />;
+  // 🟢 THÊM pageId="demo" VÀO ĐÂY
+  return <DashboardBuilder pageId="demo" />;
 }
