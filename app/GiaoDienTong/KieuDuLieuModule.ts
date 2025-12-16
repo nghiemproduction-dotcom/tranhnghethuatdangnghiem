@@ -5,17 +5,22 @@ export interface CotHienThi {
   hienThiList: boolean; 
   hienThiDetail: boolean; 
   
-  // 🟢 THÊM MỚI: Ràng buộc dữ liệu
+  // 🟢 LEVEL 3: Ràng buộc dữ liệu (Validation)
   batBuoc?: boolean; // Bắt buộc nhập (Not Null)
-  tuDong?: boolean;  // Tự động sinh (VD: id, created_at) -> Ẩn khi thêm mới, Disable khi sửa
+  tuDong?: boolean;  // Tự động sinh (VD: id, created_at) -> Ẩn khi thêm mới
 }
 
 export interface ModuleConfig {
   id: string;
   tenModule: string;  
   bangDuLieu: string; 
+  
+  // Layout
   doRong?: number;    
   doCao?: number;
+  
+  // 🟢 MENU: Phân biệt trang (Trang chủ, Nhân sự,...)
+  page_id?: string; 
 
   // Cấu hình Widget (Level 1)
   viewType?: 'list' | 'chart' | 'stat'; 
@@ -33,6 +38,7 @@ export interface ModuleConfig {
   };
 
   danhSachCot: CotHienThi[];
+  
   version: string;
   updatedAt: string;
 }

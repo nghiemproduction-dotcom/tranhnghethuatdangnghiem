@@ -5,7 +5,6 @@ import { X, ArrowRight, ArrowLeft, Check, Layers } from 'lucide-react';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
 import { ModuleConfig } from '../KieuDuLieuModule';
 
-// Import Steps
 import Buoc1_ChonNguon from './Buoc1_ChonNguon';
 import Buoc2_GiaoDienList from './Buoc2_GiaoDienList';
 import Buoc3_GiaoDienDetail from './Buoc3_GiaoDienDetail';
@@ -14,9 +13,9 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: ModuleConfig) => void;
-  initialConfig?: ModuleConfig | null;
+  initialConfig?: ModuleConfig | null; 
   // 🟢 THÊM PAGE ID
-  pageId: string; 
+  pageId: string;
 }
 
 const defaultNewConfig: Partial<ModuleConfig> = {
@@ -58,16 +57,16 @@ export default function ModalTaoModule({ isOpen, onClose, onSave, initialConfig,
 
        let dbCall;
        if (initialConfig?.id) {
-           // Update
+           // Update: Cập nhật config và đảm bảo page_id đúng
            dbCall = supabase.from('cau_hinh_modules')
                .update({ 
                    config_json: finalConfig, 
                    version: ver,
-                   page_id: pageId // 🟢 Update cả page_id cho chắc
+                   page_id: pageId // 🟢 Lưu page_id
                })
                .eq('module_id', moduleId);
        } else {
-           // Insert mới
+           // Insert: Thêm mới với page_id
            dbCall = supabase.from('cau_hinh_modules')
                .insert({ 
                    module_id: moduleId, 
@@ -90,13 +89,12 @@ export default function ModalTaoModule({ isOpen, onClose, onSave, initialConfig,
     <div className="fixed inset-0 z-[99999] bg-black/95 flex items-center justify-center p-0 md:p-4">
       <div className="w-full max-w-5xl h-[100dvh] md:h-[85vh] bg-[#050505] border-x border-y border-white/10 md:rounded-sm flex flex-col shadow-2xl overflow-hidden">
         
-        {/* HEADER */}
         <div className="h-14 border-b border-white/10 flex items-center justify-between px-4 md:px-6 shrink-0 bg-[#080808]">
           <div className="flex items-center gap-3">
              <Layers size={18} className="text-blue-600"/>
              <div className="flex flex-col">
                  <span className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-widest">
-                    {initialConfig ? 'CHỈNH SỬA MODULE' : 'TẠO MỚI MODULE'}
+                    {initialConfig ? 'CHỈNH SỬA' : 'TẠO MỚI'}
                  </span>
                  <span className="text-[10px] text-blue-500 font-mono">Page: {pageId} • Bước {step}/3</span>
              </div>
@@ -106,19 +104,16 @@ export default function ModalTaoModule({ isOpen, onClose, onSave, initialConfig,
           </button>
         </div>
 
-        {/* PROGRESS BAR */}
         <div className="w-full h-[2px] bg-[#111]">
             <div className="h-full bg-blue-600 transition-all duration-300" style={{ width: `${(step / 3) * 100}%` }}></div>
         </div>
 
-        {/* BODY */}
         <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-dark-scroll bg-black">
           {step === 1 && <Buoc1_ChonNguon config={config as ModuleConfig} setConfig={setConfig} />}
           {step === 2 && <Buoc2_GiaoDienList config={config as ModuleConfig} setConfig={setConfig} />}
           {step === 3 && <Buoc3_GiaoDienDetail config={config as ModuleConfig} setConfig={setConfig} />}
         </div>
 
-        {/* FOOTER */}
         <div className="h-16 border-t border-white/10 bg-[#050505] flex items-center justify-between px-4 md:px-6 shrink-0 safe-area-bottom">
           <button 
             onClick={() => setStep(s => Math.max(1, s - 1))}

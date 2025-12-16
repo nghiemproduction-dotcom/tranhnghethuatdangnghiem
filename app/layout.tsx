@@ -2,13 +2,10 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 
-// Import các thành phần
 import BaoVeLoi from '@/app/components/BaoVeLoi';
 import GlobalCodeEditor from '@/app/components/GlobalCodeEditor';
 
-// 🟢 1. IMPORT MENU DƯỚI & MENU TRÊN
-import MenuDuoi from '@/app/GiaoDienTong/MenuDuoi'; 
-import MenuTren from '@/app/GiaoDienTong/MenuTren'; // 👈 Đã sửa tên đúng với folder
+// ❌ ĐÃ XÓA IMPORT MenuDuoi và MenuTren KHỎI ĐÂY
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -26,18 +23,10 @@ export default function RootLayout({
     <html lang="vi">
       <body className={inter.className}>
         
-        {/* 🟢 2. HIỂN THỊ MENU TRÊN (HEADER) */}
-        {/* Truyền tạm null, sau này có logic đăng nhập sẽ truyền user thật vào */}
-        <MenuTren currentUser={null} />
-
         <BaoVeLoi>
             {children}
         </BaoVeLoi>
 
-        {/* 🟢 3. HIỂN THỊ MENU DƯỚI */}
-        <MenuDuoi />
-
-        {/* Trình sửa code */}
         <GlobalCodeEditor />
         
       </body>
