@@ -7,9 +7,7 @@ import { supabase } from '../ThuVien/ketNoiSupabase';
 import { Loader2 } from 'lucide-react';
 
 // --- IMPORT TỪ FOLDER MỚI (Nó sẽ tự tìm file index.tsx) ---
-import MenuTren from './MenuTren'; 
-import MenuDuoi from './MenuDuoi'; 
-
+ 
 const ADMIN_CUNG = {
     id: 'hardcode_tommy_vip',
     email: 'admin@artspace.vn', 
@@ -22,7 +20,7 @@ const ADMIN_CUNG = {
 export default function KhungGiaoDienTong({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isLoading, setIsLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [  setCurrentUser] = useState<any>(null);
 
   // Danh sách trang login/public
   const cacTrangCongKhai = ['/GiaoDienTong/CongDangNhap', '/phongtrungbay'];
@@ -47,8 +45,7 @@ export default function KhungGiaoDienTong({ children }: { children: React.ReactN
   return (
     <div className="flex flex-col min-h-screen bg-[#0a0a0a] text-gray-200 font-sans relative">
         
-        {/* 1. MENU TRÊN (HEADER) */}
-        <MenuTren currentUser={currentUser} />
+    
 
         {/* 2. NỘI DUNG CHÍNH */}
         {/* pb-20 là đủ cho menu 60px + khoảng hở */}
@@ -56,9 +53,7 @@ export default function KhungGiaoDienTong({ children }: { children: React.ReactN
             {children}
         </main>
 
-        {/* 3. MENU DƯỚI (FOOTER) */}
-        <MenuDuoi onAdd={() => console.log('Mở Modal thêm nhanh')} />
-
+     
     </div>
   );
 }
