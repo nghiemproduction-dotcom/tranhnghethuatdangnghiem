@@ -4,8 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import { 
     Save, FileCode, ChevronRight, ChevronDown, 
-    Search, GitGraph, Settings, Menu, Folder, 
-    X, MoreHorizontal, RefreshCw
+    Search,   Settings,  Folder, 
+    X,  RefreshCw
 } from 'lucide-react';
 
 // --- TYPES & HELPER (Giữ nguyên logic Tree View xịn xò cũ) ---

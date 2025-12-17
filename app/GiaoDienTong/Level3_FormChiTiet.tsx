@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Save, Trash2, Check, AlertCircle, Calendar, Hash, Type, Loader2, Upload, ImageIcon, Phone } from 'lucide-react';
+import { X, Save, Trash2, AlertCircle,  Hash,   Loader2, Upload, ImageIcon, Phone } from 'lucide-react';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
 import { ModuleConfig } from './KieuDuLieuModule';
 
@@ -83,7 +83,7 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
 
             // 2. Upload lên Supabase Storage bucket 'images'
             const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-            const { data, error } = await supabase.storage.from('images').upload(fileName, compressedFile);
+            const {   error } = await supabase.storage.from('images').upload(fileName, compressedFile);
             
             if (error) throw error;
 
@@ -266,7 +266,7 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
 
                             return (
                                 <div key={col.key} className={col.key.includes('mo_ta') ? 'md:col-span-2' : ''}>
-                                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 ml-1 flex justify-between">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 ml-1 flex justify-between">
                                         <span>{col.label || col.key}</span>
                                         {col.batBuoc && <span className="text-red-500 text-[9px]">*Bắt buộc</span>}
                                     </label>
