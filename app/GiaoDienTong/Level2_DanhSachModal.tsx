@@ -3,9 +3,9 @@
 import React, { useEffect, useState } from 'react';
 // 🟢 THÊM ICON Users, RefreshCw
 import { 
-    X, Plus, Search, Edit, Trash2, Loader2, 
+    X, Plus, Search, Edit, Loader2, 
     LayoutGrid, Table as IconTable, Kanban as IconKanban, 
-    ChevronLeft, ChevronRight, Settings2, MoreHorizontal, ImageIcon, Users, RefreshCw
+    ChevronLeft, ChevronRight, Settings2, MoreHorizontal, ImageIcon, RefreshCw
 } from 'lucide-react';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
 import { ModuleConfig } from './KieuDuLieuModule';

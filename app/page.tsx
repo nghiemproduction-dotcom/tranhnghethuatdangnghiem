@@ -16,7 +16,7 @@ export default function TrangChaoMung() {
   
   // 🟢 THÊM: ?v=1 để ép điện thoại tải ảnh mới, tránh việc nó nhớ cái ảnh lỗi cũ trong bộ nhớ đệm
   const bgMobile = `${baseUrl}/login-mobile.jpg?v=1`;
-  const bgTablet = `${baseUrl}/login-tablet.jpg?v=1`;
+ 
   const bgDesktop = `${baseUrl}/login-desktop.jpg?v=1`;
 
   return (
