@@ -14,11 +14,7 @@ interface Props {
   isAdmin: boolean;
   onDelete: () => void;
   onEdit: () => void;
-  
-  // 🟢 SỬA 1: Đổi tên thành onResize để khớp với các file cha
-  onResize: (delta: number) => void; 
-  
-  // 🟢 SỬA 2: Thêm tabletSpan vào interface để GridSection không báo lỗi
+  onResize: (delta: number) => void; // Đã đổi tên đúng
   tabletSpan?: number;
 }
 
@@ -35,24 +31,22 @@ export default function ModuleItem({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   
   const currentHeightSpan = data.doCao || 5;
-  
-  // Ưu tiên dùng tabletSpan (tính toán từ lưới) nếu có, nếu không thì dùng mặc định
-  const finalSpan = tabletSpan || data.doRong || 1;
+  // Ưu tiên dùng tabletSpan từ Grid truyền vào, nếu không có thì dùng doRong của module
+  const desktopSpan = tabletSpan || data.doRong || 1;
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     
-    // ❌ QUAN TRỌNG: BỎ gridColumn Ở ĐÂY ĐỂ CSS XỬ LÝ (Responsive)
-    // gridColumn: ... (Đã xóa)
+    // ❌ QUAN TRỌNG: ĐÃ XÓA gridColumn Ở ĐÂY ĐỂ KHÔNG BỊ CƯỠNG CHẾ TRÊN MOBILE
     
     gridRow: `span ${currentHeightSpan}`,
     height: '100%',
     zIndex: isDragging ? 50 : 'auto',
     opacity: isDragging ? 0.5 : 1,
     
-    // 🟢 Truyền biến CSS để style jsx sử dụng
-    '--desktop-span': finalSpan,
+    // 🟢 MẸO: Truyền độ rộng mong muốn vào biến CSS
+    '--desktop-span': desktopSpan,
   } as React.CSSProperties;
 
   return (
@@ -62,14 +56,14 @@ export default function ModuleItem({
         style={style} 
         className="module-item relative flex flex-col bg-black border-r border-b border-white/10 group/module hover:z-10 hover:shadow-[0_0_40px_rgba(255,255,255,0.05)] transition-all duration-200"
       >
-        {/* 🟢 CSS RESPONSIVE: Mobile 1 cột, Tablet trở lên dùng span tính toán */}
+        {/* 🟢 LOGIC RESPONSIVE THỰC SỰ */}
         <style jsx>{`
             /* Mặc định (Mobile): Luôn chiếm 1 cột (Full width) */
-            .module-item { grid-column: span 1; }
+            .module-item { grid-column: span 1 !important; } 
             
             /* Tablet & PC (từ 768px trở lên): Mới dùng độ rộng cấu hình */
             @media (min-width: 768px) {
-                .module-item { grid-column: span var(--desktop-span); }
+                .module-item { grid-column: span var(--desktop-span) !important; }
             }
         `}</style>
 
