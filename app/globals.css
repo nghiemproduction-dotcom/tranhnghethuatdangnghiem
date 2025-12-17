@@ -14,7 +14,7 @@ html {
 /* Trên màn hình lớn hơn (Tablet/PC), ta có thể cho to hơn nữa */
 @media (min-width: 768px) {
   html {
-    font-size: 150%; /* Tương đương 20px */
+    font-size: 170%; /* Tương đương 20px */
   }
 }
 
@@ -31,7 +31,7 @@ body {
   /* Làm chữ đậm hơn một chút để dễ đọc (Bold & Clear) */
   font-weight: 500; 
   /* Tăng độ cao dòng để thoáng mắt */
-  line-height: 1.6;
+  line-height: 1.8;
 }
 
 /* 3. PHÓNG TO ICON (HACK) */
