@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { MessageCircle, BookUser, Clock, User, LayoutGrid } from 'lucide-react';
 import NutMenu from '../NutMenu';
 
-export default function MenuDuoi({ onAdd }: any) {
+export default function MenuDuoi({ }: any) {
   const pathname = usePathname();
 
   // Menu Zalo Darkmode chuẩn
