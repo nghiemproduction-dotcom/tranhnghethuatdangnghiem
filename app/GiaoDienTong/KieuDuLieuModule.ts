@@ -19,6 +19,10 @@ export interface ModuleConfig {
   doRong?: number;    
   doCao?: number;
   
+  // 🟢 THÊM MỚI: Định danh hàng (Hỗ trợ giao diện dòng)
+  rowId?: string;      // ID của hàng mà module này thuộc về
+  rowHeight?: number;  // Chiều cao của hàng đó (px)
+  
   // 🟢 MENU: Phân biệt trang (Trang chủ, Nhân sự,...)
   page_id?: string; 
 

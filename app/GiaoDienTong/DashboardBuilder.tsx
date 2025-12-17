@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-// 🟢 SỬA DÒNG NÀY: Bỏ Bell, MessageCircle đi
-import { Plus, Search, QrCode, X, Loader2 } from 'lucide-react'; 
+// 🟢 SỬA 1: Thay CloudCheck bằng Check, thêm lại các icon cần thiết
+import { Plus, Search, QrCode, X, Loader2, ArrowUpDown, PlusCircle, Trash2, GripHorizontal, Check, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
 import { ModuleConfig } from './KieuDuLieuModule';
 import ModuleItem from './ModuleItem';
@@ -17,19 +17,15 @@ interface Props {
 }
 
 export default function DashboardBuilder({ pageId = 'home' }: Props) {
-    // ... (Phần code còn lại giữ nguyên không đổi) ...
-    // ... Copy nội dung cũ vào đây hoặc giữ nguyên file cũ, chỉ sửa dòng import trên cùng thôi ...
-    
-    // ĐỂ TIẾT KIỆM THỜI GIAN CỦA BẠN:
-    // Bạn chỉ cần mở file này lên, tìm dòng "import ... from 'lucide-react'"
-    // Xóa chữ "Bell," và "MessageCircle," đi là được.
-    
-    // Sau đó lưu lại.
-    
-    const [globalConfig] = useState({ tabletCols: 4, baseRowHeight: 50 });
     const [modules, setModules] = useState<ModuleConfig[]>([]);
+    
+    // Config & State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingModule, setEditingModule] = useState<ModuleConfig | null>(null);
+    const [activeRowId, setActiveRowId] = useState<string | null>(null);
+    const [isAdmin, setIsAdmin] = useState(false);
+
+    // Search & Detail
     const [searchTerm, setSearchTerm] = useState('');
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [isSearching, setIsSearching] = useState(false);
@@ -38,19 +34,40 @@ export default function DashboardBuilder({ pageId = 'home' }: Props) {
     const [detailItem, setDetailItem] = useState<any>(null);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
     const [detailConfig, setDetailConfig] = useState<ModuleConfig | any>(null);
+
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(KeyboardSensor));
 
+    // CHECK QUYỀN
+    const checkUserRole = () => {
+        if (typeof window === 'undefined') return;
+        const laAdminCung = localStorage.getItem('LA_ADMIN_CUNG') === 'true';
+        if (laAdminCung) { setIsAdmin(true); return; }
+
+        const rawRole = localStorage.getItem('USER_ROLE') || '';
+        const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, "");
+        const normalizedRole = normalize(rawRole);
+        const allowedRoles = ['admin', 'quanly', 'manager', 'sep', 'boss'];
+
+        setIsAdmin(allowedRoles.includes(normalizedRole));
+    };
+
+    // LOAD DATA
     useEffect(() => {
+        checkUserRole();
         const load = async () => {
             const { data } = await supabase.from('cau_hinh_modules').select('*').eq('page_id', pageId).order('created_at', { ascending: true });
             if (data) setModules(data.map((row: any) => ({ ...row.config_json, id: row.module_id })));
         };
         load();
-        const handleClickOutside = (event: any) => { if (searchRef.current && !searchRef.current.contains(event.target)) setShowDropdown(false); };
+        
+        const handleClickOutside = (event: any) => {
+            if (searchRef.current && !searchRef.current.contains(event.target)) setShowDropdown(false);
+        };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [pageId]);
 
+    // SEARCH LOGIC
     useEffect(() => {
         const delayDebounce = setTimeout(async () => {
             if (searchTerm.length < 2) { setSearchResults([]); return; }
@@ -63,7 +80,9 @@ export default function DashboardBuilder({ pageId = 'home' }: Props) {
         return () => clearTimeout(delayDebounce);
     }, [searchTerm]);
 
+    // 🟢 SỬA 2: THÊM LẠI HÀM handleResultClick ĐỂ KHÔNG BỊ LỖI
     const handleResultClick = (item: any) => {
+        // Config giả lập để xem chi tiết
         const fakeConfig: ModuleConfig = {
             id: 'search_view', tenModule: 'Thông tin chi tiết', bangDuLieu: 'nhan_su', version: '1', updatedAt: '', 
             danhSachCot: [
@@ -74,10 +93,96 @@ export default function DashboardBuilder({ pageId = 'home' }: Props) {
                 { key: 'vi_tri', label: 'Vị trí', kieuDuLieu: 'text', hienThiList: true, hienThiDetail: true },
             ]
         };
-        setDetailConfig(fakeConfig); setDetailItem(item); setIsDetailOpen(true); setShowDropdown(false);
+        setDetailConfig(fakeConfig);
+        setDetailItem(item);
+        setIsDetailOpen(true);
+        setShowDropdown(false);
+    };
+
+    // --- LOGIC HÀNG (ROWS) ---
+    const rows: Record<string, ModuleConfig[]> = {};
+    const rowHeights: Record<string, number> = {};
+    const uniqueRowIds = Array.from(new Set(modules.map(m => m.rowId || 'default')));
+    
+    uniqueRowIds.forEach(rid => {
+        rows[rid] = modules.filter(m => (m.rowId || 'default') === rid);
+        rowHeights[rid] = rows[rid][0]?.rowHeight || 250;
+    });
+
+    const handleCreateNewRow = () => {
+        if (!isAdmin) return;
+        const newRowId = `row_${Date.now()}`;
+        setActiveRowId(newRowId);
+        setEditingModule(null);
+        setIsModalOpen(true);
+    };
+
+    const handleAddToExistingRow = (rowId: string) => {
+        if (!isAdmin) return;
+        setActiveRowId(rowId);
+        setEditingModule(null);
+        setIsModalOpen(true);
+    };
+
+    const handleSaveModule = async (config: ModuleConfig) => {
+        if (!isAdmin) return;
+        let updatedModules = [...modules];
+        const idx = modules.findIndex(m => m.id === config.id);
+        const targetRowId = idx >= 0 ? (config.rowId || 'default') : (activeRowId || 'default');
+        const currentHeight = rowHeights[targetRowId] || 250;
+
+        const newConfig = { 
+            ...config, 
+            rowId: targetRowId,
+            rowHeight: currentHeight,
+            doRong: config.doRong || 1,
+            page_id: pageId
+        };
+
+        if (idx >= 0) updatedModules[idx] = newConfig;
+        else updatedModules.push(newConfig);
+        
+        setModules(updatedModules);
+        setActiveRowId(null);
+
+        const { error } = await supabase.from('cau_hinh_modules').upsert({ module_id: newConfig.id, page_id: pageId, config_json: newConfig });
+        if (error) console.error("Lỗi lưu Supabase:", error);
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!isAdmin) return;
+        if(!confirm('Xóa module này?')) return;
+        setModules(prev => prev.filter(m => m.id !== id));
+        await supabase.from('cau_hinh_modules').delete().eq('module_id', id);
+    };
+
+    const handleResizeWidth = (id: string, delta: number) => {
+        if (!isAdmin) return;
+        setModules(prev => prev.map(m => {
+            if (m.id !== id) return m;
+            const newW = Math.max(1, Math.min(2, (m.doRong || 1) + delta));
+            supabase.from('cau_hinh_modules').update({ config_json: { ...m, doRong: newW } }).eq('module_id', id).then();
+            return { ...m, doRong: newW };
+        }));
+    };
+
+    const handleResizeRowHeight = (rowId: string, delta: number) => {
+        if (!isAdmin) return;
+        const currentH = rowHeights[rowId] || 250;
+        const newH = Math.max(150, Math.min(600, currentH + delta));
+        
+        setModules(prev => prev.map(m => {
+            if ((m.rowId || 'default') === rowId) {
+                const updated = { ...m, rowHeight: newH };
+                supabase.from('cau_hinh_modules').update({ config_json: updated }).eq('module_id', m.id).then();
+                return updated;
+            }
+            return m;
+        }));
     };
 
     const handleDragEnd = (event: DragEndEvent) => {
+        if (!isAdmin) return;
         const { active, over } = event;
         if (over && active.id !== over.id) {
             setModules((items) => {
@@ -87,30 +192,12 @@ export default function DashboardBuilder({ pageId = 'home' }: Props) {
             });
         }
     };
-    const handleSaveModule = (config: ModuleConfig) => {
-        setModules(prev => {
-            const idx = prev.findIndex(m => m.id === config.id);
-            const newConfig = { ...config, doCao: config.doCao || 5 };
-            return idx >= 0 ? prev.map((m, i) => i === idx ? newConfig : m) : [...prev, newConfig];
-        });
-    };
-    const handleDelete = async (id: string) => {
-        if(!confirm('Xóa module này?')) return;
-        setModules(prev => prev.filter(m => m.id !== id));
-        await supabase.from('cau_hinh_modules').delete().eq('module_id', id);
-    };
-    const handleResizeHeight = (id: string, delta: number) => {
-        setModules(prev => prev.map(m => {
-            if (m.id !== id) return m;
-            const newH = Math.max(2, Math.min(20, (m.doCao || 5) + delta));
-            supabase.from('cau_hinh_modules').update({ config_json: { ...m, doCao: newH } }).eq('module_id', id);
-            return { ...m, doCao: newH };
-        }));
-    };
 
     return (
-        <div className="min-h-screen bg-[#111111] text-white w-full pb-24 font-sans">
-            <div className="fixed top-0 left-0 right-0 z-[900] bg-[#1A1A1A] h-16 flex items-center justify-between px-3 md:px-4 shadow-md border-b border-white/5 pt-safe transition-all duration-300">
+        <div className="min-h-screen bg-[#111111] text-white w-full pb-32 font-sans">
+            
+            {/* HEADER */}
+            <div className="fixed top-0 left-0 right-0 z-[900] bg-[#1A1A1A] h-16 flex items-center justify-between px-3 md:px-4 shadow-md border-b border-white/5 pt-safe">
                 <div className="flex items-center gap-2 shrink-0 md:w-48">
                     <div className="w-8 h-8 bg-[#3E2723] rounded flex items-center justify-center font-black text-[#A1887F]">AS</div>
                     <span className="font-black text-sm tracking-[0.1em] text-[#C69C6D] uppercase truncate hidden sm:block">NGHIEM'S ART</span>
@@ -140,25 +227,70 @@ export default function DashboardBuilder({ pageId = 'home' }: Props) {
                     </div>
                 </div>
                 <div className="flex items-center justify-end gap-2 md:gap-3 shrink-0 md:w-48 text-gray-400">
-                    <button className="hover:text-white transition-colors" title="Quét QR"><QrCode size={20} strokeWidth={1.5}/></button>
-                    <button onClick={() => { setEditingModule(null); setIsModalOpen(true); }} className="w-8 h-8 rounded-full bg-[#333] hover:bg-[#C69C6D] hover:text-[#1A1A1A] flex items-center justify-center transition-all shadow-sm active:scale-95" title="Thêm Module"><Plus size={20}/></button>
+                    {/* 🟢 NÚT THÔNG BÁO ĐỒNG BỘ (ĐÃ SỬA ICON) */}
+                    {isAdmin && (
+                        <div className="flex items-center gap-1 text-[#4CAF50] bg-[#4CAF50]/10 px-2 py-1 rounded-full border border-[#4CAF50]/20 mr-2 animate-pulse">
+                            <Check size={14} /> 
+                            <span className="text-[9px] font-bold uppercase hidden md:block">Đã lưu</span>
+                        </div>
+                    )}
+                    <button className="hover:text-white transition-colors"><QrCode size={20} strokeWidth={1.5}/></button>
                 </div>
             </div>
-            <div className="pt-20 px-2 md:px-4"> 
+
+            {/* BODY */}
+            <div className="pt-20 px-2 md:px-4 space-y-2"> 
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                    <SortableContext items={modules.map(m => m.id)} strategy={rectSortingStrategy}>
-                        <div className="grid w-full transition-all duration-300 grid-flow-row-dense" style={{ gridTemplateColumns: `repeat(1, 1fr)`, gridAutoRows: `${globalConfig.baseRowHeight}px`, gap: 12 } as React.CSSProperties}>
-                            <style jsx>{` @media (min-width: 768px) { div.grid { grid-template-columns: repeat(${globalConfig.tabletCols}, 1fr) !important; } } `}</style>
-                            {modules.map(mod => (
-                                <ModuleItem key={mod.id} id={mod.id} data={mod} isAdmin={true} onDelete={() => handleDelete(mod.id)} onEdit={() => { setEditingModule(mod); setIsModalOpen(true); }} onResize={(delta: number) => handleResizeHeight(mod.id, delta)}/>
-                            ))}
-                        </div>
-                    </SortableContext>
+                    {uniqueRowIds.map(rowId => {
+                        const rowModules = rows[rowId];
+                        const h = rowHeights[rowId]; 
+                        return (
+                            <div key={rowId} className="relative group/row">
+                                {isAdmin && (
+                                    <div className="absolute -top-7 left-0 right-0 flex justify-between items-center px-1 opacity-0 group-hover/row:opacity-100 transition-opacity z-20">
+                                        <div className="flex items-center gap-2">
+                                            <GripHorizontal size={16} className="text-gray-600 cursor-grab"/>
+                                            <span className="text-[10px] font-bold text-gray-600 uppercase">H: {h}px</span>
+                                        </div>
+                                        <div className="flex items-center gap-1 bg-[#1A1A1A] border border-white/10 rounded-t-lg px-2 py-1 shadow-lg">
+                                            <button onClick={() => handleAddToExistingRow(rowId)} className="p-1 text-blue-500 hover:text-blue-400 hover:bg-white/5 rounded transition-colors" title="Thêm vào hàng này"><Plus size={14} /></button>
+                                            <div className="w-[1px] h-3 bg-white/20 mx-1"></div>
+                                            <button onClick={() => handleResizeRowHeight(rowId, -50)} className="p-1 text-gray-400 hover:text-white hover:bg-white/5 rounded"><ArrowUpDown size={12} className="rotate-45"/></button>
+                                            <button onClick={() => handleResizeRowHeight(rowId, 50)} className="p-1 text-gray-400 hover:text-white hover:bg-white/5 rounded"><ArrowUpDown size={12}/></button>
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="border border-transparent hover:border-white/5 rounded-xl transition-colors">
+                                    <SortableContext items={rowModules.map(m => m.id)} strategy={rectSortingStrategy}>
+                                        <div className="grid w-full transition-all duration-300 grid-flow-row-dense" style={{ gridTemplateColumns: `repeat(1, 1fr)`, gridAutoRows: `${h}px`, gap: '8px' } as React.CSSProperties}>
+                                            <style jsx>{` @media (min-width: 768px) { div.grid { grid-template-columns: repeat(2, 1fr) !important; } } `}</style>
+                                            {rowModules.map(mod => (
+                                                <ModuleItem key={mod.id} id={mod.id} data={mod} isAdmin={isAdmin} onDelete={() => handleDelete(mod.id)} onEdit={() => { setEditingModule(mod); setIsModalOpen(true); }} onResizeWidth={(delta) => handleResizeWidth(mod.id, delta)}/>
+                                            ))}
+                                        </div>
+                                    </SortableContext>
+                                </div>
+                            </div>
+                        );
+                    })}
                 </DndContext>
+
+                {isAdmin && (
+                    <div className="flex justify-center pb-10 pt-4 border-t border-dashed border-white/5">
+                        <button onClick={handleCreateNewRow} className="flex items-center gap-3 px-8 py-3 bg-[#1A1A1A] hover:bg-[#222] border border-white/10 hover:border-[#C69C6D]/50 rounded-full shadow-lg transition-all active:scale-95 group">
+                            <PlusCircle size={20} className="text-[#C69C6D] group-hover:scale-110 transition-transform"/>
+                            <span className="text-xs font-bold text-gray-300 group-hover:text-white uppercase tracking-widest">Tạo Hàng Lưới Mới</span>
+                        </button>
+                    </div>
+                )}
             </div>
+
             <ModalTaoModule isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSaveModule} initialConfig={editingModule} pageId={pageId}/>
-            <MenuDuoi onAdd={() => { setEditingModule(null); setIsModalOpen(true); }} />
-            {isDetailOpen && detailConfig && <Level3_FormChiTiet isOpen={isDetailOpen} onClose={() => setIsDetailOpen(false)} onSuccess={() => {}} config={detailConfig} initialData={detailItem} userRole={'admin'}/>}
+            <MenuDuoi onAdd={isAdmin ? handleCreateNewRow : undefined} /> 
+            
+            {isDetailOpen && detailConfig && (
+                <Level3_FormChiTiet isOpen={isDetailOpen} onClose={() => setIsDetailOpen(false)} onSuccess={() => {}} config={detailConfig} initialData={detailItem} userRole={isAdmin ? 'admin' : 'user'}/>
+            )}
         </div>
     );
 }
