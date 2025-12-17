@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -9,7 +8,8 @@ const BASE_IMG_URL = `${SUPABASE_URL}/storage/v1/object/public/hinh-nen`;
 
 export default function KhungUngDungMobile({ children }: { children: React.ReactNode }) {
   const [bgImage, setBgImage] = useState('');
-  const [isMobile, setIsMobile] = useState(false);
+  
+  // 🟢 ĐÃ XÓA: const [isMobile, setIsMobile] = useState(false); (Vì không dùng)
 
   useEffect(() => {
     // Hàm này chạy ngay khi web vừa load để quyết định ảnh nền
@@ -19,15 +19,15 @@ export default function KhungUngDungMobile({ children }: { children: React.React
         
         if (width < 768) {
             // MOBILE
-            setIsMobile(true);
+            // setIsMobile(true); -> Đã xóa
             setBgImage(`${BASE_IMG_URL}/login-mobile.jpg?v=${timeStamp}`);
         } else if (width < 1024) {
             // TABLET
-            setIsMobile(false);
+            // setIsMobile(false); -> Đã xóa
             setBgImage(`${BASE_IMG_URL}/login-tablet.jpg?v=${timeStamp}`);
         } else {
             // DESKTOP
-            setIsMobile(false);
+            // setIsMobile(false); -> Đã xóa
             setBgImage(`${BASE_IMG_URL}/login-desktop.jpg?v=${timeStamp}`);
         }
     };
