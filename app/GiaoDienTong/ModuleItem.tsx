@@ -14,18 +14,34 @@ interface Props {
   isAdmin: boolean;
   onDelete: () => void;
   onEdit: () => void;
-  onResizeHeight: (delta: number) => void;
+  
+  // 🟢 SỬA 1: Đổi tên onResizeHeight -> onResize để khớp với GridSection
+  onResize: (delta: number) => void;
+  
+  // 🟢 SỬA 2: Thêm tabletSpan vào interface
+  tabletSpan?: number; 
 }
 
-export default function ModuleItem({ id, data, isAdmin, onDelete, onEdit, onResizeHeight }: Props) {
+export default function ModuleItem({ 
+    id, 
+    data, 
+    isAdmin, 
+    onDelete, 
+    onEdit, 
+    onResize, // Nhận prop onResize
+    tabletSpan // Nhận prop tabletSpan
+}: Props) {
   const [showLevel2, setShowLevel2] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const currentHeightSpan = data.doCao || 5;
 
+  // 🟢 SỬA 3: Ưu tiên dùng tabletSpan nếu có (để không bị vỡ giao diện)
+  const finalSpan = tabletSpan || data.doRong || 1;
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    gridColumn: `span ${data.doRong || 1}`,
+    gridColumn: `span ${finalSpan}`, // Dùng span đã tính toán
     gridRow: `span ${currentHeightSpan}`,
     height: '100%',
     zIndex: isDragging ? 50 : 'auto',
@@ -43,7 +59,6 @@ export default function ModuleItem({ id, data, isAdmin, onDelete, onEdit, onResi
              <div {...attributes} {...listeners} className="text-gray-500 hover:text-white cursor-grab active:cursor-grabbing p-1">
                 <GripVertical size={16} />
              </div>
-             {/* 🟢 Click vào Tên cũng mở Modal */}
              <div onClick={() => setShowLevel2(true)} className="flex items-center gap-2 font-bold text-[10px] text-gray-400 uppercase tracking-wider truncate cursor-pointer hover:text-blue-400 transition-colors">
                 <Gauge size={12} className="shrink-0"/> 
                 <span className="truncate">{data.tenModule}</span>
@@ -53,8 +68,9 @@ export default function ModuleItem({ id, data, isAdmin, onDelete, onEdit, onResi
           {isAdmin && (
               <div className="flex items-center gap-1 shrink-0 ml-2">
                   <div className="flex flex-col bg-[#151515] rounded border border-white/10 mr-1">
-                    <button onClick={(e) => { e.stopPropagation(); onResizeHeight(-1); }} className="p-0.5 hover:text-white text-gray-500 border-b border-white/10 hover:bg-blue-500/20 h-4 flex items-center justify-center w-6"><ChevronUp size={10}/></button>
-                    <button onClick={(e) => { e.stopPropagation(); onResizeHeight(1); }} className="p-0.5 hover:text-white text-gray-500 hover:bg-blue-500/20 h-4 flex items-center justify-center w-6"><ChevronDown size={10}/></button>
+                    {/* 🟢 SỬA 4: Gọi onResize thay vì onResizeHeight */}
+                    <button onClick={(e) => { e.stopPropagation(); onResize(-1); }} className="p-0.5 hover:text-white text-gray-500 border-b border-white/10 hover:bg-blue-500/20 h-4 flex items-center justify-center w-6"><ChevronUp size={10}/></button>
+                    <button onClick={(e) => { e.stopPropagation(); onResize(1); }} className="p-0.5 hover:text-white text-gray-500 hover:bg-blue-500/20 h-4 flex items-center justify-center w-6"><ChevronDown size={10}/></button>
                   </div>
                   <div className="flex items-center bg-[#151515] rounded border border-white/10">
                     <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-1.5 hover:text-blue-400 text-gray-600 border-r border-white/10"><Settings size={14}/></button>

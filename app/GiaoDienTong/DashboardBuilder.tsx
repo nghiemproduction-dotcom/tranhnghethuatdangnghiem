@@ -130,19 +130,18 @@ export default function DashboardBuilder({ pageId = 'home' }: Props) {
     return (
         <div className="min-h-screen bg-[#111111] text-white w-full pb-24 font-sans">
             
-            {/* 🟢 HEADER CỐ ĐỊNH */}
-            <div className="fixed top-0 left-0 right-0 z-[900] bg-[#1A1A1A] h-16 flex items-center justify-between px-4 shadow-md border-b border-white/5 pt-safe">
+            {/* HEADER CỐ ĐỊNH */}
+            <div className="fixed top-0 left-0 right-0 z-[900] bg-[#1A1A1A] h-16 flex items-center justify-between px-4 shadow-md border-b border-white/5 pt-safe transition-all duration-300">
                 
-                {/* 1. LOGO & TÊN (Bên Trái) */}
+                {/* 1. LOGO & TÊN */}
                 <div className="flex items-center gap-2 w-48 shrink-0">
-                   
-                    {/* Chữ Nâu Vàng như yêu cầu */}
+                    <div className="w-8 h-8 bg-[#3E2723] rounded flex items-center justify-center font-black text-[#A1887F]">AS</div>
                     <span className="font-black text-sm tracking-[0.1em] text-[#C69C6D] uppercase truncate hidden sm:block">
                         NGHIEM'S ART
                     </span>
                 </div>
 
-                {/* 2. THANH TÌM KIẾM (Ở Giữa) */}
+                {/* 2. THANH TÌM KIẾM */}
                 <div className="flex-1 flex justify-center px-4 relative" ref={searchRef}>
                     <div className="w-full max-w-xl relative">
                         <div className="flex items-center gap-2 bg-[#111] rounded-full px-4 py-2 text-sm text-gray-400 group border border-white/5 focus-within:border-[#C69C6D]/50 transition-all shadow-inner">
@@ -162,7 +161,7 @@ export default function DashboardBuilder({ pageId = 'home' }: Props) {
                             )}
                         </div>
 
-                        {/* DROPDOWN KẾT QUẢ (Căn giữa theo thanh tìm kiếm) */}
+                        {/* DROPDOWN KẾT QUẢ */}
                         {showDropdown && (
                             <div className="absolute top-full left-0 right-0 mt-2 bg-[#1A1A1A] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[910] max-h-80 overflow-y-auto custom-hover-scroll">
                                 {searchResults.length > 0 ? (
@@ -190,7 +189,7 @@ export default function DashboardBuilder({ pageId = 'home' }: Props) {
                     </div>
                 </div>
 
-                {/* 3. NÚT CHỨC NĂNG (Bên Phải) */}
+                {/* 3. NÚT CHỨC NĂNG */}
                 <div className="flex items-center justify-end gap-3 w-48 shrink-0 text-gray-400">
                     <button className="hover:text-white transition-colors" title="Quét QR">
                         <QrCode size={20} strokeWidth={1.5}/>
@@ -212,7 +211,16 @@ export default function DashboardBuilder({ pageId = 'home' }: Props) {
                         <div className="grid w-full transition-all duration-300 grid-flow-row-dense" style={{ gridTemplateColumns: `repeat(1, 1fr)`, gridAutoRows: `${globalConfig.baseRowHeight}px`, gap: 12 } as React.CSSProperties}>
                             <style jsx>{` @media (min-width: 768px) { div.grid { grid-template-columns: repeat(${globalConfig.tabletCols}, 1fr) !important; } } `}</style>
                             {modules.map(mod => (
-                                <ModuleItem key={mod.id} id={mod.id} data={mod} isAdmin={true} onDelete={() => handleDelete(mod.id)} onEdit={() => { setEditingModule(mod); setIsModalOpen(true); }} onResizeHeight={(delta) => handleResizeHeight(mod.id, delta)}/>
+                                <ModuleItem 
+                                    key={mod.id} 
+                                    id={mod.id} 
+                                    data={mod} 
+                                    isAdmin={true}
+                                    onDelete={() => handleDelete(mod.id)}
+                                    onEdit={() => { setEditingModule(mod); setIsModalOpen(true); }}
+                                    // 🟢 ĐÃ SỬA LỖI Ở ĐÂY: onResizeHeight -> onResize
+                                    onResize={(delta: number) => handleResizeHeight(mod.id, delta)}
+                                />
                             ))}
                         </div>
                     </SortableContext>
