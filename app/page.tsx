@@ -5,67 +5,117 @@ import Link from 'next/link';
 import { Star, MapPin, ArrowRight } from 'lucide-react'; 
 import CongDangNhap from '@/app/CongDangNhap/CongDangNhap';
 import GoogleDich from '@/app/ThuVien/GoogleDich'; 
-// Import cái bọc mới
-import KhungUngDungMobile from '@/app/components/KhungUngDungMobile';
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const BASE_IMG_URL = `${SUPABASE_URL}/storage/v1/object/public/hinh-nen`;
 
 export default function TrangChaoMung() {
   const [hienPopupLogin, setHienPopupLogin] = useState(false);
 
+  const baseUrl = SUPABASE_URL ? BASE_IMG_URL : '';
+  
+  // 🟢 THÊM: ?v=1 để ép điện thoại tải ảnh mới, tránh việc nó nhớ cái ảnh lỗi cũ trong bộ nhớ đệm
+  const bgMobile = `${baseUrl}/login-mobile.jpg?v=1`;
+  const bgTablet = `${baseUrl}/login-tablet.jpg?v=1`;
+  const bgDesktop = `${baseUrl}/login-desktop.jpg?v=1`;
+
   return (
-    // 🟢 DÙNG CÁI BỌC NÀY ĐỂ KHỐNG CHẾ GIAO DIỆN
-    <KhungUngDungMobile>
+    <div className="relative h-[100dvh] w-full bg-[#050505] text-[#F5F5F5] overflow-hidden font-sans flex flex-col">
       
+      {/* 1. LAYER NỀN (SỬ DỤNG THẺ IMG THAY VÌ BACKGROUND CSS) */}
+      <div className="absolute inset-0 w-full h-full z-0 pointer-events-none select-none">
+          {SUPABASE_URL && (
+            <>
+              {/* 🟢 1. Ảnh Mobile (Chỉ hiện khi màn hình nhỏ) */}
+              <img 
+                src={bgMobile} 
+                alt="Background Mobile"
+                className="absolute inset-0 w-full h-full object-cover md:hidden"
+                loading="eager" // Bắt buộc tải ngay lập tức
+              />
+
+              {/* 🟢 2. Ảnh Tablet */}
+              <img 
+                className="absolute inset-0 w-full h-full object-cover hidden md:block lg:hidden"
+               loading="eager"
+              />
+
+              {/* 🟢 3. Ảnh Desktop */}
+              <img 
+                src={bgDesktop} 
+                alt="Background Desktop"
+                className="absolute inset-0 w-full h-full object-cover hidden lg:block"
+                loading="eager"
+              />
+            </>
+          )}
+          
+          {/* Lớp phủ Gradient (Dưới đậm - Trên nhạt) */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
+      </div>
+
       <GoogleDich />
 
-      {/* PHẦN NỘI DUNG CHỮ & NÚT */}
-      <div className="flex-1 flex flex-col justify-end items-center pb-10 px-4 animate-fade-in-up">
+      {/* 2. CONTAINER NỘI DUNG (CHIẾM 50% DƯỚI) */}
+      <div className="absolute bottom-0 left-0 w-full h-[55%] flex flex-col justify-end items-center pb-6 md:pb-10 px-4 z-10 animate-fade-in-up">
             
-            <div className="text-center space-y-3 mb-8">
-                <div className="flex items-center justify-center gap-2 text-[10px] font-bold tracking-[0.3em] uppercase mb-1 drop-shadow-md text-gray-300">
+            {/* CỤM CHỮ */}
+            <div className="text-center space-y-3 md:space-y-4 mb-6 md:mb-8">
+                <div className="flex items-center justify-center gap-2 text-[10px] md:text-xs font-bold tracking-[0.3em] text-white uppercase mb-1 drop-shadow-md">
                     <MapPin size={12} className="text-yellow-500" />
                     <span>CẦN THƠ / VIỆT NAM</span>
                 </div>
 
-                <div>
-                    <h1 className="text-5xl md:text-7xl font-thin tracking-widest leading-none text-white super-text-shadow">
+                <div className="relative">
+                    <h1 className="text-4xl md:text-7xl font-thin tracking-widest leading-none text-white super-text-shadow">
                         ĐĂNG NGHIÊM
                     </h1>
-                    <p className="text-xl md:text-2xl font-serif italic text-yellow-500 mt-2 tracking-wide font-medium drop-shadow-md">
+                    <p className="text-lg md:text-2xl font-serif italic text-yellow-500 mt-1 tracking-wide font-medium drop-shadow-md">
                         Art Gallery
                     </p>
                 </div>
 
-                <div className="flex flex-col items-center gap-2 mt-2">
-                    <p className="text-xs text-white/80 font-light tracking-wider">
+                <div className="flex flex-col items-center gap-2 mt-1">
+                    <p className="text-xs md:text-sm text-white/90 font-light tracking-wider drop-shadow-sm">
                         Chủ trì bởi Nghệ nhân <strong className="text-white border-b border-yellow-500/50 pb-0.5">Trần Đăng Nghiêm</strong>
                     </p>
-                    <div className="flex items-center gap-1.5 text-[9px] text-yellow-400 font-bold bg-white/10 px-3 py-1 rounded-full backdrop-blur-md shadow-lg border border-white/10">
+                    <div className="flex items-center gap-1.5 text-[9px] md:text-xs text-yellow-400 font-bold bg-white/10 px-3 py-1 rounded-full backdrop-blur-md shadow-lg border border-white/10">
                         <Star size={10} fill="currentColor" />
                         <span>Kỷ lục Tranh gạo ST25 lớn nhất Việt Nam</span>
                     </div>
                 </div>
             </div>
 
-            <div className="flex flex-row items-center justify-center gap-10 w-full mb-4">
-                <Link href="/phongtrungbay" className="group flex flex-col items-center gap-2">
-                    <div className="w-14 h-14 rounded-full flex items-center justify-center bg-white/10 text-white border border-white/30 backdrop-blur-sm shadow-xl">
-                        <ArrowRight size={22} />
+            {/* CỤM NÚT BẤM */}
+            <div className="flex flex-row items-center justify-center gap-4 md:gap-16 w-full mb-2">
+                
+                {/* Nút KHÁCH */}
+                <Link href="/phongtrungbay" className="group flex flex-col items-center gap-2 opacity-90 hover:opacity-100 transition-opacity">
+                    <div className="w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center bg-white/5 text-white group-hover:bg-yellow-500 group-hover:text-black transition-all duration-500 ease-out shadow-lg border border-white/20 hover:border-yellow-400">
+                        <ArrowRight size={20} className="group-hover:-rotate-45 transition-transform duration-500" />
                     </div>
-                    <span className="text-xs font-bold tracking-[0.2em]">THAM QUAN</span>
+                    <div className="flex flex-col items-center">
+                        <span className="text-xs md:text-sm font-bold tracking-[0.2em] text-white group-hover:text-yellow-400 transition-colors drop-shadow-lg">THAM QUAN</span>
+                        <span className="hidden sm:block text-[9px] text-gray-400 font-light mt-0.5 drop-shadow-md">Khách & Đối tác</span>
+                    </div>
                 </Link>
 
-                <div className="w-[1px] h-10 bg-white/20" />
+                <div className="w-[1px] h-8 md:h-10 bg-white/20" />
 
-                <button onClick={() => setHienPopupLogin(true)} className="group flex flex-col items-center gap-2">
-                    <div className="w-14 h-14 rounded-full flex items-center justify-center bg-white text-black shadow-xl">
-                        <ArrowRight size={22} />
+                {/* Nút NỘI BỘ */}
+                <button onClick={() => setHienPopupLogin(true)} className="group flex flex-col items-center gap-2 opacity-90 hover:opacity-100 transition-opacity">
+                    <div className="w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center bg-transparent text-gray-400 group-hover:bg-white group-hover:text-black transition-all duration-500 ease-out shadow-lg border border-white/20 hover:border-white">
+                        <ArrowRight size={20} className="group-hover:-rotate-45 transition-transform duration-500" />
                     </div>
-                    <span className="text-xs font-bold tracking-[0.2em] text-white">NỘI BỘ</span>
+                    <div className="flex flex-col items-center">
+                        <span className="text-xs md:text-sm font-bold tracking-[0.2em] text-gray-400 group-hover:text-white transition-colors drop-shadow-lg">NỘI BỘ</span>
+                        <span className="hidden sm:block text-[9px] text-gray-500 font-light mt-0.5 drop-shadow-md">Nhân sự & Quản lý</span>
+                    </div>
                 </button>
             </div>
             
-            <div className="text-center mt-4 opacity-40">
-                 <p className="text-[8px] tracking-[0.2em] uppercase font-bold text-gray-500">
+            <div className="text-center mt-2 opacity-40">
+                 <p className="text-[8px] tracking-[0.2em] uppercase font-bold text-gray-500 drop-shadow-sm">
                     © {new Date().getFullYear()} DANG NGHIEM ART
                  </p>
             </div>
@@ -74,11 +124,19 @@ export default function TrangChaoMung() {
       <CongDangNhap isOpen={hienPopupLogin} onClose={() => setHienPopupLogin(false)} />
       
       <style jsx global>{`
-        .super-text-shadow { text-shadow: 0 2px 10px rgba(0,0,0,0.8); }
-        .animate-fade-in-up { animation: fade-in 1s ease-out; }
-        @keyframes fade-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-      `}</style>
+        @keyframes fade-in-up { 
+            0% { opacity: 0; transform: translateY(20px); } 
+            100% { opacity: 1; transform: translateY(0); } 
+        }
+        .animate-fade-in-up { animation: fade-in-up 1.5s ease-out forwards; }
 
-    </KhungUngDungMobile>
+        .super-text-shadow {
+            text-shadow: 
+                0 2px 4px rgba(0,0,0,0.9),    
+                0 8px 16px rgba(0,0,0,0.8),   
+                0 0 20px rgba(0,0,0,0.5);     
+        }
+      `}</style>
+    </div>
   );
 }
