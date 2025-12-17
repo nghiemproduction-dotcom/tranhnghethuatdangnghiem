@@ -130,11 +130,11 @@ export default function DashboardBuilder({ pageId = 'home' }: Props) {
     return (
         <div className="min-h-screen bg-[#111111] text-white w-full pb-24 font-sans">
             
-            {/* HEADER CỐ ĐỊNH */}
-            <div className="fixed top-0 left-0 right-0 z-[900] bg-[#1A1A1A] h-16 flex items-center justify-between px-4 shadow-md border-b border-white/5 pt-safe transition-all duration-300">
+            {/* HEADER */}
+            <div className="fixed top-0 left-0 right-0 z-[900] bg-[#1A1A1A] h-16 flex items-center justify-between px-3 md:px-4 shadow-md border-b border-white/5 pt-safe transition-all duration-300">
                 
                 {/* 1. LOGO & TÊN */}
-                <div className="flex items-center gap-2 w-48 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 md:w-48">
                     <div className="w-8 h-8 bg-[#3E2723] rounded flex items-center justify-center font-black text-[#A1887F]">AS</div>
                     <span className="font-black text-sm tracking-[0.1em] text-[#C69C6D] uppercase truncate hidden sm:block">
                         NGHIEM'S ART
@@ -142,22 +142,22 @@ export default function DashboardBuilder({ pageId = 'home' }: Props) {
                 </div>
 
                 {/* 2. THANH TÌM KIẾM */}
-                <div className="flex-1 flex justify-center px-4 relative" ref={searchRef}>
+                <div className="flex-1 flex justify-center px-2 md:px-4 relative" ref={searchRef}>
                     <div className="w-full max-w-xl relative">
-                        <div className="flex items-center gap-2 bg-[#111] rounded-full px-4 py-2 text-sm text-gray-400 group border border-white/5 focus-within:border-[#C69C6D]/50 transition-all shadow-inner">
-                            <Search size={18} className="text-gray-500 group-focus-within:text-[#C69C6D]" />
+                        <div className="flex items-center gap-2 bg-[#111] rounded-full px-3 md:px-4 py-2 text-sm text-gray-400 group border border-white/5 focus-within:border-[#C69C6D]/50 transition-all shadow-inner">
+                            <Search size={18} className="text-gray-500 group-focus-within:text-[#C69C6D] shrink-0" />
                             <input 
                                 type="text" 
                                 placeholder="Tìm kiếm..." 
-                                className="bg-transparent border-none outline-none w-full placeholder-gray-600 text-white text-xs"
+                                className="bg-transparent border-none outline-none w-full placeholder-gray-600 text-white text-xs md:text-sm min-w-[50px]"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 onFocus={() => { if(searchTerm) setShowDropdown(true); }}
                             />
                             {isSearching ? (
-                                <Loader2 size={16} className="animate-spin text-[#C69C6D]"/>
+                                <Loader2 size={16} className="animate-spin text-[#C69C6D] shrink-0"/>
                             ) : searchTerm && (
-                                <button onClick={() => setSearchTerm('')}><X size={16} className="text-gray-500 hover:text-white"/></button>
+                                <button onClick={() => setSearchTerm('')}><X size={16} className="text-gray-500 hover:text-white shrink-0"/></button>
                             )}
                         </div>
 
@@ -174,9 +174,9 @@ export default function DashboardBuilder({ pageId = 'home' }: Props) {
                                                 ) : (
                                                     <div className="w-9 h-9 rounded-full bg-[#3E2723] flex items-center justify-center text-[#C69C6D] font-bold text-xs">{(item.ten_hien_thi || '?').charAt(0)}</div>
                                                 )}
-                                                <div>
-                                                    <div className="text-sm font-bold text-white">{item.ten_hien_thi || 'No Name'}</div>
-                                                    <div className="text-[11px] text-gray-500">{item.sdt || item.vi_tri}</div>
+                                                <div className="min-w-0">
+                                                    <div className="text-sm font-bold text-white truncate">{item.ten_hien_thi || 'No Name'}</div>
+                                                    <div className="text-[11px] text-gray-500 truncate">{item.sdt || item.vi_tri}</div>
                                                 </div>
                                             </div>
                                         ))}
@@ -190,7 +190,7 @@ export default function DashboardBuilder({ pageId = 'home' }: Props) {
                 </div>
 
                 {/* 3. NÚT CHỨC NĂNG */}
-                <div className="flex items-center justify-end gap-3 w-48 shrink-0 text-gray-400">
+                <div className="flex items-center justify-end gap-2 md:gap-3 shrink-0 md:w-48 text-gray-400">
                     <button className="hover:text-white transition-colors" title="Quét QR">
                         <QrCode size={20} strokeWidth={1.5}/>
                     </button>
@@ -208,8 +208,21 @@ export default function DashboardBuilder({ pageId = 'home' }: Props) {
             <div className="pt-20 px-2 md:px-4"> 
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                     <SortableContext items={modules.map(m => m.id)} strategy={rectSortingStrategy}>
-                        <div className="grid w-full transition-all duration-300 grid-flow-row-dense" style={{ gridTemplateColumns: `repeat(1, 1fr)`, gridAutoRows: `${globalConfig.baseRowHeight}px`, gap: 12 } as React.CSSProperties}>
-                            <style jsx>{` @media (min-width: 768px) { div.grid { grid-template-columns: repeat(${globalConfig.tabletCols}, 1fr) !important; } } `}</style>
+                        <div 
+                            className="grid w-full transition-all duration-300 grid-flow-row-dense" 
+                            style={{
+                                gridTemplateColumns: `repeat(1, 1fr)`, // 🟢 Mobile mặc định 1 cột
+                                gridAutoRows: `${globalConfig.baseRowHeight}px`,
+                                gap: 12 
+                            } as React.CSSProperties}
+                        >
+                            {/* 🟢 Tablet trở lên mới chia 4 cột */}
+                            <style jsx>{`
+                                @media (min-width: 768px) {
+                                    div.grid { grid-template-columns: repeat(${globalConfig.tabletCols}, 1fr) !important; }
+                                }
+                            `}</style>
+
                             {modules.map(mod => (
                                 <ModuleItem 
                                     key={mod.id} 
@@ -218,7 +231,6 @@ export default function DashboardBuilder({ pageId = 'home' }: Props) {
                                     isAdmin={true}
                                     onDelete={() => handleDelete(mod.id)}
                                     onEdit={() => { setEditingModule(mod); setIsModalOpen(true); }}
-                                    // 🟢 ĐÃ SỬA LỖI Ở ĐÂY: onResizeHeight -> onResize
                                     onResize={(delta: number) => handleResizeHeight(mod.id, delta)}
                                 />
                             ))}

@@ -15,11 +15,11 @@ interface Props {
   onDelete: () => void;
   onEdit: () => void;
   
-  // 🟢 SỬA 1: Đổi tên onResizeHeight -> onResize để khớp với GridSection
-  onResize: (delta: number) => void;
+  // 🟢 SỬA 1: Đổi tên thành onResize để khớp với các file cha
+  onResize: (delta: number) => void; 
   
-  // 🟢 SỬA 2: Thêm tabletSpan vào interface
-  tabletSpan?: number; 
+  // 🟢 SỬA 2: Thêm tabletSpan vào interface để GridSection không báo lỗi
+  tabletSpan?: number;
 }
 
 export default function ModuleItem({ 
@@ -28,30 +28,50 @@ export default function ModuleItem({
     isAdmin, 
     onDelete, 
     onEdit, 
-    onResize, // Nhận prop onResize
-    tabletSpan // Nhận prop tabletSpan
+    onResize, 
+    tabletSpan 
 }: Props) {
   const [showLevel2, setShowLevel2] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  
   const currentHeightSpan = data.doCao || 5;
-
-  // 🟢 SỬA 3: Ưu tiên dùng tabletSpan nếu có (để không bị vỡ giao diện)
+  
+  // Ưu tiên dùng tabletSpan (tính toán từ lưới) nếu có, nếu không thì dùng mặc định
   const finalSpan = tabletSpan || data.doRong || 1;
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    gridColumn: `span ${finalSpan}`, // Dùng span đã tính toán
+    
+    // ❌ QUAN TRỌNG: BỎ gridColumn Ở ĐÂY ĐỂ CSS XỬ LÝ (Responsive)
+    // gridColumn: ... (Đã xóa)
+    
     gridRow: `span ${currentHeightSpan}`,
     height: '100%',
     zIndex: isDragging ? 50 : 'auto',
     opacity: isDragging ? 0.5 : 1,
-  };
+    
+    // 🟢 Truyền biến CSS để style jsx sử dụng
+    '--desktop-span': finalSpan,
+  } as React.CSSProperties;
 
   return (
     <>
-      <div ref={setNodeRef} style={style} className="relative flex flex-col bg-black border-r border-b border-white/10 group/module hover:z-10 hover:shadow-[0_0_40px_rgba(255,255,255,0.05)] transition-all duration-200">
-        <style jsx>{` @media (max-width: 768px) { div { grid-column: span 1 !important; } } `}</style>
+      <div 
+        ref={setNodeRef} 
+        style={style} 
+        className="module-item relative flex flex-col bg-black border-r border-b border-white/10 group/module hover:z-10 hover:shadow-[0_0_40px_rgba(255,255,255,0.05)] transition-all duration-200"
+      >
+        {/* 🟢 CSS RESPONSIVE: Mobile 1 cột, Tablet trở lên dùng span tính toán */}
+        <style jsx>{`
+            /* Mặc định (Mobile): Luôn chiếm 1 cột (Full width) */
+            .module-item { grid-column: span 1; }
+            
+            /* Tablet & PC (từ 768px trở lên): Mới dùng độ rộng cấu hình */
+            @media (min-width: 768px) {
+                .module-item { grid-column: span var(--desktop-span); }
+            }
+        `}</style>
 
         {/* HEADER */}
         <div className="h-9 px-2 flex items-center justify-between bg-black/60 border-b border-white/5 shrink-0 backdrop-blur-md absolute top-0 left-0 right-0 z-20">
@@ -68,7 +88,6 @@ export default function ModuleItem({
           {isAdmin && (
               <div className="flex items-center gap-1 shrink-0 ml-2">
                   <div className="flex flex-col bg-[#151515] rounded border border-white/10 mr-1">
-                    {/* 🟢 SỬA 4: Gọi onResize thay vì onResizeHeight */}
                     <button onClick={(e) => { e.stopPropagation(); onResize(-1); }} className="p-0.5 hover:text-white text-gray-500 border-b border-white/10 hover:bg-blue-500/20 h-4 flex items-center justify-center w-6"><ChevronUp size={10}/></button>
                     <button onClick={(e) => { e.stopPropagation(); onResize(1); }} className="p-0.5 hover:text-white text-gray-500 hover:bg-blue-500/20 h-4 flex items-center justify-center w-6"><ChevronDown size={10}/></button>
                   </div>

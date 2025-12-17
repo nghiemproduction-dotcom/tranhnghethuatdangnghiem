@@ -16,6 +16,12 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
+    "noImplicitAny": true,         // Báo lỗi ngay nếu biến nào không có kiểu (any)
+    "strictNullChecks": true,      // Kiểm tra kỹ các trường hợp null/undefined
+    "noUnusedLocals": true,        // Báo lỗi nếu khai báo biến mà không dùng (Vercel hay bắt cái này)
+    "noUnusedParameters": true,    // Báo lỗi tham số thừa trong hàm
+
+
     "plugins": [
       {
         "name": "next"
