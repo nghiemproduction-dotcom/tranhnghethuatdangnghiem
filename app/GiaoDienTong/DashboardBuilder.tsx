@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-// 🟢 ĐÃ SỬA: Xóa Trash2 và ShieldCheck khỏi dòng import này
+// 🟢 ĐÃ SỬA: Xóa Trash2, ShieldCheck thừa đi
 import { Plus, Search, QrCode, X, Loader2, ArrowUpDown, PlusCircle, GripHorizontal, Check } from 'lucide-react';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
 import { ModuleConfig } from './KieuDuLieuModule';
@@ -226,7 +226,6 @@ export default function DashboardBuilder({ pageId = 'home' }: Props) {
                     </div>
                 </div>
                 <div className="flex items-center justify-end gap-2 md:gap-3 shrink-0 md:w-48 text-gray-400">
-                    {/* THÔNG BÁO ĐỒNG BỘ */}
                     {isAdmin && (
                         <div className="flex items-center gap-1 text-[#4CAF50] bg-[#4CAF50]/10 px-2 py-1 rounded-full border border-[#4CAF50]/20 mr-2 animate-pulse">
                             <Check size={14} /> 
