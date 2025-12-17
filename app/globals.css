@@ -2,20 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 1. CẤU HÌNH CỠ CHỮ GỐC (ROOT FONT SIZE) */
+/* 🟢 CÔNG THỨC TỰ ĐỘNG CO GIÃN (FLUID TYPOGRAPHY) */
 html {
-  /* Mặc định trình duyệt là 16px. 
-     Ta tăng lên 18px (112.5%) cho Mobile để to rõ hơn mà không vỡ.
-     Đừng để 200% (32px) vì Logo + Ô tìm kiếm sẽ không thể nhét vừa chiều ngang điện thoại.
+  /* Giải thích công thức clamp(MIN, VAL, MAX):
+     1. MIN (100% = 16px): Trên điện thoại, chữ sẽ không bao giờ nhỏ hơn 16px (chuẩn dễ đọc).
+     2. VAL (0.8rem + 0.5vw): Đây là phần "thông minh". Nó lấy 0.8 phần chữ gốc + 0.5% chiều rộng màn hình.
+        -> Màn hình càng rộng, số vw càng lớn -> chữ tự động to lên.
+     3. MAX (130% = ~21px): Trên màn hình tivi hay 4K, chữ cũng chỉ to đến mức này là dừng, không bị vỡ layout.
   */
-  font-size: 150%; /* Tương đương 18px */
-}
-
-/* Trên màn hình lớn hơn (Tablet/PC), ta có thể cho to hơn nữa */
-@media (min-width: 768px) {
-  html {
-    font-size: 170%; /* Tương đương 20px */
-  }
+  font-size: clamp(180%, 0.85rem + 0.5vw, 130%);
 }
 
 /* 2. CẤU HÌNH BODY */
@@ -28,55 +23,41 @@ body {
   color: #ffffff;
   overflow-x: hidden;
   
-  /* Làm chữ đậm hơn một chút để dễ đọc (Bold & Clear) */
-  font-weight: 500; 
-  /* Tăng độ cao dòng để thoáng mắt */
-  line-height: 1.8;
+  font-weight: 400; 
+  line-height: 1.6; /* Tăng khoảng cách dòng một chút để thoáng mắt khi chữ to ra */
 }
 
-/* 3. PHÓNG TO ICON (HACK) */
-/* Vì một số icon Lucide đang set cứng size={number} (pixel), ta dùng CSS để ép nó to ra theo dòng chữ */
+/* 3. TỰ ĐỘNG PHÓNG TO ICON THEO CHỮ (QUAN TRỌNG) */
+/*
+   Thay vì scale(1.5) cố định làm vỡ layout, ta dùng width/height theo 'em'.
+   'em' là đơn vị phụ thuộc vào cỡ chữ hiện tại. 
+   -> Chữ to ra (do clamp ở trên) -> Icon tự động to ra theo tỉ lệ chính xác.
+*/
 svg.lucide {
-  transform: scale(1.5); /* Phóng to icon thêm 20% */
-  transform-origin: center;
+  width: 1.3em;  /* Icon luôn to hơn chữ một chút (1.3 lần) */
+  height: 1.3em;
+  vertical-align: middle; /* Căn giữa icon với dòng chữ */
 }
 
-/* --- CÁC CLASS TIỆN ÍCH KHÁC (GIỮ NGUYÊN) --- */
-
+/* --- THANH CUỘN ĐẸP --- */
 ::-webkit-scrollbar {
-  width: 0px;
-  height: 0px;
-  background: transparent;
+  width: 6px;
+  height: 6px;
 }
-
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+::-webkit-scrollbar-track {
+  background: transparent; 
+}
+::-webkit-scrollbar-thumb {
+  background: #333; 
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #555; 
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
-
-.custom-hover-scroll {
-  overflow: auto;
-}
-
-.custom-hover-scroll::-webkit-scrollbar {
-  width: 6px !important; /* To hơn chút cho dễ bấm */
-  height: 6px !important;
-}
-
-.custom-hover-scroll::-webkit-scrollbar-track {
-  background: transparent; 
-}
-
-.custom-hover-scroll::-webkit-scrollbar-thumb {
-  background: #333;
-  border-radius: 4px;
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
-
-.custom-hover-scroll:hover::-webkit-scrollbar-thumb {
-  background-color: #555; 
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;  
 }

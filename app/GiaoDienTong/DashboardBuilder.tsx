@@ -197,10 +197,8 @@ export default function DashboardBuilder({ pageId = 'home' }: Props) {
             
             {/* HEADER */}
             <div className="fixed top-0 left-0 right-0 z-[900] bg-[#1A1A1A] h-16 flex items-center justify-between px-3 md:px-4 shadow-md border-b border-white/5 pt-safe">
-                <div className="flex items-center gap-2 shrink-0 md:w-48">
-                    <div className="w-8 h-8 bg-[#3E2723] rounded flex items-center justify-center font-black text-[#A1887F]">AS</div>
-                    <span className="font-black text-sm tracking-[0.1em] text-[#C69C6D] uppercase truncate hidden sm:block">NGHIEM'S ART</span>
-                </div>
+                <span className="font-black text-sm tracking-[0.1em] text-[#C69C6D] uppercase truncate hidden sm:block">NGHIEM'S ART</span>
+                                         
                 <div className="flex-1 flex justify-center px-2 md:px-4 relative" ref={searchRef}>
                     <div className="w-full max-w-xl relative">
                         <div className="flex items-center gap-2 bg-[#111] rounded-full px-3 md:px-4 py-2 text-sm text-gray-400 group border border-white/5 focus-within:border-[#C69C6D]/50 transition-all shadow-inner">

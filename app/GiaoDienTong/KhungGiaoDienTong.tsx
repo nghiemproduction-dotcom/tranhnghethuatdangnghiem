@@ -7,7 +7,7 @@ import { supabase } from '../ThuVien/ketNoiSupabase';
 import { Loader2 } from 'lucide-react';
 
 // --- IMPORT TỪ FOLDER MỚI (Nó sẽ tự tìm file index.tsx) ---
-import MenuTren from './MenuTren'; 
+ 
 import MenuDuoi from './MenuDuoi'; 
 
 const ADMIN_CUNG = {
@@ -47,8 +47,7 @@ export default function KhungGiaoDienTong({ children }: { children: React.ReactN
   return (
     <div className="flex flex-col min-h-screen bg-[#0a0a0a] text-gray-200 font-sans relative">
         
-        {/* 1. MENU TRÊN (HEADER) */}
-        <MenuTren currentUser={currentUser} />
+    
 
         {/* 2. NỘI DUNG CHÍNH */}
         {/* pb-20 là đủ cho menu 60px + khoảng hở */}
