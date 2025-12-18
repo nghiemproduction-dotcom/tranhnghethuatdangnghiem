@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-// 🟢 ĐÃ SỬA: Xóa Trash2, ShieldCheck thừa đi
-import { Plus, Search, QrCode, X, Loader2, ArrowUpDown, PlusCircle, GripHorizontal, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, ArrowUpDown, PlusCircle, GripHorizontal, Check, ShieldAlert, Loader2 } from 'lucide-react';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
 import { ModuleConfig } from './KieuDuLieuModule';
 import ModuleItem from './ModuleItem';
@@ -11,26 +10,30 @@ import MenuDuoi from './MenuDuoi';
 import Level3_FormChiTiet from './Level3_FormChiTiet'; 
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
+import { useRouter } from 'next/navigation'; 
 
+// 🟢 NHẬN TÊN PHÒNG TỪ CHA
 interface Props {
-    pageId?: string; 
+    pageId: string; 
+    title: string;
+    allowedRoles: string[]; // VD: ['quanly', 'admin']
 }
 
-export default function DashboardBuilder({ pageId = 'home' }: Props) {
+export default function DashboardBuilder({ pageId, title, allowedRoles }: Props) {
+    const router = useRouter();
     const [modules, setModules] = useState<ModuleConfig[]>([]);
     
-    // Config & State
+    // States
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingModule, setEditingModule] = useState<ModuleConfig | null>(null);
     const [activeRowId, setActiveRowId] = useState<string | null>(null);
-    const [isAdmin, setIsAdmin] = useState(false);
+    
+    // Quyền hạn
+    const [isAdmin, setIsAdmin] = useState(false); 
+    const [hasAccess, setHasAccess] = useState(false);
+    const [isChecking, setIsChecking] = useState(true);
 
-    // Search & Detail
-    const [searchTerm, setSearchTerm] = useState('');
-    const [searchResults, setSearchResults] = useState<any[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
-    const [showDropdown, setShowDropdown] = useState(false);
-    const searchRef = useRef<HTMLDivElement>(null);
+    // Detail State
     const [detailItem, setDetailItem] = useState<any>(null);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
     const [detailConfig, setDetailConfig] = useState<ModuleConfig | any>(null);
@@ -38,65 +41,58 @@ export default function DashboardBuilder({ pageId = 'home' }: Props) {
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(KeyboardSensor));
 
     // CHECK QUYỀN
-    const checkUserRole = () => {
-        if (typeof window === 'undefined') return;
-        const laAdminCung = localStorage.getItem('LA_ADMIN_CUNG') === 'true';
-        if (laAdminCung) { setIsAdmin(true); return; }
-
-        const rawRole = localStorage.getItem('USER_ROLE') || '';
-        const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, "");
-        const normalizedRole = normalize(rawRole);
-        const allowedRoles = ['admin', 'quanly', 'manager', 'sep', 'boss'];
-
-        setIsAdmin(allowedRoles.includes(normalizedRole));
-    };
-
-    // LOAD DATA
     useEffect(() => {
-        checkUserRole();
-        const load = async () => {
-            const { data } = await supabase.from('cau_hinh_modules').select('*').eq('page_id', pageId).order('created_at', { ascending: true });
-            if (data) setModules(data.map((row: any) => ({ ...row.config_json, id: row.module_id })));
-        };
-        load();
-        
-        const handleClickOutside = (event: any) => {
-            if (searchRef.current && !searchRef.current.contains(event.target)) setShowDropdown(false);
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [pageId]);
+        const verifyAccess = () => {
+            setIsChecking(true);
+            if (typeof window === 'undefined') return;
 
-    // SEARCH LOGIC
+            // Lấy role đã chuẩn hóa ("quanly", "admin", "thosanxuat")
+            const currentUserRole = localStorage.getItem('USER_ROLE') || 'khach';
+            const laAdminCung = localStorage.getItem('LA_ADMIN_CUNG') === 'true';
+
+            // 1. Quyền sửa Layout (Admin & Quản lý)
+            // Lưu ý: Role "quanly" (từ "Quản lý") được phép sửa
+            const builderRoles = ['admin', 'adminsystem', 'quanly', 'manager'];
+            const canEditLayout = laAdminCung || builderRoles.some(r => currentUserRole === r || currentUserRole.includes(r));
+            setIsAdmin(canEditLayout);
+
+            // 2. Quyền VÀO phòng này
+            // - Admin hệ thống -> Vào tuốt
+            const isSystemAdmin = currentUserRole.includes('admin') || laAdminCung;
+            
+            // - Hoặc người có role nằm trong danh sách cho phép (allowedRoles)
+            // VD: allowedRoles=['quanly'] mà user='quanly' -> OK
+            const isAllowed = isSystemAdmin || allowedRoles.some(r => currentUserRole.includes(r));
+
+            if (!isAllowed) {
+                alert(`Bạn (${currentUserRole}) không có quyền truy cập khu vực: ${title}`);
+                router.push('/'); 
+            } else {
+                setHasAccess(true);
+            }
+            setIsChecking(false);
+        };
+
+        verifyAccess();
+    }, [pageId, allowedRoles, title, router]);
+
+    // LOAD DỮ LIỆU
     useEffect(() => {
-        const delayDebounce = setTimeout(async () => {
-            if (searchTerm.length < 2) { setSearchResults([]); return; }
-            setIsSearching(true); setShowDropdown(true);
-            try {
-                const { data, error } = await supabase.from('nhan_su').select('*').or(`ten_hien_thi.ilike.%${searchTerm}%,sdt.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`).limit(5);
-                if (!error && data) setSearchResults(data);
-            } catch (error) { console.error(error); } finally { setIsSearching(false); }
-        }, 500);
-        return () => clearTimeout(delayDebounce);
-    }, [searchTerm]);
+        if (!hasAccess) return;
 
-    // CLICK KẾT QUẢ TÌM KIẾM
-    const handleResultClick = (item: any) => {
-        const fakeConfig: ModuleConfig = {
-            id: 'search_view', tenModule: 'Thông tin chi tiết', bangDuLieu: 'nhan_su', version: '1', updatedAt: '', 
-            danhSachCot: [
-                { key: 'hinh_anh', label: 'Ảnh đại diện', kieuDuLieu: 'text', hienThiList: true, hienThiDetail: true },
-                { key: 'ten_hien_thi', label: 'Tên hiển thị', kieuDuLieu: 'text', hienThiList: true, hienThiDetail: true, batBuoc: true },
-                { key: 'sdt', label: 'Số điện thoại', kieuDuLieu: 'text', hienThiList: true, hienThiDetail: true },
-                { key: 'email', label: 'Email', kieuDuLieu: 'text', hienThiList: true, hienThiDetail: true },
-                { key: 'vi_tri', label: 'Vị trí', kieuDuLieu: 'text', hienThiList: true, hienThiDetail: true },
-            ]
+        const loadModules = async () => {
+            const { data } = await supabase
+                .from('cau_hinh_modules')
+                .select('*')
+                .eq('page_id', pageId)
+                .order('created_at', { ascending: true });
+                
+            if (data) {
+                setModules(data.map((row: any) => ({ ...row.config_json, id: row.module_id })));
+            }
         };
-        setDetailConfig(fakeConfig);
-        setDetailItem(item);
-        setIsDetailOpen(true);
-        setShowDropdown(false);
-    };
+        loadModules();
+    }, [pageId, hasAccess]);
 
     // --- LOGIC HÀNG (ROWS) ---
     const rows: Record<string, ModuleConfig[]> = {};
@@ -144,7 +140,11 @@ export default function DashboardBuilder({ pageId = 'home' }: Props) {
         setModules(updatedModules);
         setActiveRowId(null);
 
-        const { error } = await supabase.from('cau_hinh_modules').upsert({ module_id: newConfig.id, page_id: pageId, config_json: newConfig });
+        const { error } = await supabase.from('cau_hinh_modules').upsert({ 
+            module_id: newConfig.id, 
+            page_id: pageId, 
+            config_json: newConfig 
+        });
         if (error) console.error("Lỗi lưu Supabase:", error);
     };
 
@@ -192,46 +192,39 @@ export default function DashboardBuilder({ pageId = 'home' }: Props) {
         }
     };
 
+    if (isChecking) {
+        return <div className="min-h-screen bg-[#111] flex items-center justify-center text-[#C69C6D]"><Loader2 className="animate-spin mr-2"/> Đang tải dữ liệu...</div>;
+    }
+
+    if (!hasAccess) return null;
+
     return (
-        <div className="min-h-screen bg-[#111111] text-white w-full pb-32 font-sans">
+        <div className="min-h-screen bg-[#111111] text-white w-full pb-32 font-sans bg-[url('/noise.png')] bg-repeat opacity-95">
             
             {/* HEADER */}
-            <div className="fixed top-0 left-0 right-0 z-[900] bg-[#1A1A1A] h-16 flex items-center justify-between px-3 md:px-4 shadow-md border-b border-white/5 pt-safe">
-                <span className="font-black text-sm tracking-[0.1em] text-[#C69C6D] uppercase truncate hidden sm:block">NGHIEM'S ART</span>
-                                         
-                <div className="flex-1 flex justify-center px-2 md:px-4 relative" ref={searchRef}>
-                    <div className="w-full max-w-xl relative">
-                        <div className="flex items-center gap-2 bg-[#111] rounded-full px-3 md:px-4 py-2 text-sm text-gray-400 group border border-white/5 focus-within:border-[#C69C6D]/50 transition-all shadow-inner">
-                            <Search size={18} className="text-gray-500 group-focus-within:text-[#C69C6D] shrink-0" />
-                            <input type="text" placeholder="Tìm kiếm..." className="bg-transparent border-none outline-none w-full placeholder-gray-600 text-white text-xs md:text-sm min-w-[50px]" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onFocus={() => { if(searchTerm) setShowDropdown(true); }}/>
-                            {isSearching ? <Loader2 size={16} className="animate-spin text-[#C69C6D] shrink-0"/> : searchTerm && <button onClick={() => setSearchTerm('')}><X size={16} className="text-gray-500 hover:text-white shrink-0"/></button>}
+            <div className="fixed top-0 left-0 right-0 z-[900] h-16 pt-safe flex items-center justify-center pointer-events-none">
+                <div className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/50 to-transparent"></div>
+                <div className="relative w-full max-w-md mx-6 group pointer-events-auto transform hover:scale-[1.02] transition-transform duration-500 ease-out mt-1">
+                    <div className="absolute -inset-1 bg-gradient-to-r from-[#8B5E3C] via-[#C69C6D] to-[#8B5E3C] blur-xl opacity-20 group-hover:opacity-40 transition duration-700 rounded-[20px]"></div>
+                    <div className="relative h-full bg-gradient-to-br from-[#5D4037] via-[#8B5E3C] to-[#3E2723] p-[2px] rounded-[12px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.9)] border-t border-white/20 overflow-hidden">
+                        <div className="absolute inset-0 opacity-30 bg-[repeating-linear-gradient(45deg,rgba(0,0,0,0.3)_0px,rgba(0,0,0,0.3)_1px,transparent_1px,transparent_3px)] mix-blend-overlay"></div>
+                        <div className="relative h-full bg-[#1a120f] rounded-[10px] flex items-center justify-center py-2 px-8 shadow-[inset_0_3px_15px_rgba(0,0,0,1)] border-b border-white/5 overflow-hidden">
+                            <div className="absolute top-1.5 left-1.5 w-2.5 h-2.5 rounded-full bg-gradient-to-br from-[#F5E6D3] to-[#5D4037] shadow-[inset_0_1px_1px_rgba(0,0,0,0.8),0_1px_2px_rgba(0,0,0,0.7)] border border-[#8B5E3C]/50"></div>
+                            <div className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-gradient-to-bl from-[#F5E6D3] to-[#5D4037] shadow-[inset_0_1px_1px_rgba(0,0,0,0.8),0_1px_2px_rgba(0,0,0,0.7)] border border-[#8B5E3C]/50"></div>
+                            <div className="absolute bottom-1.5 left-1.5 w-2.5 h-2.5 rounded-full bg-gradient-to-tr from-[#F5E6D3] to-[#5D4037] shadow-[inset_0_1px_1px_rgba(0,0,0,0.8),0_1px_2px_rgba(0,0,0,0.7)] border border-[#8B5E3C]/50"></div>
+                            <div className="absolute bottom-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-gradient-to-tl from-[#F5E6D3] to-[#5D4037] shadow-[inset_0_1px_1px_rgba(0,0,0,0.8),0_1px_2px_rgba(0,0,0,0.7)] border border-[#8B5E3C]/50"></div>
+                            <h1 className="relative z-10 text-transparent bg-clip-text bg-gradient-to-b from-[#F5E6D3] via-[#C69C6D] to-[#8B5E3C] font-black tracking-[0.2em] text-sm sm:text-base md:text-lg uppercase text-center drop-shadow-[0_1px_1px_rgba(0,0,0,0.9)] truncate">
+                                {title}
+                            </h1>
+                            <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent skew-x-12 pointer-events-none mix-blend-overlay"></div>
                         </div>
-                        {showDropdown && (
-                            <div className="absolute top-full left-0 right-0 mt-2 bg-[#1A1A1A] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[910] max-h-80 overflow-y-auto custom-hover-scroll">
-                                {searchResults.length > 0 ? (
-                                    <div>
-                                        <div className="px-4 py-2 text-[10px] uppercase font-bold text-gray-500 bg-[#111]">Kết quả</div>
-                                        {searchResults.map((item) => (
-                                            <div key={item.id} onClick={() => handleResultClick(item)} className="flex items-center gap-3 px-4 py-3 hover:bg-[#2A2A2A] cursor-pointer border-b border-white/5 last:border-0 transition-colors">
-                                                {item.hinh_anh ? <img src={item.hinh_anh} className="w-9 h-9 rounded-full object-cover bg-[#222]" alt=""/> : <div className="w-9 h-9 rounded-full bg-[#3E2723] flex items-center justify-center text-[#C69C6D] font-bold text-xs">{(item.ten_hien_thi || '?').charAt(0)}</div>}
-                                                <div className="min-w-0"><div className="text-sm font-bold text-white truncate">{item.ten_hien_thi || 'No Name'}</div><div className="text-[11px] text-gray-500 truncate">{item.sdt || item.vi_tri}</div></div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : <div className="p-4 text-center text-gray-500 text-xs">Không tìm thấy kết quả.</div>}
-                            </div>
-                        )}
                     </div>
                 </div>
-                <div className="flex items-center justify-end gap-2 md:gap-3 shrink-0 md:w-48 text-gray-400">
-                    {isAdmin && (
-                        <div className="flex items-center gap-1 text-[#4CAF50] bg-[#4CAF50]/10 px-2 py-1 rounded-full border border-[#4CAF50]/20 mr-2 animate-pulse">
-                            <Check size={14} /> 
-                            <span className="text-[9px] font-bold uppercase hidden md:block">Đã lưu</span>
-                        </div>
-                    )}
-                    <button className="hover:text-white transition-colors"><QrCode size={20} strokeWidth={1.5}/></button>
-                </div>
+                {isAdmin && (
+                    <div className="absolute right-2 top-2 pointer-events-auto bg-red-900/80 backdrop-blur-sm text-red-200 p-1 rounded-md border border-red-500/30 shadow-lg" title="Chế độ Admin: Bạn có quyền sửa Layout">
+                        <ShieldAlert size={12} />
+                    </div>
+                )}
             </div>
 
             {/* BODY */}

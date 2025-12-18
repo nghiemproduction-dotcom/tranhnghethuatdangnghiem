@@ -2,62 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 🟢 CÔNG THỨC TỰ ĐỘNG CO GIÃN (FLUID TYPOGRAPHY) */
-html {
-  /* Giải thích công thức clamp(MIN, VAL, MAX):
-     1. MIN (100% = 16px): Trên điện thoại, chữ sẽ không bao giờ nhỏ hơn 16px (chuẩn dễ đọc).
-     2. VAL (0.8rem + 0.5vw): Đây là phần "thông minh". Nó lấy 0.8 phần chữ gốc + 0.5% chiều rộng màn hình.
-        -> Màn hình càng rộng, số vw càng lớn -> chữ tự động to lên.
-     3. MAX (130% = ~21px): Trên màn hình tivi hay 4K, chữ cũng chỉ to đến mức này là dừng, không bị vỡ layout.
-  */
-  font-size: clamp(180%, 0.85rem + 0.5vw, 130%);
-}
+/* 1. CẤU HÌNH CỠ CHỮ */
+html { font-size: 110%; }
+@media (min-width: 640px) { html { font-size: 112.5%; } }
+@media (min-width: 1024px) { html { font-size: 125%; } }
+@media (min-width: 1280px) { html { font-size: 137.5%; } }
+@media (min-width: 1536px) { html { font-size: 150%; } }
 
-/* 2. CẤU HÌNH BODY */
-body {
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-  overscroll-behavior: none;
-  min-height: 100vh;
+/* 2. KHÓA BODY (APP SHELL) - Giữ nguyên để không bị trôi trang */
+html, body {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  overscroll-behavior: none; /* Cấm nẩy lò xo body */
   background-color: #000000;
   color: #ffffff;
-  overflow-x: hidden;
-  
   font-weight: 400; 
-  line-height: 1.6; /* Tăng khoảng cách dòng một chút để thoáng mắt khi chữ to ra */
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* 3. TỰ ĐỘNG PHÓNG TO ICON THEO CHỮ (QUAN TRỌNG) */
-/*
-   Thay vì scale(1.5) cố định làm vỡ layout, ta dùng width/height theo 'em'.
-   'em' là đơn vị phụ thuộc vào cỡ chữ hiện tại. 
-   -> Chữ to ra (do clamp ở trên) -> Icon tự động to ra theo tỉ lệ chính xác.
-*/
+/* 3. ICON */
 svg.lucide {
-  width: 1.3em;  /* Icon luôn to hơn chữ một chút (1.3 lần) */
-  height: 1.3em;
-  vertical-align: middle; /* Căn giữa icon với dòng chữ */
+  width: 1.4em; 
+  height: 1.4em;
+  vertical-align: middle;
 }
 
-/* --- THANH CUỘN ĐẸP --- */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent; 
-}
-::-webkit-scrollbar-thumb {
-  background: #333; 
-  border-radius: 10px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #555; 
-}
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;  
+/* 4. THANH CUỘN ĐẸP */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* 🟢 QUAN TRỌNG: SỬA LẠI CLASS NÀY ĐỂ TRƯỢT NGANG DỌC MƯỢT MÀ */
+.custom-hover-scroll {
+  overflow: auto; /* Cho phép cuộn cả 2 chiều */
+  -webkit-overflow-scrolling: touch; /* Cuộn mượt trên iOS */
+  touch-action: pan-x pan-y; /* 🟢 Bắt buộc có: Cho phép ngón tay vuốt ngang và dọc */
+  overscroll-behavior: contain; /* 🟢 Ngăn việc cuộn lan ra body cha */
 }

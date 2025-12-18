@@ -14,17 +14,11 @@ interface Props {
   onClose: () => void;
   onSave: (config: ModuleConfig) => void;
   initialConfig?: ModuleConfig | null; 
-  // 🟢 THÊM PAGE ID
   pageId: string;
 }
 
 const defaultNewConfig: Partial<ModuleConfig> = {
-    tenModule: '',
-    bangDuLieu: '',
-    danhSachCot: [],
-    viewType: 'list',
-    widgetData: {},
-    listConfig: {}
+    tenModule: '', bangDuLieu: '', danhSachCot: [], viewType: 'list', widgetData: {}, listConfig: {}
 };
 
 export default function ModalTaoModule({ isOpen, onClose, onSave, initialConfig, pageId }: Props) {
@@ -33,10 +27,7 @@ export default function ModalTaoModule({ isOpen, onClose, onSave, initialConfig,
   const [config, setConfig] = useState<Partial<ModuleConfig>>(defaultNewConfig);
 
   useEffect(() => {
-      if (isOpen) {
-          setConfig(initialConfig || defaultNewConfig);
-          setStep(1);
-      }
+      if (isOpen) { setConfig(initialConfig || defaultNewConfig); setStep(1); }
   }, [isOpen, initialConfig]);
 
   if (!isOpen) return null;
@@ -47,101 +38,64 @@ export default function ModalTaoModule({ isOpen, onClose, onSave, initialConfig,
        const now = new Date();
        const ver = `v${now.getTime()}`;
        const moduleId = config.id || `mod_${Date.now()}`;
-       
-       const finalConfig: ModuleConfig = { 
-           ...(config as ModuleConfig), 
-           id: moduleId,
-           version: ver, 
-           updatedAt: now.toISOString() 
-       };
+       const finalConfig: ModuleConfig = { ...(config as ModuleConfig), id: moduleId, version: ver, updatedAt: now.toISOString() };
 
        let dbCall;
        if (initialConfig?.id) {
-           // Update: Cập nhật config và đảm bảo page_id đúng
-           dbCall = supabase.from('cau_hinh_modules')
-               .update({ 
-                   config_json: finalConfig, 
-                   version: ver,
-                   page_id: pageId // 🟢 Lưu page_id
-               })
-               .eq('module_id', moduleId);
+           dbCall = supabase.from('cau_hinh_modules').update({ config_json: finalConfig, version: ver, page_id: pageId }).eq('module_id', moduleId);
        } else {
-           // Insert: Thêm mới với page_id
-           dbCall = supabase.from('cau_hinh_modules')
-               .insert({ 
-                   module_id: moduleId, 
-                   config_json: finalConfig, 
-                   version: ver,
-                   page_id: pageId // 🟢 Lưu page_id
-               });
+           dbCall = supabase.from('cau_hinh_modules').insert({ module_id: moduleId, config_json: finalConfig, version: ver, page_id: pageId });
        }
-
-       const { error } = await dbCall;
-       if (error) throw error;
-
-       onSave(finalConfig);
-       onClose();
-    } catch (err: any) { alert("Lỗi: " + err.message); } 
-    finally { setLoading(false); }
+       const { error } = await dbCall; if (error) throw error;
+       onSave(finalConfig); onClose();
+    } catch (err: any) { alert("Lỗi: " + err.message); } finally { setLoading(false); }
   };
 
   return (
-    <div className="fixed inset-0 z-[99999] bg-black/95 flex items-center justify-center p-0 md:p-4">
-      <div className="w-full max-w-5xl h-[100dvh] md:h-[85vh] bg-[#050505] border-x border-y border-white/10 md:rounded-sm flex flex-col shadow-2xl overflow-hidden">
-        
-        <div className="h-14 border-b border-white/10 flex items-center justify-between px-4 md:px-6 shrink-0 bg-[#080808]">
+    // 🟢 FIX VỊ TRÍ: bottom-[clamp...]
+    <div className="fixed top-0 left-0 right-0 bottom-[clamp(60px,15vw,80px)] z-[990] bg-[#050505] flex flex-col border-b border-[#8B5E3C]/30 shadow-2xl animate-in slide-in-from-bottom-10 duration-300">
+      
+      {/* HEADER */}
+      <div className="h-[clamp(60px,15vw,70px)] border-b border-[#8B5E3C]/20 flex items-center justify-between px-6 shrink-0 bg-gradient-to-r from-transparent via-[#8B5E3C]/10 to-transparent">
           <div className="flex items-center gap-3">
-             <Layers size={18} className="text-blue-600"/>
+             <Layers size={20} className="text-[#C69C6D]"/>
              <div className="flex flex-col">
-                 <span className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-widest">
-                    {initialConfig ? 'CHỈNH SỬA' : 'TẠO MỚI'}
-                 </span>
-                 <span className="text-[10px] text-blue-500 font-mono">Page: {pageId} • Bước {step}/3</span>
+                 <span className="text-xs font-bold text-[#F5E6D3] uppercase tracking-widest">{initialConfig ? 'CHỈNH SỬA MODULE' : 'TẠO MỚI MODULE'}</span>
+                 <span className="text-[10px] text-[#8B5E3C] font-mono">Page: {pageId} • Bước {step}/3</span>
              </div>
           </div>
-          <button onClick={onClose} className="p-2 active:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors">
-              <X size={24}/>
-          </button>
-        </div>
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-white/5 text-[#8B5E3C] hover:text-[#C69C6D]"><X size={24}/></button>
+      </div>
 
-        <div className="w-full h-[2px] bg-[#111]">
-            <div className="h-full bg-blue-600 transition-all duration-300" style={{ width: `${(step / 3) * 100}%` }}></div>
-        </div>
+      {/* PROGRESS BAR */}
+      <div className="w-full h-[2px] bg-[#1a120f]">
+          <div className="h-full bg-[#C69C6D] transition-all duration-300 shadow-[0_0_10px_#C69C6D]" style={{ width: `${(step / 3) * 100}%` }}></div>
+      </div>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-dark-scroll bg-black">
+      {/* CONTENT */}
+      <div className="flex-1 overflow-y-auto p-6 custom-scroll bg-[#0a0807]">
           {step === 1 && <Buoc1_ChonNguon config={config as ModuleConfig} setConfig={setConfig} />}
           {step === 2 && <Buoc2_GiaoDienList config={config as ModuleConfig} setConfig={setConfig} />}
           {step === 3 && <Buoc3_GiaoDienDetail config={config as ModuleConfig} setConfig={setConfig} />}
-        </div>
+      </div>
 
-        <div className="h-16 border-t border-white/10 bg-[#050505] flex items-center justify-between px-4 md:px-6 shrink-0 safe-area-bottom">
-          <button 
-            onClick={() => setStep(s => Math.max(1, s - 1))}
-            disabled={step === 1}
-            className={`flex items-center gap-2 text-xs font-bold uppercase tracking-widest p-2 ${step === 1 ? 'opacity-0 pointer-events-none' : 'text-gray-500 active:text-white'}`}
-          >
+      {/* FOOTER NAV */}
+      <div className="h-[60px] bg-[#110d0c] border-t border-[#8B5E3C]/30 flex items-center justify-between px-6 shrink-0">
+          <button onClick={() => setStep(s => Math.max(1, s - 1))} disabled={step === 1} className={`flex items-center gap-2 text-xs font-bold uppercase tracking-widest p-2 ${step === 1 ? 'opacity-0 pointer-events-none' : 'text-[#8B5E3C] hover:text-[#C69C6D]'}`}>
             <ArrowLeft size={16}/> Quay Lại
           </button>
 
           {step < 3 ? (
-             <button 
-               onClick={() => setStep(s => Math.min(3, s + 1))}
-               className="flex items-center gap-2 px-6 py-3 bg-white text-black hover:bg-gray-200 active:scale-95 text-xs font-bold uppercase tracking-widest transition-all rounded-sm"
-             >
+             <button onClick={() => setStep(s => Math.min(3, s + 1))} className="flex items-center gap-2 px-6 py-2 bg-[#F5E6D3] text-[#1a120f] hover:bg-white active:scale-95 text-xs font-bold uppercase tracking-widest transition-all rounded-full shadow-lg">
                Tiếp Tục <ArrowRight size={16}/>
              </button>
           ) : (
-             <button 
-               onClick={handleFinalSave}
-               disabled={loading}
-               className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white hover:bg-blue-500 active:scale-95 text-xs font-bold uppercase tracking-widest transition-all rounded-sm"
-             >
+             <button onClick={handleFinalSave} disabled={loading} className="flex items-center gap-2 px-8 py-2 bg-[#C69C6D] text-[#1a120f] hover:bg-[#b08b5e] active:scale-95 text-xs font-bold uppercase tracking-widest transition-all rounded-full shadow-[0_0_15px_rgba(198,156,109,0.3)]">
                {loading ? 'Lưu...' : <><Check size={16}/> Hoàn Tất</>}
              </button>
           )}
-        </div>
-
       </div>
+
     </div>
   );
 }

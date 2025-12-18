@@ -40,7 +40,8 @@ export default function ModuleItem({
       <div 
         ref={setNodeRef} 
         style={style} 
-        className="module-item relative flex flex-col bg-black border border-white/10 rounded-lg overflow-hidden group/module hover:shadow-[0_0_20px_rgba(255,255,255,0.1)] transition-all duration-200"
+        // 🟢 STYLE MỚI: Kim loại tối, viền đồng, bóng đổ sâu
+        className="module-item relative flex flex-col bg-[#110d0c] border border-[#8B5E3C]/30 rounded-xl overflow-hidden group/module hover:shadow-[0_0_25px_rgba(198,156,109,0.15)] hover:border-[#C69C6D]/60 transition-all duration-300"
       >
         <style jsx>{`
             /* Mobile: Luôn 1 cột */
@@ -49,38 +50,45 @@ export default function ModuleItem({
             @media (min-width: 768px) {
                 .module-item { grid-column: span var(--item-span) !important; }
             }
+            /* Fluid Font */
+            .text-resp-xs { font-size: clamp(10px, 2.5vw, 12px); }
         `}</style>
 
-        {/* HEADER */}
-        <div className="h-8 px-2 flex items-center justify-between bg-black/80 border-b border-white/10 shrink-0 absolute top-0 left-0 right-0 z-20 opacity-0 group-hover/module:opacity-100 transition-opacity">
-          <div className="flex items-center gap-1 pl-1 overflow-hidden">
-             <div {...attributes} {...listeners} className="text-gray-500 hover:text-white cursor-grab active:cursor-grabbing p-1">
-                <GripVertical size={14} />
+        {/* HEADER: Chỉ hiện khi Hover hoặc Admin (để không rối mắt) */}
+        <div className="h-[clamp(28px,6vw,36px)] px-2 flex items-center justify-between bg-gradient-to-r from-[#1a120f] via-[#2a1e1b] to-[#1a120f] border-b border-[#8B5E3C]/20 shrink-0 absolute top-0 left-0 right-0 z-20 opacity-0 group-hover/module:opacity-100 transition-opacity duration-300">
+          <div className="flex items-center gap-1 pl-1 overflow-hidden w-full">
+             {/* Grip để kéo thả */}
+             <div {...attributes} {...listeners} className="text-[#8B5E3C] hover:text-[#C69C6D] cursor-grab active:cursor-grabbing p-1 transition-colors">
+                <GripVertical size={16} />
              </div>
-             <div onClick={() => setShowLevel2(true)} className="flex items-center gap-2 font-bold text-[10px] text-gray-400 uppercase tracking-wider truncate cursor-pointer hover:text-blue-400 transition-colors">
-                <Gauge size={12} className="shrink-0"/> 
+             
+             {/* Tên Module (Click mở Level 2) */}
+             <div onClick={(e) => { e.stopPropagation(); setShowLevel2(true); }} className="flex-1 flex items-center gap-2 font-bold text-resp-xs text-[#C69C6D] uppercase tracking-wider truncate cursor-pointer hover:text-white transition-colors select-none">
+                <Gauge size={14} className="shrink-0"/> 
                 <span className="truncate">{data.tenModule}</span>
              </div>
           </div>
 
+          {/* 🟢 ADMIN CONTROLS: Các nút chỉnh sửa */}
           {isAdmin && (
               <div className="flex items-center gap-1 shrink-0 ml-1">
                   {/* CHỈNH ĐỘ RỘNG (1 <-> 2) */}
-                  <div className="flex items-center bg-[#151515] rounded border border-white/10 mr-1">
-                    <button onClick={(e) => { e.stopPropagation(); onResizeWidth(-1); }} className="p-1 hover:text-white text-gray-500 border-r border-white/10 hover:bg-blue-500/20" title="Thu hẹp"><ChevronLeft size={12}/></button>
-                    <button onClick={(e) => { e.stopPropagation(); onResizeWidth(1); }} className="p-1 hover:text-white text-gray-500 hover:bg-blue-500/20" title="Mở rộng"><ChevronRight size={12}/></button>
+                  <div className="flex items-center bg-[#0a0807] rounded border border-[#8B5E3C]/30 mr-1">
+                    <button onClick={(e) => { e.stopPropagation(); onResizeWidth(-1); }} className="p-1.5 hover:text-white text-[#8B5E3C] border-r border-[#8B5E3C]/30 hover:bg-[#C69C6D]/20 transition-colors" title="Thu hẹp"><ChevronLeft size={12}/></button>
+                    <button onClick={(e) => { e.stopPropagation(); onResizeWidth(1); }} className="p-1.5 hover:text-white text-[#8B5E3C] hover:bg-[#C69C6D]/20 transition-colors" title="Mở rộng"><ChevronRight size={12}/></button>
                   </div>
 
-                  <div className="flex items-center bg-[#151515] rounded border border-white/10">
-                    <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-1 hover:text-blue-400 text-gray-600 border-r border-white/10"><Settings size={12}/></button>
-                    <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1 hover:text-red-400 text-gray-600"><Trash2 size={12}/></button>
+                  {/* EDIT / DELETE */}
+                  <div className="flex items-center bg-[#0a0807] rounded border border-[#8B5E3C]/30">
+                    <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-1.5 hover:text-[#C69C6D] text-[#8B5E3C] border-r border-[#8B5E3C]/30 hover:bg-[#C69C6D]/20 transition-colors" title="Cấu hình"><Settings size={12}/></button>
+                    <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1.5 hover:text-red-400 text-red-900/70 hover:bg-red-900/20 transition-colors" title="Xóa"><Trash2 size={12}/></button>
                   </div>
               </div>
           )}
         </div>
 
         {/* BODY */}
-        <div className="flex-1 overflow-hidden relative pt-0 group-hover/module:pt-8 transition-all">
+        <div className="flex-1 overflow-hidden relative pt-0 group-hover/module:pt-[clamp(28px,6vw,36px)] transition-all duration-300">
            <Level1_Widget config={data} onClick={() => setShowLevel2(true)} />
         </div>
       </div>
