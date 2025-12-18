@@ -1,29 +1,29 @@
 'use client';
+
 import React from 'react';
 
+// 🟢 KHAI BÁO PROPS ĐỂ SỬA LỖI
 interface Props {
-  onRegisterClick: () => void; 
-  onForgotPasswordClick: () => void; 
+    onSupportClick?: () => void;
 }
 
-export default function ChanForm({ onRegisterClick, onForgotPasswordClick }: Props) {
-  return (
-    <div className="flex items-center justify-between w-full mt-2 px-1">
-        <button 
-            type="button" 
-            onClick={onRegisterClick} 
-            className="text-[10px] md:text-xs font-bold tracking-[0.1em] uppercase text-gray-400 hover:text-white transition-colors border-b border-transparent hover:border-white pb-0.5"
-        >
-            ĐĂNG KÝ
-        </button>
-
-        <button 
-            type="button" 
-            onClick={onForgotPasswordClick} 
-            className="text-[10px] md:text-xs font-bold tracking-[0.1em] uppercase text-gray-400 hover:text-white transition-colors border-b border-transparent hover:border-white pb-0.5"
-        >
-            QUÊN MẬT KHẨU
-        </button>
-    </div>
-  );
+export default function ChanForm({ onSupportClick }: Props) {
+    return (
+        <div className="w-full flex flex-col items-center gap-2 mt-4">
+            <div className="w-full h-[1px] bg-white/10"></div>
+            <div className="flex gap-1 text-[10px] uppercase tracking-wider font-bold text-gray-600">
+                <span>Power by</span>
+                <span className="text-[#8B5E3C]">ArtSpace System</span>
+            </div>
+            
+            {/* Nút Hỗ trợ */}
+            <button 
+                type="button" 
+                onClick={onSupportClick}
+                className="text-[10px] text-gray-500 hover:text-[#C69C6D] underline decoration-dotted underline-offset-4 transition-colors cursor-pointer"
+            >
+                Cần hỗ trợ đăng nhập?
+            </button>
+        </div>
+    );
 }
