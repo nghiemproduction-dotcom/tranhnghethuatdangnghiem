@@ -2,12 +2,10 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css'; 
 
-// 🟢 SỬA ĐƯỜNG DẪN IMPORT: Trỏ đúng vào file app/ForceFullScreen.tsx
 import ForceFullScreen from '@/app/components/ForceFullScreen';
 
-// Các component khác giữ nguyên (nếu bạn có file)
+// Import component bảo vệ nếu có (Optional)
 // import BaoVeLoi from '@/app/components/BaoVeLoi'; 
-// import GlobalCodeEditor from '@/app/components/GlobalCodeEditor';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -18,6 +16,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
+    title: 'ArtSpace ERP',
   },
   icons: { apple: '/icon-192.png' },
 };
@@ -27,20 +26,23 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: 'cover', // Quan trọng: Tràn viền tai thỏ/đục lỗ
   themeColor: '#000000',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi">
-      <body className={inter.className}>
+      {/* Thêm bg-black min-h-[100dvh] để trị dứt điểm vệt trắng */}
+      <body className={`${inter.className} bg-black min-h-[100dvh] overflow-hidden`}>
         
-        {/* 1. CẢNH SÁT FULLSCREEN (Luôn check trạng thái) */}
         <ForceFullScreen />
-
-        {/* 2. APP CONTENT */}
-        {children}
         
+        {/* Vùng nội dung chính */}
+        <main className="w-full h-full relative">
+            {children}
+        </main>
+
       </body>
     </html>
   );

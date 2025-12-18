@@ -1,20 +1,23 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { Building2, Grid, LayoutTemplate, UserCircle } from 'lucide-react'; 
+import { Building2, Grid, Plus, LayoutTemplate, UserCircle } from 'lucide-react'; 
 import NutMenu from './NutMenu';
 import ModalPhongBan from './ModalPhongBan'; 
 import ModalCaNhan from './ModalCaNhan'; 
 
 interface Props {
-  onAdd?: () => void; // Giữ lại interface để tránh lỗi type nếu cha có truyền, dù không dùng nữa
+  onAdd?: () => void;
   currentUser?: any; 
 }
 
-export default function MenuDuoi({ currentUser: propUser }: Props) {
+export default function MenuDuoi({ onAdd, currentUser: propUser }: Props) {
   const pathname = usePathname();
   
+  // 🟢 SMART TOGGLE LOGIC: Chỉ dùng 1 biến state để quản lý modal
   const [activeModal, setActiveModal] = useState<'phongban' | 'canhan' | null>(null);
+
+  // State lưu user thực tế
   const [realUser, setRealUser] = useState<any>(null);
 
   useEffect(() => {
@@ -34,17 +37,23 @@ export default function MenuDuoi({ currentUser: propUser }: Props) {
     }
   }, [propUser]);
 
+  // Hàm xử lý bật/tắt thông minh
   const toggleModal = (modalName: 'phongban' | 'canhan') => {
       setActiveModal(prev => (prev === modalName ? null : modalName));
   };
 
   const handleClose = () => setActiveModal(null);
 
-  // 🟢 Class cho Icon Responsive: Tự co giãn từ 22px đến 32px tùy màn hình
+  // Class cho Icon Responsive
   const iconResponsiveClass = "w-[clamp(22px,6vw,32px)] h-[clamp(22px,6vw,32px)]";
 
   return (
     <>
+      {/* 🟢 MENU CHÍNH 
+          - fixed bottom-0: Luôn ghim đáy
+          - w-full: Phủ kín chiều ngang
+          - z-[990]: Cao hơn nội dung, thấp hơn Modal (999)
+      */}
       <nav className="fixed bottom-0 left-0 right-0 z-[990] bg-[#110d0c] pb-safe h-[clamp(60px,15vw,80px)] shadow-[0_-5px_20px_rgba(0,0,0,0.8)] border-t border-[#3E2723]">
         <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#C69C6D]/50 to-transparent"></div>
 
@@ -82,6 +91,7 @@ export default function MenuDuoi({ currentUser: propUser }: Props) {
         </div>
       </nav>
 
+      {/* 🟢 CÁC MODAL */}
       <ModalPhongBan 
         isOpen={activeModal === 'phongban'} 
         onClose={handleClose}

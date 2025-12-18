@@ -6,7 +6,9 @@ import { CSS } from '@dnd-kit/utilities';
 import { Settings, Trash2, Gauge, GripVertical, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ModuleConfig } from './KieuDuLieuModule';
 import Level1_Widget from './Level1_Widget';
-import Level2_DanhSachModal from './Level2_DanhSachModal';
+
+// 🟢 CẬP NHẬT ĐƯỜNG DẪN: Trỏ vào thư mục Level2 (nó sẽ tự tìm file index.tsx)
+import Level2_DanhSachModal from './Level2';
 
 interface Props {
   id: string;
@@ -23,13 +25,13 @@ export default function ModuleItem({
   const [showLevel2, setShowLevel2] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   
-  // 🟢 Chiều rộng: 1 hoặc 2 (tối đa 2 theo yêu cầu mới)
+  // Chiều rộng: 1 hoặc 2
   const colSpan = data.doRong || 1;
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    height: '100%', // 🟢 Luôn cao 100% theo hàng chứa nó
+    height: '100%', 
     zIndex: isDragging ? 50 : 'auto',
     opacity: isDragging ? 0.5 : 1,
     '--item-span': colSpan,
@@ -40,7 +42,7 @@ export default function ModuleItem({
       <div 
         ref={setNodeRef} 
         style={style} 
-        // 🟢 STYLE MỚI: Kim loại tối, viền đồng, bóng đổ sâu
+        // Style: Kim loại tối, viền đồng, bóng đổ sâu
         className="module-item relative flex flex-col bg-[#110d0c] border border-[#8B5E3C]/30 rounded-xl overflow-hidden group/module hover:shadow-[0_0_25px_rgba(198,156,109,0.15)] hover:border-[#C69C6D]/60 transition-all duration-300"
       >
         <style jsx>{`
@@ -54,7 +56,7 @@ export default function ModuleItem({
             .text-resp-xs { font-size: clamp(10px, 2.5vw, 12px); }
         `}</style>
 
-        {/* HEADER: Chỉ hiện khi Hover hoặc Admin (để không rối mắt) */}
+        {/* HEADER: Chỉ hiện khi Hover hoặc Admin */}
         <div className="h-[clamp(28px,6vw,36px)] px-2 flex items-center justify-between bg-gradient-to-r from-[#1a120f] via-[#2a1e1b] to-[#1a120f] border-b border-[#8B5E3C]/20 shrink-0 absolute top-0 left-0 right-0 z-20 opacity-0 group-hover/module:opacity-100 transition-opacity duration-300">
           <div className="flex items-center gap-1 pl-1 overflow-hidden w-full">
              {/* Grip để kéo thả */}
@@ -69,10 +71,10 @@ export default function ModuleItem({
              </div>
           </div>
 
-          {/* 🟢 ADMIN CONTROLS: Các nút chỉnh sửa */}
+          {/* ADMIN CONTROLS */}
           {isAdmin && (
               <div className="flex items-center gap-1 shrink-0 ml-1">
-                  {/* CHỈNH ĐỘ RỘNG (1 <-> 2) */}
+                  {/* CHỈNH ĐỘ RỘNG */}
                   <div className="flex items-center bg-[#0a0807] rounded border border-[#8B5E3C]/30 mr-1">
                     <button onClick={(e) => { e.stopPropagation(); onResizeWidth(-1); }} className="p-1.5 hover:text-white text-[#8B5E3C] border-r border-[#8B5E3C]/30 hover:bg-[#C69C6D]/20 transition-colors" title="Thu hẹp"><ChevronLeft size={12}/></button>
                     <button onClick={(e) => { e.stopPropagation(); onResizeWidth(1); }} className="p-1.5 hover:text-white text-[#8B5E3C] hover:bg-[#C69C6D]/20 transition-colors" title="Mở rộng"><ChevronRight size={12}/></button>
@@ -93,6 +95,7 @@ export default function ModuleItem({
         </div>
       </div>
 
+      {/* MODAL LEVEL 2 (Gọi từ folder mới) */}
       <Level2_DanhSachModal isOpen={showLevel2} onClose={() => setShowLevel2(false)} config={data} />
     </>
   );

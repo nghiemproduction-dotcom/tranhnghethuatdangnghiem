@@ -9,18 +9,40 @@ html { font-size: 110%; }
 @media (min-width: 1280px) { html { font-size: 137.5%; } }
 @media (min-width: 1536px) { html { font-size: 150%; } }
 
-/* 2. KHÓA BODY (APP SHELL) - Giữ nguyên để không bị trôi trang */
-html, body {
-  height: 100%;
-  width: 100%;
+/* 2. KHÓA BODY (APP SHELL) - TRỊ BỆNH HỞ CHÂN TRANG */
+:root {
+  background-color: #000000; /* Ép màu đen từ gốc rễ */
+}
+
+html {
+  height: 100dvh; /* Dùng Dynamic Viewport Height thay vì % */
+  width: 100vw;
+  background-color: #000000;
+  overflow: hidden; /* Cấm cuộn trang gốc */
+}
+
+body {
+  height: 100dvh;
+  width: 100vw;
   overflow: hidden;
-  overscroll-behavior: none; /* Cấm nẩy lò xo body */
+  overscroll-behavior: none; /* Cấm nẩy lò xo (rubber band effect) */
   background-color: #000000;
   color: #ffffff;
   font-weight: 400; 
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
+  
+  /* Fix layout */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Fix riêng cho iOS Safari để full màn hình */
+@supports (-webkit-touch-callout: none) {
+  body {
+    height: -webkit-fill-available;
+  }
 }
 
 /* 3. ICON */
@@ -32,17 +54,24 @@ svg.lucide {
 
 /* 4. THANH CUỘN ĐẸP */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #555; }
+::-webkit-scrollbar-track { background: #1a120f; }
+::-webkit-scrollbar-thumb { background: #8B5E3C; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #C69C6D; }
 
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+/* 5. CÁC CLASS TIỆN ÍCH */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
 
-/* 🟢 QUAN TRỌNG: SỬA LẠI CLASS NÀY ĐỂ TRƯỢT NGANG DỌC MƯỢT MÀ */
-.custom-hover-scroll {
-  overflow: auto; /* Cho phép cuộn cả 2 chiều */
-  -webkit-overflow-scrolling: touch; /* Cuộn mượt trên iOS */
-  touch-action: pan-x pan-y; /* 🟢 Bắt buộc có: Cho phép ngón tay vuốt ngang và dọc */
-  overscroll-behavior: contain; /* 🟢 Ngăn việc cuộn lan ra body cha */
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* Ẩn thanh cuộn nhưng vẫn cuộn được (cho các vùng cần thiết) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }
