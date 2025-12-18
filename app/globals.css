@@ -9,23 +9,29 @@ html { font-size: 110%; }
 @media (min-width: 1280px) { html { font-size: 137.5%; } }
 @media (min-width: 1536px) { html { font-size: 150%; } }
 
-/* 2. KHÓA BODY (APP SHELL) - TRỊ BỆNH HỞ CHÂN TRANG */
+/* 2. KHÓA BODY (APP SHELL) - FIX TRIỆT ĐỂ LỖI HỞ TRẮNG */
 :root {
-  background-color: #000000; /* Ép màu đen từ gốc rễ */
+  background-color: #000000;
 }
 
 html {
-  height: 100dvh; /* Dùng Dynamic Viewport Height thay vì % */
+  /* Ưu tiên dùng biến JS tính toán, fallback về 100dvh */
+  height: 100vh; 
+  height: var(--app-height, 100dvh);
+  
   width: 100vw;
   background-color: #000000;
-  overflow: hidden; /* Cấm cuộn trang gốc */
+  overflow: hidden; 
 }
 
 body {
-  height: 100dvh;
+  /* Ưu tiên dùng biến JS tính toán */
+  height: 100vh;
+  height: var(--app-height, 100dvh);
+  
   width: 100vw;
   overflow: hidden;
-  overscroll-behavior: none; /* Cấm nẩy lò xo (rubber band effect) */
+  overscroll-behavior: none; 
   background-color: #000000;
   color: #ffffff;
   font-weight: 400; 
@@ -33,12 +39,11 @@ body {
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   
-  /* Fix layout */
   display: flex;
   flex-direction: column;
 }
 
-/* Fix riêng cho iOS Safari để full màn hình */
+/* Fix riêng cho iOS Safari PWA Standalone */
 @supports (-webkit-touch-callout: none) {
   body {
     height: -webkit-fill-available;
@@ -58,20 +63,17 @@ svg.lucide {
 ::-webkit-scrollbar-thumb { background: #8B5E3C; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #C69C6D; }
 
-/* 5. CÁC CLASS TIỆN ÍCH */
+/* 5. UTILS */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom);
 }
-
 .pt-safe {
   padding-top: env(safe-area-inset-top);
 }
-
-/* Ẩn thanh cuộn nhưng vẫn cuộn được (cho các vùng cần thiết) */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
 .no-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

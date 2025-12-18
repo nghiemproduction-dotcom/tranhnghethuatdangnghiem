@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Maximize, Ban, AlertCircle } from 'lucide-react'; // Thêm icon Ban cho nút tắt
+import { Maximize, Ban } from 'lucide-react'; 
 import { usePathname } from 'next/navigation';
 
 export default function ForceFullScreen() {
@@ -9,7 +9,28 @@ export default function ForceFullScreen() {
   const [showPrompt, setShowPrompt] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
 
-  // Hàm kích hoạt Fullscreen
+  // 1. LOGIC FIX LỖI HỞ TRẮNG (APP HEIGHT HACK)
+  useEffect(() => {
+    const setAppHeight = () => {
+        const doc = document.documentElement;
+        // Lấy chiều cao thực tế của vùng nhìn thấy
+        doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+    };
+
+    // Chạy ngay lập tức
+    setAppHeight();
+
+    // Chạy lại khi xoay màn hình hoặc resize
+    window.addEventListener('resize', setAppHeight);
+    window.addEventListener('orientationchange', setAppHeight);
+
+    return () => {
+        window.removeEventListener('resize', setAppHeight);
+        window.removeEventListener('orientationchange', setAppHeight);
+    };
+  }, []);
+
+  // 2. LOGIC FULLSCREEN API (F11 MODE)
   const triggerFull = () => {
       const elem = document.documentElement as any;
       if (elem.requestFullscreen) elem.requestFullscreen().catch(() => {});
@@ -18,7 +39,6 @@ export default function ForceFullScreen() {
       else if (elem.msRequestFullscreen) elem.msRequestFullscreen();
   };
 
-  // Hàm TẮT chế độ toàn màn hình vĩnh viễn
   const disableFullScreenMode = () => {
       if (typeof window !== 'undefined') {
           localStorage.setItem('GLOBAL_FULLSCREEN_PREF', 'false');
@@ -27,125 +47,76 @@ export default function ForceFullScreen() {
   };
 
   useEffect(() => {
-    // 1. Nếu là trang chủ -> Luôn cho qua
     if (pathname === '/') {
         setShowPrompt(false);
         return;
     }
 
-    // 2. Kiểm tra thiết bị
     const userAgent = window.navigator.userAgent.toLowerCase();
-    const isIphone = /iphone|ipad|ipod/.test(userAgent);
-    setIsIOS(isIphone);
+    const ios = /iphone|ipad|ipod/.test(userAgent);
+    setIsIOS(ios);
 
-    // 3. Hàm kiểm tra trạng thái
-    const checkStatus = () => {
-        // 0. LOẠI TRỪ LOCALHOST (Môi trường dev không cần check)
-        const hostname = window.location.hostname;
-        if (hostname === 'localhost' || hostname === '127.0.0.1') {
-            setShowPrompt(false);
-            return;
-        }
+    const savedPref = localStorage.getItem('GLOBAL_FULLSCREEN_PREF');
+    const isExplicitlyDisabled = savedPref === 'false';
 
-        // PWA Mode -> Coi như Full
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
-        if (isStandalone) {
-            setShowPrompt(false);
-            return;
-        }
-
-        // Kiểm tra xem user CÓ BẬT chế độ này không? (Master Switch)
-        const wantsFull = localStorage.getItem('GLOBAL_FULLSCREEN_PREF') === 'true';
-        
-        // Nếu user ĐÃ TẮT -> Thì không bao giờ hiện bảng nữa
-        if (!wantsFull) {
-            setShowPrompt(false);
-            return;
-        }
-
-        // Nếu user ĐANG BẬT -> Kiểm tra xem trình duyệt có đang full không?
-        const doc = document as any;
-        const isFull = !!(
-            doc.fullscreenElement || 
-            doc.webkitFullscreenElement || 
-            doc.mozFullScreenElement || 
-            doc.msFullscreenElement
-        );
-
-        if (isFull) {
-            setShowPrompt(false);
-        } else {
-            // Muốn full nhưng đang bị rớt -> Hiện bảng cảnh báo
+    if (!isExplicitlyDisabled) {
+        const isFullscreen = document.fullscreenElement || (document as any).webkitFullscreenElement;
+        if (!isFullscreen && !ios) {
             setShowPrompt(true);
         }
+    }
+
+    const handleChange = () => {
+        const isFs = document.fullscreenElement || (document as any).webkitFullscreenElement;
+        if (isFs) setShowPrompt(false);
     };
 
-    // Đợi 1 chút sau khi chuyển trang mới check (tránh báo ảo khi đang load)
-    const timer = setTimeout(() => {
-        checkStatus();
-    }, 800); 
-
-    // CƠ CHẾ TỰ ĐỘNG KHÔI PHỤC KHI CLICK (Chỉ khi bảng đang hiện)
-    const handleGlobalClick = () => {
-        if (showPrompt) {
-            triggerFull();
-        }
-    };
-    // Lưu ý: Tạm tắt global click tự động để user còn bấm được nút "Tắt chế độ"
-    // window.addEventListener('click', handleGlobalClick);
-
-    // Lắng nghe sự kiện
-    const events = ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'msfullscreenchange'];
-    events.forEach(e => document.addEventListener(e, checkStatus));
-    
-    const interval = setInterval(checkStatus, 2000);
+    document.addEventListener('fullscreenchange', handleChange);
+    document.addEventListener('webkitfullscreenchange', handleChange);
 
     return () => {
-        clearTimeout(timer);
-        // window.removeEventListener('click', handleGlobalClick);
-        events.forEach(e => document.removeEventListener(e, checkStatus));
-        clearInterval(interval);
+        document.removeEventListener('fullscreenchange', handleChange);
+        document.removeEventListener('webkitfullscreenchange', handleChange);
     };
-  }, [pathname, showPrompt]);
+  }, [pathname]);
 
   if (!showPrompt) return null;
 
   return (
-    <div className="fixed inset-0 z-[99999] bg-[#110d0c]/95 backdrop-blur-md flex flex-col items-center justify-center text-center animate-in fade-in duration-300 touch-none">
-      
-      <div className="relative p-8 rounded-2xl bg-[#1a120f] border border-[#8B5E3C] shadow-[0_0_40px_rgba(0,0,0,0.8)] max-w-sm mx-4 overflow-hidden w-full">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#C69C6D]/10 to-transparent pointer-events-none"></div>
-
-        <AlertCircle className="text-[#C69C6D] mb-4 mx-auto animate-pulse" size={48} strokeWidth={1.5} />
-
-        <h2 className="text-[#F5E6D3] text-lg font-bold uppercase tracking-widest mb-4 relative z-10 leading-snug">
-          Bạn đã cho phép bật toàn màn hình, vui lòng xác nhận lại !
+    <div className="fixed inset-0 z-[99999] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-6 animate-in fade-in duration-500">
+        <div className="w-16 h-16 mb-6 rounded-2xl bg-gradient-to-br from-[#C69C6D] to-[#5D4037] flex items-center justify-center shadow-[0_0_30px_rgba(198,156,109,0.4)]">
+            <Maximize className="text-white w-8 h-8 animate-pulse" />
+        </div>
+        
+        <h2 className="text-xl md:text-2xl font-bold text-[#F5E6D3] mb-2 text-center uppercase tracking-widest">
+            Trải nghiệm tốt nhất
         </h2>
         
+        <p className="text-gray-400 text-sm md:text-base text-center max-w-md mb-8 leading-relaxed">
+            Ứng dụng được thiết kế để chạy ở chế độ toàn màn hình. Vui lòng kích hoạt để ẩn thanh địa chỉ và mở rộng không gian làm việc.
+        </p>
+        
         {isIOS ? (
-             <p className="text-[#A1887F] text-sm mb-8 font-light px-2 relative z-10">
-                Trên iPhone/iPad, vui lòng thêm ứng dụng vào màn hình chính (Add to Home Screen) để có trải nghiệm tốt nhất.
+             <p className="text-[#A1887F] text-sm mb-8 font-light px-2 relative z-10 text-center border border-[#8B5E3C]/30 p-4 rounded-lg bg-[#1a120f]">
+                Trên iPhone/iPad: Nhấn nút <strong>Chia sẻ (Share)</strong> <br/> Chọn <strong>"Thêm vào MH chính" (Add to Home Screen)</strong>.
              </p>
         ) : (
-            <div className="flex flex-col gap-3 relative z-10 w-full">
-                {/* NÚT 1: CHO PHÉP (Kích hoạt lại Fullscreen) */}
+            <div className="flex flex-col gap-3 relative z-10 w-full max-w-xs">
                 <button 
                     onClick={(e) => { e.stopPropagation(); triggerFull(); }}
                     className="w-full py-3 bg-[#C69C6D] hover:bg-[#b08b5e] text-[#1a120f] font-bold text-xs uppercase tracking-widest rounded-lg transition-all active:scale-95 shadow-lg flex items-center justify-center gap-2"
                 >
-                    <Maximize size={16} /> Cho phép toàn màn hình
+                    <Maximize size={16} /> Bật toàn màn hình
                 </button>
 
-                {/* NÚT 2: TẮT CHẾ ĐỘ (Tắt Master Switch) */}
                 <button 
                     onClick={(e) => { e.stopPropagation(); disableFullScreenMode(); }}
                     className="w-full py-3 bg-transparent hover:bg-white/5 border border-white/10 hover:border-white/30 text-gray-400 hover:text-white font-bold text-xs uppercase tracking-widest rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
                 >
-                    <Ban size={16} /> Tắt chế độ toàn màn hình
+                    <Ban size={16} /> Không hiển thị lại
                 </button>
             </div>
         )}
-      </div>
     </div>
   );
 }
