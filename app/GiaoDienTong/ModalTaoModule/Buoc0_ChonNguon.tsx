@@ -22,7 +22,7 @@ export default function Buoc0_ChonNguon({ config, setConfig, onNext }: Props) {
         setLoading(true);
         const res = await getTablesWithRLSAction();
         if (res.success && res.data) {
-            // 🔴 FIX LỖI Ở ĐÂY: Ép kiểu 'as any' để TypeScript không bắt bẻ RowList vs Array
+            // 🔴 FIX LỖI: Ép kiểu 'as any' để TypeScript không bắt bẻ RowList vs Array
             setTables(res.data as any);
         } else {
             console.error("Lỗi tải bảng:", res.error);
@@ -102,7 +102,7 @@ export default function Buoc0_ChonNguon({ config, setConfig, onNext }: Props) {
                 )}
             </div>
 
-            <div className="flex justify-end shrink-0">
+            <div className="flex-1 flex justify-end shrink-0 h-10 items-end">
                 <button onClick={onNext} disabled={!selected} className="px-8 py-3 bg-[#C69C6D] text-[#1a120f] font-bold text-xs uppercase rounded-lg hover:bg-[#b08b5e] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg">
                     {selected ? `Tiếp Tục Với: ${selected}` : 'Vui Lòng Chọn Bảng'}
                 </button>
