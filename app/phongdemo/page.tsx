@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import DashboardBuilder from '@/app/GiaoDienTong/DashboardBuilder';
+import DashboardBuilder from '@/app/GiaoDienTong/DashboardBuilder/DashboardBuilder';
 
 export default function PhongDemo() {
   return (

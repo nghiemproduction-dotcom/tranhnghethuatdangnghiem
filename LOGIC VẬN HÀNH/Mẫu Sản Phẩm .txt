@@ -1,0 +1,24 @@
+Logic vận hành module MẪU SẢN PHẨM
+
+1.Cách lấy dữ liệu:
+	- Lấy từ bảng mau_san_pham trên supabase đã bật realtime và unrestricted.
+	- Các cột trong bảng bao gồm( tên cột - tên hiển thị cột - kiểu cột - cách nhập liệu - nguyên tắc của cột):
+		.id - ID MẪU SẢN PHẨM - kiểu ID - tạo tự động - nguyên tắc: không được trùng dù xóa hay tạo mới.
+		.mo_ta - MÔ TẢ - kiểu text - người dùng nhập tay - nguyên tắc: tự động viết hoa chữ cái đầu tiên trong mỗi từ sau khi người dùng lưu lại.
+		.the_loai - THỂ LOẠI - kiểu danh sách xổ xuống - người dùng chọn 1 (chỉ được chọn 1) loại trong danh sách thể loại - nguyên tắc: có thêm nút tạo thêm để người dùng tạo thêm thể loại trong danh sách, sau khi tạo thêm nó sẽ lưu, có thêm nút xóa/chỉnh sửa chỉ dành riêng cho vị trí admin và quanly.
+		.nguoi_dang_mau - NGƯỜI ĐĂNG MẪU - kiểu liên kết dữ liệu (liên kết với bảng nhan_su) - sẽ tạo tự động người dùng không ai được tùy chọn - nguyên tắc: chỉ nhân sự vị trí thietke/admin/quanly mới được đăng, sẽ liên kết với bảng nhan_su để lấy chính xác tên hiển thị của người dùng đó, đây là liên kết qua lại nên từ bảng nhan_su vẫn vẫn phải truy ra được là có những mẫu thiết kế nào của nhan_su đó tạo.
+		.thoi_diem_dang_mau - THỜI ĐIỂM ĐĂNG MẪU - kiểu Time ( Giờ:Phút Ngày Tháng Năm) - sẽ tạo tự động người dùng không ai được tùy chọn - nguyên tắc: đã lấy thời điểm rồi là không bao giờ thay đổi.
+		.lich_su_chinh_sua - LỊCH SỬ CHỈNH SỬA - kiểu danh sách - sẽ tạo tự động với 3 cột con sau: 
+				.nguoi_chinh_sua - NGƯỜI CHỈNH SỬA (kiểu cột, cách nhập liệu và nguyên tắc giống hệt với nguoi_dang_mau)
+				.thoi_diem_chinh_sua - THỜI ĐIỂM CHỈNH SỬA (kiểu cột, cách nhập liệu và nguyên tắc giống hệt với thoi_diem_dang_mau)
+				.noi_dung_chinh_sua  - NỘI DUNG CHỈNH SỬA - kiểu text - tạo tự động ghi lại mọi hoạt động chỉnh sửa của người chỉnh sửa)
+		
+		.file_thiet_ke - FILE THIẾT KẾ - kiểu danh sách url - người dùng sẽ thêm vào các đường link mở ra file lưu trữ ở google - nguyên tắc: chỉ có admin/quản lý/ hoặc chính thiết kế đã dán link vào thì mới được xóa hoặc chỉnh sửa(để chống việc người thiết kế này xóa bỏ file của người thiết kế khác) 
+
+2.Cách hiển thị module (khi chưa nhấp vào):
+	Hiển thị kiểu biểu đồ hình hình cột với tên cột lấy dữ liệu từ cột the_loại và số liệu của cột lấy dữ liệu từ việc đếm các mẫu có cùng thể loại.
+3.Cách hiển thị bảng thống kê các row trong bảng (khi nhấp vào xem module):
+	Dạng card với 3 kiểu trình bày card khác nhau, có đầy đủ bộ action cơ bản : tạo mới, chỉnh sửa, xóa v.v….
+	Có đầy đủ tính năng: tìm kiếm, sort, lọc, thao tác hàng loạt v.v…
+4.Cách hiển thị bảng chi tiết mỗi row trong modal thống kê (khi nhấp vào các row trong bảng thống kê):
+	Dạng page to page có đầy đủ các cột và đầy đủ bộ action cơ bản.

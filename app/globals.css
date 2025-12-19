@@ -2,8 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 1. CẤU HÌNH CỠ CHỮ */
-html { font-size: 110%; }
+/* 1. CẤU HÌNH CỠ CHỮ & FIX SAMSUNG INTERNET */
+html { 
+  font-size: 110%; 
+  -webkit-text-size-adjust: 100%; /* Cấm trình duyệt tự scale chữ */
+  text-size-adjust: 100%;
+}
+
 @media (min-width: 640px) { html { font-size: 112.5%; } }
 @media (min-width: 1024px) { html { font-size: 125%; } }
 @media (min-width: 1280px) { html { font-size: 137.5%; } }
@@ -15,9 +20,9 @@ html { font-size: 110%; }
 }
 
 html {
-  /* Ưu tiên dùng biến JS tính toán, fallback về 100dvh */
+  /* Dùng biến --app-height được tính từ JS (visualViewport) */
   height: 100vh; 
-  height: var(--app-height, 100dvh);
+  height: var(--app-height, 100dvh) !important; /* !important để đè mọi setting mặc định */
   
   width: 100vw;
   background-color: #000000;
@@ -25,9 +30,8 @@ html {
 }
 
 body {
-  /* Ưu tiên dùng biến JS tính toán */
   height: 100vh;
-  height: var(--app-height, 100dvh);
+  height: var(--app-height, 100dvh) !important;
   
   width: 100vw;
   overflow: hidden;

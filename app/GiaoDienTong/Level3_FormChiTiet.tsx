@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Save, Trash2, AlertCircle, Hash, Loader2, Upload, ImageIcon, Phone, XCircle, Check } from 'lucide-react';
+import { X, Save, Trash2, AlertCircle, Loader2, Upload, ImageIcon, Check } from 'lucide-react';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
 import { ModuleConfig } from './KieuDuLieuModule';
+// 🟢 Đảm bảo bạn đã tạo file InputRegistry.tsx ở đường dẫn này
+import { renderField } from '@/app/GiaoDienTong/ModalTaoModule/ColumnTypes/InputRegistry'; 
 
 interface Props {
     isOpen: boolean;
@@ -20,7 +22,8 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
     const [uploadingImg, setUploadingImg] = useState(false);
     const [error, setError] = useState('');
 
-    const canEdit = ['admin', 'adminsystem', 'quanly', 'manager', 'admin_cung'].some(r => userRole.includes(r));
+    // Kiểm tra quyền
+    const canEdit = ['admin', 'adminsystem', 'quanly', 'manager', 'thietke', 'boss'].some(r => userRole.includes(r));
     const isEditMode = !!initialData;
 
     useEffect(() => {
@@ -32,151 +35,139 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
 
     if (!isOpen) return null;
 
-    // ... (Giữ nguyên logic nén ảnh và validate - compressImage, handleImageUpload, validateForm) ...
-    // Để tiết kiệm không gian, tôi sẽ chỉ viết phần render UI chính, các hàm logic bên trên giữ nguyên từ phiên bản trước
-
-    const compressImage = (file: File): Promise<Blob> => {
-        return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.src = URL.createObjectURL(file);
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                const MAX_WIDTH = 800;
-                let width = img.width; let height = img.height;
-                if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
-                canvas.width = width; canvas.height = height;
-                ctx?.drawImage(img, 0, 0, width, height);
-                canvas.toBlob((blob) => { if(blob) resolve(blob); else reject("Lỗi nén"); }, 'image/jpeg', 0.7);
-            };
-            img.onerror = reject;
-        });
-    };
-
+    // --- LOGIC XỬ LÝ ẢNH ---
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, colKey: string) => {
         const file = e.target.files?.[0]; if (!file) return;
+        setUploadingImg(true);
         try {
-            setUploadingImg(true);
-            const compressedBlob = await compressImage(file);
-            const compressedFile = new File([compressedBlob], file.name, { type: 'image/jpeg' });
-            const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-            const { error } = await supabase.storage.from('images').upload(fileName, compressedFile);
+            const fileName = `${config.bangDuLieu}/${Date.now()}.jpg`;
+            const { error } = await supabase.storage.from('images').upload(fileName, file);
             if (error) throw error;
-            const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
-            setFormData((prev: any) => ({ ...prev, [colKey]: publicUrl }));
-        } catch (err: any) { alert("Lỗi: " + err.message); } finally { setUploadingImg(false); }
+            const { data } = supabase.storage.from('images').getPublicUrl(fileName);
+            setFormData((prev: any) => ({ ...prev, [colKey]: data.publicUrl }));
+        } catch (err: any) { alert(err.message); } finally { setUploadingImg(false); }
     };
 
+    // --- LOGIC LƯU DỮ LIỆU ---
     const handleSave = async () => {
         setLoading(true); setError('');
         try {
-            // validateForm(); // Gọi hàm validate
             const payload: any = {};
             config.danhSachCot.forEach(col => {
-                if (!isEditMode && col.tuDong) return;
-                if (formData[col.key] !== undefined) payload[col.key] = formData[col.key];
+                if (col.tuDong) return; // Bỏ qua cột tự động
+                const val = formData[col.key];
+                
+                // Chuẩn hóa dữ liệu trước khi gửi
+                if ((col.kieuDuLieu === 'link_array' || col.kieuDuLieu === 'text[]') && Array.isArray(val)) {
+                    payload[col.key] = val.filter((v: string) => v && v.trim() !== '');
+                } else if (['integer', 'number', 'float', 'numeric'].includes(col.kieuDuLieu)) {
+                    payload[col.key] = val === '' ? null : Number(val);
+                } else {
+                    if (val !== undefined) payload[col.key] = val;
+                }
             });
-            if (isEditMode) { const { error } = await supabase.from(config.bangDuLieu).update(payload).eq('id', initialData.id); if (error) throw error; } 
-            else { const { error } = await supabase.from(config.bangDuLieu).insert(payload); if (error) throw error; }
+
+            if (isEditMode) { 
+                const { error } = await supabase.from(config.bangDuLieu).update(payload).eq('id', initialData.id);
+                if (error) throw error;
+            } else { 
+                const { error } = await supabase.from(config.bangDuLieu).insert(payload);
+                if (error) throw error;
+            }
             onSuccess(); onClose();
-        } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu.'); } finally { setLoading(false); }
+        } catch (err: any) { setError('Lỗi lưu: ' + err.message); } finally { setLoading(false); }
     };
 
     const handleDelete = async () => {
-        if (!confirm('Xóa dữ liệu này?')) return;
+        if (!confirm('Xóa vĩnh viễn?')) return;
         setLoading(true);
-        try { const { error } = await supabase.from(config.bangDuLieu).delete().eq('id', initialData.id); if (error) throw error; onSuccess(); onClose(); } 
-        catch (err: any) { alert("Lỗi xóa: " + err.message); setLoading(false); }
-    };
-
-    const renderInput = (col: any) => {
-        const val = formData[col.key] || '';
-        const isReadOnly = !canEdit || (col.tuDong && isEditMode);
-        const baseClass = "w-full bg-[#1a120f] border border-[#8B5E3C]/30 rounded-lg px-3 py-3 text-sm text-[#F5E6D3] focus:border-[#C69C6D] outline-none transition-all placeholder-[#5D4037] disabled:opacity-50 disabled:cursor-not-allowed";
-
-        if (['hinh_anh', 'avatar', 'image'].includes(col.key)) return null;
-        if (['dien_thoai', 'sdt', 'phone'].includes(col.key)) return ( <div className="relative"> <input type="text" value={val} onChange={(e) => setFormData({...formData, [col.key]: e.target.value})} disabled={isReadOnly} className={baseClass} /> <Phone size={14} className="absolute right-3 top-3 text-[#5D4037]"/> </div> );
-        if (['integer', 'bigint', 'numeric', 'number'].includes(col.kieuDuLieu)) return ( <div className="relative"> <input type="number" value={val} onChange={(e) => setFormData({...formData, [col.key]: e.target.value})} disabled={isReadOnly} className={baseClass}/> <Hash size={14} className="absolute right-3 top-3 text-[#5D4037]"/> </div> );
-        if (col.key.includes('ngay') || col.kieuDuLieu.includes('date')) { const dateVal = val ? String(val).split('T')[0] : ''; return <input type="date" value={dateVal} onChange={(e) => setFormData({...formData, [col.key]: e.target.value})} disabled={isReadOnly} className={`${baseClass} [color-scheme:dark]`}/>; }
-        if (col.key.includes('mo_ta') || col.key.includes('ghi_chu')) return <textarea rows={3} value={val} onChange={(e) => setFormData({...formData, [col.key]: e.target.value})} disabled={isReadOnly} className={baseClass}/>;
-        return <input type="text" value={val} onChange={(e) => setFormData({...formData, [col.key]: e.target.value})} disabled={isReadOnly} className={baseClass}/>;
+        const { error } = await supabase.from(config.bangDuLieu).delete().eq('id', initialData.id);
+        setLoading(false);
+        if (!error) { onSuccess(); onClose(); } else alert(error.message);
     };
 
     const imgCol = config.danhSachCot.find(c => ['hinh_anh', 'avatar', 'image'].includes(c.key));
 
     return (
-        <div className="fixed inset-0 z-[1000] flex justify-end">
-            {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300" onClick={onClose}></div>
-
-            {/* Panel */}
-            <div className="relative w-full md:w-[600px] lg:w-[800px] bg-[#110d0c] shadow-[-10px_0_40px_rgba(0,0,0,0.8)] border-l border-[#8B5E3C]/30 flex flex-col h-full animate-in slide-in-from-right duration-300 bottom-[clamp(60px,15vw,80px)] top-0">
-                <style jsx>{` .custom-scroll::-webkit-scrollbar { width: 4px; } .custom-scroll::-webkit-scrollbar-thumb { background: #8B5E3C; border-radius: 4px; } `}</style>
-
-                {/* 🟢 HEADER (Chứa tất cả nút điều khiển) */}
-                <div className="h-[70px] px-6 border-b border-[#8B5E3C]/20 flex items-center justify-between bg-gradient-to-r from-transparent via-[#8B5E3C]/10 to-transparent shrink-0">
-                    <div className="flex flex-col">
-                        <h2 className="text-[clamp(16px,5vw,20px)] font-bold text-[#C69C6D] uppercase tracking-wide truncate">
-                            {isEditMode ? 'Thông Tin' : 'Thêm Mới'}
-                        </h2>
-                        {isEditMode && <span className="text-[10px] font-mono text-[#8B5E3C]">ID: {initialData?.id}</span>}
-                    </div>
-                    
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <div className="relative w-full max-w-5xl h-[90vh] bg-[#110d0c] border border-[#8B5E3C]/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95">
+                
+                {/* Header */}
+                <div className="h-16 border-b border-[#8B5E3C]/20 flex items-center justify-between px-6 bg-[#1a120f] shrink-0">
                     <div className="flex items-center gap-3">
-                        {canEdit && (
-                            <>
-                                {isEditMode && (
-                                    <button 
-                                        onClick={handleDelete} 
-                                        className="p-2 text-red-400 hover:bg-red-900/20 rounded-full transition-all" 
-                                        title="Xóa"
-                                    >
-                                        <Trash2 size={20}/>
-                                    </button>
-                                )}
-                                <button 
-                                    onClick={handleSave} 
-                                    disabled={loading} 
-                                    className="flex items-center gap-2 px-4 py-2 bg-[#C69C6D] hover:bg-[#b08b5e] text-[#1a120f] font-bold text-xs uppercase rounded-full shadow-lg transition-all active:scale-95 disabled:opacity-50"
-                                >
-                                    {loading ? <Loader2 size={16} className="animate-spin"/> : <Check size={16} strokeWidth={3}/>}
-                                    <span>Lưu</span>
-                                </button>
-                            </>
-                        )}
-                        <div className="w-[1px] h-6 bg-[#8B5E3C]/20 mx-1"></div>
-                        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-[#8B5E3C] hover:text-[#C69C6D] transition-colors">
-                            <XCircle size={24}/>
-                        </button>
+                        <div className="p-2 bg-[#C69C6D]/10 rounded-lg">{isEditMode ? <Check size={20} className="text-[#C69C6D]"/> : <Upload size={20} className="text-[#C69C6D]"/>}</div>
+                        <div>
+                            <h2 className="text-lg font-bold text-[#F5E6D3] uppercase">{isEditMode ? 'Cập Nhật' : 'Thêm Mới'}</h2>
+                            <p className="text-[10px] text-[#8B5E3C]">MODULE: {config.tenModule}</p>
+                        </div>
+                    </div>
+                    <div className="flex gap-2">
+                        {canEdit && isEditMode && <button onClick={handleDelete} className="p-2 text-red-400 hover:bg-red-900/20 rounded"><Trash2 size={20}/></button>}
+                        <button onClick={onClose} className="p-2 text-gray-400 hover:text-white"><X size={24}/></button>
                     </div>
                 </div>
 
-                {/* BODY */}
-                <div className="flex-1 overflow-y-auto p-6 custom-scroll bg-[#0a0807]">
+                {/* Body */}
+                <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+                    {/* Cột ảnh (Trái) */}
                     {imgCol && (
-                        <div className="flex flex-col items-center mb-8">
-                            <div className="relative group w-32 h-32">
-                                {formData[imgCol.key] ? (<img src={formData[imgCol.key]} className="w-32 h-32 rounded-full object-cover border-4 border-[#C69C6D] shadow-[0_0_20px_rgba(198,156,109,0.2)]" alt="Avatar"/>) : (<div className="w-32 h-32 rounded-full bg-[#1a120f] flex items-center justify-center border-4 border-[#8B5E3C]/50 shadow-inner"><ImageIcon size={40} className="text-[#5D4037]"/></div>)}
-                                {canEdit && (<label className="absolute bottom-0 right-0 p-2 bg-[#C69C6D] hover:bg-[#b08b5e] text-[#1a120f] rounded-full cursor-pointer shadow-lg transition-transform hover:scale-110">{uploadingImg ? <Loader2 size={16} className="animate-spin"/> : <Upload size={16}/>}<input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, imgCol.key)} disabled={uploadingImg}/></label>)}
+                        <div className="w-full lg:w-[30%] bg-[#0f0b0a] border-r border-[#8B5E3C]/20 p-6 flex flex-col items-center justify-center">
+                            <div className="relative w-full aspect-square bg-[#1a120f] rounded-xl flex items-center justify-center text-[#5D4037] overflow-hidden group border border-[#8B5E3C]/30">
+                                {formData[imgCol.key] ? <img src={formData[imgCol.key]} className="w-full h-full object-cover"/> : <ImageIcon size={48}/>}
+                                {canEdit && (
+                                    <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center cursor-pointer text-[#C69C6D] transition-opacity">
+                                        {uploadingImg ? <Loader2 size={32} className="animate-spin"/> : <Upload size={32}/>}
+                                        <span className="text-xs font-bold mt-2 uppercase">Tải ảnh</span>
+                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, imgCol.key)} disabled={uploadingImg}/>
+                                    </label>
+                                )}
                             </div>
                         </div>
                     )}
 
-                    {error && <div className="mb-4 p-3 bg-red-900/20 border border-red-500/50 rounded flex items-center gap-2 text-red-200 text-sm"><AlertCircle size={16}/> {error}</div>}
+                    {/* Cột Form (Phải) */}
+                    <div className="flex-1 bg-[#110d0c] p-8 overflow-y-auto custom-scroll">
+                        {error && <div className="mb-6 p-4 bg-red-950/30 border border-red-500/30 rounded-lg flex items-center gap-3 text-red-200"><AlertCircle size={20}/> {error}</div>}
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {config.danhSachCot.map((col) => {
+                                if (['hinh_anh', 'avatar', 'image'].includes(col.key)) return null;
+                                
+                                // Kiểm tra phân quyền (Nếu có cấu hình quyền xem)
+                                if (col.quyenXem && col.quyenXem.length > 0 && !col.quyenXem.some(role => userRole.includes(role))) return null;
+                                
+                                const isReadOnly = !canEdit || (col.quyenSua && col.quyenSua.length > 0 && !col.quyenSua.some(role => userRole.includes(role)));
+                                const isFullWidth = ['mo_ta', 'ghi_chu', 'file_thiet_ke', 'lich_su_chinh_sua'].includes(col.key) || col.kieuDuLieu === 'link_array' || col.kieuDuLieu === 'history';
 
-                    <div className="grid grid-cols-1 gap-5">
-                        {config.danhSachCot.map((col) => {
-                            if (!isEditMode && col.tuDong) return null;
-                            if (col.key === 'id' || ['hinh_anh', 'avatar', 'image'].includes(col.key)) return null;
-                            return (
-                                <div key={col.key}>
-                                    <label className="text-[10px] font-bold text-[#8B5E3C] uppercase tracking-wider mb-1.5 ml-1 block">{col.label || col.key} {col.batBuoc && <span className="text-red-500">*</span>}</label>
-                                    {renderInput(col)}
-                                </div>
-                            );
-                        })}
+                                return (
+                                    <div key={col.key} className={isFullWidth ? "md:col-span-2" : ""}>
+                                        <label className="flex items-center gap-1 text-[10px] font-bold text-[#8B5E3C] uppercase tracking-widest mb-2">
+                                            {col.label} {col.batBuoc && <span className="text-red-500">*</span>}
+                                        </label>
+                                        
+                                        {/* 🟢 GỌI RENDER TỪ REGISTRY (ĐÃ FIX LỖI TYPE ANY) */}
+                                        {renderField(
+                                            col, 
+                                            formData[col.key], 
+                                            (val: any) => setFormData({ ...formData, [col.key]: val }), 
+                                            isReadOnly || col.tuDong || false
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
+
+                {/* Footer */}
+                {canEdit && (
+                    <div className="h-20 border-t border-[#8B5E3C]/20 bg-[#161210] flex items-center justify-end px-8 gap-4">
+                        <button onClick={onClose} className="px-6 py-3 rounded-lg text-gray-400 hover:text-[#F5E6D3] font-bold text-xs uppercase">Hủy Bỏ</button>
+                        <button onClick={handleSave} disabled={loading} className="flex items-center gap-3 px-8 py-3 bg-[#C69C6D] hover:bg-[#b08b5e] text-[#1a120f] font-bold text-xs uppercase rounded-lg shadow-lg">
+                            {loading ? <Loader2 size={18} className="animate-spin"/> : <Save size={18}/>} <span>Lưu Dữ Liệu</span>
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

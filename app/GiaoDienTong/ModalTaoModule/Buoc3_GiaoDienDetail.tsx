@@ -1,82 +1,137 @@
-import React from 'react';
-import { FileText, Settings, ShieldAlert, Printer, History } from 'lucide-react';
+'use client';
 
-export default function Buoc3_GiaoDienDetail({ config, setConfig }: any) {
+import React, { useState, useEffect } from 'react';
+import { Link2, Loader2, Plus, Trash2, ArrowRight } from 'lucide-react';
+import { supabase } from '@/app/ThuVien/ketNoiSupabase';
+import { createForeignKeyAction } from '@/app/actions/admindb';
+import { ModuleConfig } from '../KieuDuLieuModule';
 
-  // Các quyền hạn trong trang chi tiết
-  const detailActions = [
-    { id: 'edit', label: 'Cho phép Sửa', icon: <Settings size={18}/> },
-    { id: 'delete', label: 'Cho phép Xóa', icon: <ShieldAlert size={18}/> },
-    { id: 'print', label: 'In ấn (Print)', icon: <Printer size={18}/> },
-    { id: 'history', label: 'Xem lịch sử (Log)', icon: <History size={18}/> },
-  ];
+interface Props {
+    config: ModuleConfig;
+    setConfig: (val: any) => void;
+}
 
-  const toggleDetailPerm = (permId: string) => {
-    const currentPerms = config.quyenAdminDetail || [];
-    if (currentPerms.includes(permId)) {
-      setConfig({ ...config, quyenAdminDetail: currentPerms.filter((p: string) => p !== permId) });
-    } else {
-      setConfig({ ...config, quyenAdminDetail: [...currentPerms, permId] });
-    }
-  };
+export default function Buoc3_GiaoDienDetail({ config, setConfig }: Props) {
+    const [targetTables, setTargetTables] = useState<string[]>([]);
+    const [loadingTables, setLoadingTables] = useState(false);
+    
+    // Form State
+    const [sourceCol, setSourceCol] = useState('');
+    const [targetTable, setTargetTable] = useState('');
+    const [targetCol, setTargetCol] = useState('id'); // Mặc định ID
+    const [creating, setCreating] = useState(false);
 
-  return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-right-10 duration-300">
-      
-      <div className="bg-blue-900/20 border border-blue-500/30 p-6 rounded-xl flex items-start gap-4">
-        <div className="p-3 bg-blue-600 rounded-lg text-white">
-          <FileText size={24} />
-        </div>
-        <div>
-          <h3 className="text-lg font-bold text-blue-100">Cấu hình Trang Chi Tiết</h3>
-          <p className="text-sm text-blue-200/70 mt-1">
-            Đây là giao diện sẽ hiện ra khi người dùng nhấp vào một dòng trong danh sách.
-            Hệ thống sẽ tự động tạo form dựa trên các cột dữ liệu bạn đã chọn ở Bước 1.
-          </p>
-        </div>
-      </div>
+    // Load danh sách bảng để liên kết
+    useEffect(() => {
+        const load = async () => {
+            setLoadingTables(true);
+            const { data } = await supabase.rpc('get_tables');
+            if (data) setTargetTables(data.map((t: any) => t.table_name).filter((t: string) => t !== config.bangDuLieu));
+            setLoadingTables(false);
+        };
+        load();
+    }, [config.bangDuLieu]);
 
-      <div className="space-y-4">
-        <label className="text-sm font-bold text-gray-400 uppercase">Các hành động cho phép</label>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {detailActions.map((action) => {
-            const isChecked = (config.quyenAdminDetail || []).includes(action.id);
-            return (
-              <button
-                key={action.id}
-                onClick={() => toggleDetailPerm(action.id)}
-                className={`flex items-center justify-between px-6 py-4 rounded-xl border transition-all
-                  ${isChecked 
-                    ? 'bg-[#333] border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.2)]' 
-                    : 'bg-[#252526] border-white/10 opacity-60 hover:opacity-100'}
-                `}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${isChecked ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400'}`}>
-                    {action.icon}
-                  </div>
-                  <span className={`font-bold ${isChecked ? 'text-white' : 'text-gray-400'}`}>
-                    {action.label}
-                  </span>
+    const handleCreateRelation = async () => {
+        if (!sourceCol || !targetTable) return alert("Vui lòng chọn đủ thông tin!");
+        setCreating(true);
+        
+        // Gọi Server Action tạo FK
+        const res = await createForeignKeyAction(config.bangDuLieu, sourceCol, targetTable, targetCol);
+        
+        if (res.success) {
+            alert("Đã tạo liên kết thành công!");
+            // Lưu metadata vào config để App biết
+            const newRelation = { 
+                sourceCol, 
+                targetTable, 
+                targetCol, 
+                type: 'Many-to-One' 
+            };
+            const currentRelations = config.widgetData?.relations || [];
+            setConfig({
+                ...config,
+                widgetData: { ...config.widgetData, relations: [...currentRelations, newRelation] }
+            });
+            setSourceCol(''); setTargetTable('');
+        } else {
+            alert("Lỗi tạo liên kết: " + res.error);
+        }
+        setCreating(false);
+    };
+
+    return (
+        <div className="h-full flex flex-col gap-6 animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className="shrink-0 flex items-center gap-2 text-[#F5E6D3]">
+                <Link2 size={18} className="text-[#C69C6D]"/>
+                <h3 className="text-sm font-bold uppercase tracking-widest">3. Thiết Lập Quan Hệ (Relationships)</h3>
+            </div>
+
+            {/* Form Tạo Liên Kết */}
+            <div className="bg-[#1a120f] border border-[#8B5E3C]/20 rounded-xl p-5 shadow-lg">
+                <div className="flex items-end gap-4">
+                    <div className="flex-1 space-y-1">
+                        <label className="text-[10px] font-bold text-[#8B5E3C] uppercase">Cột Bảng Hiện Tại ({config.bangDuLieu})</label>
+                        <select 
+                            value={sourceCol} onChange={(e) => setSourceCol(e.target.value)}
+                            className="w-full bg-[#0a0807] border border-[#8B5E3C]/30 rounded px-3 py-2 text-sm text-[#F5E6D3] outline-none"
+                        >
+                            <option value="">-- Chọn cột --</option>
+                            {config.danhSachCot?.map(c => <option key={c.key} value={c.key}>{c.key} ({c.kieuDuLieu})</option>)}
+                        </select>
+                    </div>
+
+                    <div className="pb-3 text-[#8B5E3C]"><ArrowRight size={16}/></div>
+
+                    <div className="flex-1 space-y-1">
+                        <label className="text-[10px] font-bold text-[#8B5E3C] uppercase">Bảng Đích (Target Table)</label>
+                        <select 
+                            value={targetTable} onChange={(e) => setTargetTable(e.target.value)}
+                            className="w-full bg-[#0a0807] border border-[#8B5E3C]/30 rounded px-3 py-2 text-sm text-[#F5E6D3] outline-none"
+                        >
+                            <option value="">-- Chọn bảng --</option>
+                            {targetTables.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                    </div>
+
+                    <div className="flex-1 space-y-1">
+                        <label className="text-[10px] font-bold text-[#8B5E3C] uppercase">Cột Đích (Target ID)</label>
+                        <input type="text" value={targetCol} disabled className="w-full bg-[#161210] border border-[#8B5E3C]/10 rounded px-3 py-2 text-sm text-gray-500 cursor-not-allowed"/>
+                    </div>
+
+                    <button 
+                        onClick={handleCreateRelation} 
+                        disabled={creating}
+                        className="bg-[#C69C6D] hover:bg-[#b08b5e] text-[#1a120f] font-bold h-[38px] px-4 rounded flex items-center gap-2 text-xs uppercase"
+                    >
+                        {creating ? <Loader2 size={14} className="animate-spin"/> : <Plus size={14}/>} Liên Kết
+                    </button>
                 </div>
-                
-                {/* Toggle Switch UI */}
-                <div className={`w-12 h-6 rounded-full p-1 transition-colors ${isChecked ? 'bg-blue-600' : 'bg-gray-600'}`}>
-                  <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${isChecked ? 'translate-x-6' : 'translate-x-0'}`} />
+                <p className="text-[10px] text-[#8B5E3C] mt-3 italic">* Ví dụ: Cột <b>user_id</b> trong bảng hiện tại liên kết tới bảng <b>nhan_su</b> cột <b>id</b>.</p>
+            </div>
+
+            {/* Danh Sách Liên Kết Đã Tạo */}
+            <div className="flex-1 bg-[#1a120f] border border-[#8B5E3C]/20 rounded-xl overflow-hidden flex flex-col">
+                <div className="p-3 bg-[#161210] border-b border-[#8B5E3C]/20 text-xs font-bold text-[#F5E6D3] uppercase">Danh Sách Quan Hệ</div>
+                <div className="flex-1 p-4 overflow-y-auto custom-scroll">
+                    {config.widgetData?.relations?.length > 0 ? (
+                        <div className="space-y-2">
+                            {config.widgetData.relations.map((rel: any, idx: number) => (
+                                <div key={idx} className="flex items-center justify-between p-3 bg-[#0a0807] border border-[#8B5E3C]/10 rounded hover:border-[#C69C6D]/30 transition-all">
+                                    <div className="flex items-center gap-3 text-xs">
+                                        <span className="text-[#C69C6D] font-bold font-mono">{config.bangDuLieu}.{rel.sourceCol}</span>
+                                        <ArrowRight size={12} className="text-[#8B5E3C]"/>
+                                        <span className="text-[#F5E6D3] font-bold font-mono">{rel.targetTable}.{rel.targetCol}</span>
+                                    </div>
+                                    <button className="text-[#5D4037] hover:text-red-500"><Trash2 size={14}/></button>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center text-[#5D4037] text-xs mt-10">Chưa có liên kết nào.</div>
+                    )}
                 </div>
-              </button>
-            );
-          })}
+            </div>
         </div>
-      </div>
-
-      {/* Preview giả lập (Optional) */}
-      <div className="mt-8 pt-8 border-t border-white/10 text-center opacity-50">
-        <p className="text-xs text-gray-500 italic">
-          * Form chi tiết sẽ tự động Responsive và sắp xếp layout thông minh dựa trên kiểu dữ liệu.
-        </p>
-      </div>
-
-    </div>
-  );
+    );
 }

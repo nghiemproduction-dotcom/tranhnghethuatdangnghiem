@@ -1,5 +1,5 @@
 'use client';
-import DashboardBuilder from '@/app/GiaoDienTong/DashboardBuilder';
+import DashboardBuilder from '@/app/GiaoDienTong/DashboardBuilder/DashboardBuilder';
 
 export default function PhongAdmin() {
   return (
