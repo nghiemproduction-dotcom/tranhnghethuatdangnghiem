@@ -17,39 +17,65 @@ LỆNH CẤM: Tuyệt đối không được viết code sửa đổi ngay bây 
 -------------------------------------------------------------------------------------------------------------------------
 
 
-Rất tốt. Tao tải lên các file mày cần đây!
-Nhiệm vụ: Dùng nội dung file tao vừa upload (đây là NGUỒN DUY NHẤT) để sửa code theo yêu cầu.
+ok. Tao tải lên các file mày cần đây!
+
+Nhiệm vụ: Dùng chính xác nội dung của những file tao vừa upload (chứ không lấy từ nội dung trả lời trước) để sửa code theo yêu cầu.
+
 QUY TẮC XỬ LÝ "SMART BATCH" (TUÂN THỦ TUYỆT ĐỐI):
+
 1. KHÔNG RÚT GỌN (NO TRUNCATION):
+
    -Tuyệt đối không xóa tùy tiện, chỉ chỉnh sửa hoặc thêm mới những chỗ cần thiết.
+
    - Mã trả về phải là FULL CODE để copy-paste (Drop-in replacement).
+
    - Tuyệt đối không dùng dấu "..." hay "// ... code cũ".
+
    - Hãy chia thành nhiều câu trả lời nếu mã viết hơn dài hơn 200 dòng.
+
    - Đếm file tải lên xem được bao nhiêu dòng và cho tôi biết trước khi viết mã là sẽ tạo ra mã dài bao nhiêu dòng. Nếu mã tạo ra quá ngắn so với mã trong file mà tôi tải lên thì như vậy có nghĩa là bạn đã rút gọn và như vậy là không được phép.
+
 2. TỐI ƯU HÓA DUNG LƯỢNG TRẢ LỜI:
+
    - Nếu file ngắn: Hãy gộp nhiều file vào 1 câu trả lời cho nhanh.
+
    - Nếu file quá dài: Hãy tách ra, viết đến hết dung lượng cho phép thì dừng lại.
 
+
+
 3. CHẾ ĐỘ BẢO ĐẢM:
+
     - Cam kết các file tạo ra không gây lỗi hoặc xung đột với file khác dù là nhỏ nhất.
+
     - Cam kết nếu cần thêm file để tham khảo thêm nữa thì sẽ yêu cầu thêm file chứ không ham tạo mã liền.
 
+
+
 4. CƠ CHẾ BÁO CÁO TIẾN ĐỘ (STATUS REPORT) - BẮT BUỘC Ở CUỐI CÂU TRẢ LỜI:
+
    - Cuối câu trả lời, mày PHẢI in ra một bảng trạng thái theo mẫu sau để tao biết đường ra lệnh tiếp:
+
    --------------------------------------------------
+
    [TIẾN ĐỘ THỰC HIỆN]
+
    - Đã xong: [Tên các file đã in full code xong]
+
    - Đang dang dở: [Tên file đang viết dở - nếu có]
+
    - Còn lại (Chưa làm): [Danh sách các file còn lại trong yêu cầu]
+
    -> Trạng thái: [ĐÃ XONG HẾT / CẦN LÀM TIẾP]
+
    --------------------------------------------------
+
 Giờ hãy bắt đầu xử lý. Nhớ in bảng tiến độ ở cuối.
 
 
 ------------------------------------------------------------------------------------------------------------------------------------------
 ------------------------------------------------------------------------------------------------------------------------------------------
 
-OK. Dựa vào bảng [TIẾN ĐỘ THỰC HIỆN] ở câu trả lời ngay vừa rồi của mày:
+OK tiếp tục đi, dựa vào bảng [TIẾN ĐỘ THỰC HIỆN] ở câu trả lời ngay vừa rồi của mày:
 
 1. XÁC ĐỊNH ĐIỂM TIẾP NỐI:
    - Nếu có file "Đang dang dở": Hãy viết tiếp code của file đó (nối liền mạch, không lặp lại đoạn đã viết).
@@ -64,3 +90,18 @@ OK. Dựa vào bảng [TIẾN ĐỘ THỰC HIỆN] ở câu trả lời ngay v�
    - Kết thúc câu trả lời vẫn phải in lại bảng [TIẾN ĐỘ THỰC HIỆN] cập nhật mới nhất.
 
 Làm tiếp đi!
+
+
+
+
+
+
+
+
+
+
+Chưa được. chúng ta cần tạo cái này nữa mới được: app\GiaoDienTong\ModalDaCap\Giaodien với các file và folder như sau:
+1.ThanhTieuDe.tsx   luôn chỉ hiển thị tiêu đề, chữ đậm, cân giữa, độ cao và chữ thì co giãn bằng cách đo màn hình thiết bị.
+2.ThanhDieuHuong.tsx       là thanh phân cấp để người dùng biết được là họ đang ở đâu, có thể nhấp vào các thành phần trong đường phân cấp để trở lại cấp đó, nếu có nhiều cấp quá thì có thể rút gọn phần đầu.
+3.NoidungModal.tsx    là nơi sẽ chứa thành phần nội dung chính của Modal
+4.NutModal.tsx     là các nút nổi hình tròn nằm ở góc dưới bên phải màn hình, không che menu dưới, nút này có 2 thành phần: 1 là nút tròn chỉ có logo, 2 là tên nút hiển thị bên trái nút.

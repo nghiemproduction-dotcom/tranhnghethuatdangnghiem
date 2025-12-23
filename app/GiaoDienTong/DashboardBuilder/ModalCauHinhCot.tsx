@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, RefreshCw, Settings, Database, Layout } from 'lucide-react';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
-import { ModuleConfig, CotHienThi } from '../KieuDuLieuModule';
+import { ModuleConfig, CotHienThi } from './KieuDuLieuModule';
 
 interface Props {
     isOpen: boolean;

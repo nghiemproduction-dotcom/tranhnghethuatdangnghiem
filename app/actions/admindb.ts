@@ -5,79 +5,98 @@ import postgres from 'postgres';
 // Kết nối DB
 const sql = postgres(process.env.DATABASE_URL!, {
   ssl: 'require',
-  max: 10, // Tăng kết nối để xử lý mượt hơn
+  max: 10,
+  idle_timeout: 20, 
 });
 
-// --- 1. LẤY DANH SÁCH BẢNG & TRẠNG THÁI RLS (Cho Bước 0) ---
+// --- 1. LẤY DANH SÁCH BẢNG & TRẠNG THÁI RLS ---
 export async function getTablesWithRLSAction() {
     try {
         const tables = await sql`
-            SELECT 
-                c.relname as table_name,
-                c.relrowsecurity as rls_enabled
+            SELECT c.relname as table_name, c.relrowsecurity as rls_enabled
             FROM pg_class c
             JOIN pg_namespace n ON n.oid = c.relnamespace
-            WHERE n.nspname = 'public' 
-              AND c.relkind = 'r'
+            WHERE n.nspname = 'public' AND c.relkind = 'r'
             ORDER BY c.relname;
         `;
-        return { success: true, data: tables };
+        return { success: true, data: Array.from(tables).map(t => ({ table_name: t.table_name, rls_enabled: t.rls_enabled })) };
     } catch (error: any) {
         return { success: false, error: error.message };
     }
 }
 
-// --- 2. TOGGLE RLS (BẬT/TẮT BẢO MẬT - Cho Bước 0) ---
+// --- 2. KIỂM TRA TRẠNG THÁI RLS CỦA 1 BẢNG ---
+export async function checkTableRLSAction(tableName: string) {
+    try {
+        const [result] = await sql`
+            SELECT c.relrowsecurity as rls_enabled
+            FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' 
+              AND c.relkind = 'r'
+              AND c.relname = ${tableName}
+        `;
+        
+        if (!result) return { success: false, error: "Bảng không tồn tại" };
+        return { success: true, rls_enabled: result.rls_enabled };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+// --- 3. LẤY SCHEMA (DANH SÁCH CỘT) CỦA BẢNG (MỚI) ---
+// Hàm này phục vụ cho Bước 1 để load các cột vào dropdown
+export async function getTableSchemaAction(tableName: string) {
+    try {
+        const columns = await sql`
+            SELECT column_name, data_type, is_nullable, column_default
+            FROM information_schema.columns 
+            WHERE table_schema = 'public' 
+              AND table_name = ${tableName}
+            ORDER BY ordinal_position;
+        `;
+        return { success: true, data: Array.from(columns) };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+// --- 4. TOGGLE RLS (BẬT/TẮT) ---
 export async function toggleRLSAction(tableName: string, enable: boolean) {
     try {
         if (enable) {
             await sql`ALTER TABLE ${sql(tableName)} ENABLE ROW LEVEL SECURITY`;
         } else {
             await sql`ALTER TABLE ${sql(tableName)} DISABLE ROW LEVEL SECURITY`;
-            // Unrestricted: Cấp full quyền cho mọi người
             await sql`GRANT ALL ON TABLE ${sql(tableName)} TO anon, authenticated, service_role`;
         }
         return { success: true };
-    } catch (error: any) {
-        return { success: false, error: error.message };
-    }
+    } catch (error: any) { return { success: false, error: error.message }; }
 }
 
-// --- 3. LẤY DỮ LIỆU PHÂN TRANG (Cho Bước 2) ---
+// --- 5. LẤY DỮ LIỆU PHÂN TRANG ---
 export async function getTableDataPaginatedAction(tableName: string, page: number, pageSize: number) {
     try {
         const offset = (page - 1) * pageSize;
-        const data = await sql`
-            SELECT * FROM ${sql(tableName)}
-            ORDER BY created_at DESC
-            LIMIT ${pageSize} OFFSET ${offset}
-        `;
-        // Đếm tổng số dòng
+        const data = await sql`SELECT * FROM ${sql(tableName)} ORDER BY created_at DESC LIMIT ${pageSize} OFFSET ${offset}`;
         const [count] = await sql`SELECT count(*) as total FROM ${sql(tableName)}`;
-        return { success: true, data: data, total: Number(count.total) };
-    } catch (error: any) {
-        return { success: false, error: error.message };
-    }
+        return { success: true, data: Array.from(data), total: Number(count.total) };
+    } catch (error: any) { return { success: false, error: error.message }; }
 }
 
-// --- 4. TẠO KHÓA NGOẠI (RELATIONSHIP - Cho Bước 3) ---
+// --- 6. TẠO KHÓA NGOẠI ---
 export async function createForeignKeyAction(table: string, col: string, refTable: string, refCol: string = 'id') {
     try {
         const constraintName = `fk_${table}_${col}_${Date.now()}`;
         await sql.unsafe(`
-            ALTER TABLE "${table}"
-            ADD CONSTRAINT "${constraintName}"
-            FOREIGN KEY ("${col}")
-            REFERENCES "${refTable}" ("${refCol}")
-            ON DELETE SET NULL
+            ALTER TABLE "${table}" ADD CONSTRAINT "${constraintName}" 
+            FOREIGN KEY ("${col}") REFERENCES "${refTable}" ("${refCol}") ON DELETE SET NULL
         `);
         return { success: true };
-    } catch (error: any) {
-        return { success: false, error: error.message };
-    }
+    } catch (error: any) { return { success: false, error: error.message }; }
 }
 
-// --- 5. QUẢN LÝ CẤU TRÚC BẢNG (CORE) ---
+// --- 7. QUẢN LÝ CẤU TRÚC BẢNG (CORE) ---
 export async function manageTableStructureAction(tableName: string, columnsDef: any[]) {
   try {
     if (!tableName) throw new Error("Tên bảng không được để trống");
@@ -89,37 +108,39 @@ export async function manageTableStructureAction(tableName: string, columnsDef: 
       )
     `;
 
-    // Mặc định tắt RLS khi tạo mới để tiện dev
     try {
         await sql`ALTER TABLE ${sql(tableName)} DISABLE ROW LEVEL SECURITY`;
         await sql`GRANT ALL ON TABLE ${sql(tableName)} TO anon, authenticated, service_role`;
     } catch (e) {}
 
     for (const col of columnsDef) {
-        if (col.name === 'id' || col.name === 'created_at') continue;
+        if (['id', 'created_at'].includes(col.name)) continue;
 
         try {
-            const [existing] = await sql`
-                SELECT column_name FROM information_schema.columns 
-                WHERE table_schema = 'public' AND table_name = ${tableName} AND column_name = ${col.name}
-            `;
+            const [existing] = await sql`SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = ${tableName} AND column_name = ${col.name}`;
 
-            // Xử lý giá trị mặc định an toàn
             let safeDefault = '';
-            if (col.defaultValue) {
-                let val = col.defaultValue.trim();
-                // Fix lỗi malformed array literal: thêm {} nếu là mảng
-                if (col.type.endsWith('[]') && !val.startsWith('{')) val = `{${val}}`;
-                
-                const isFunc = ['now()', 'gen_random_uuid()', 'true', 'false'].includes(val);
-                safeDefault = isFunc ? val : `'${val}'`;
+            if (col.defaultValue !== undefined && col.defaultValue !== null && col.defaultValue !== '') {
+                let val = String(col.defaultValue).trim();
+                val = val.replace(/::[a-zA-Z0-9_ ]+$/, ''); 
+
+                const isFuncOrNum = ['now()', 'gen_random_uuid()', 'true', 'false', 'current_timestamp'].includes(val.toLowerCase()) || !isNaN(Number(val));
+
+                if (isFuncOrNum) {
+                    safeDefault = val;
+                } else {
+                    if (val.startsWith("'") && val.endsWith("'")) {
+                        safeDefault = val;
+                    } else {
+                        if (col.type.endsWith('[]') && !val.startsWith('{')) val = `{${val}}`;
+                        safeDefault = `'${val}'`;
+                    }
+                }
             }
 
             if (existing) {
                 await sql.unsafe(`ALTER TABLE "${tableName}" ALTER COLUMN "${col.name}" TYPE ${col.type} USING "${col.name}"::${col.type}`);
-                const nullCmd = col.isNullable ? 'DROP NOT NULL' : 'SET NOT NULL';
-                await sql.unsafe(`ALTER TABLE "${tableName}" ALTER COLUMN "${col.name}" ${nullCmd}`);
-                
+                await sql.unsafe(`ALTER TABLE "${tableName}" ALTER COLUMN "${col.name}" ${col.isNullable ? 'DROP NOT NULL' : 'SET NOT NULL'}`);
                 if (safeDefault) await sql.unsafe(`ALTER TABLE "${tableName}" ALTER COLUMN "${col.name}" SET DEFAULT ${safeDefault}`);
                 else await sql.unsafe(`ALTER TABLE "${tableName}" ALTER COLUMN "${col.name}" DROP DEFAULT`);
             } else {
@@ -138,18 +159,11 @@ export async function manageTableStructureAction(tableName: string, columnsDef: 
   }
 }
 
-// --- 6. MỞ KHÓA BẢNG (Unlock - Hàm bạn đang thiếu) ---
+// --- 8. CÁC HÀM KHÁC ---
 export async function unlockTableAction(tableName: string) {
-    try {
-        await sql`ALTER TABLE ${sql(tableName)} DISABLE ROW LEVEL SECURITY`;
-        await sql`GRANT ALL ON TABLE ${sql(tableName)} TO anon, authenticated, service_role`;
-        return { success: true };
-    } catch (error: any) {
-        return { success: false, error: error.message };
-    }
+    return toggleRLSAction(tableName, false);
 }
 
-// --- 7. THÊM CỘT NHANH ---
 export async function addColumnAction(tableName: string, colName: string, colType: string) {
     try {
         await sql.unsafe(`ALTER TABLE "${tableName}" ADD COLUMN "${colName}" ${colType}`);

@@ -24,16 +24,12 @@ export default function CongDangNhap({ isOpen, onClose, isGateKeeper = false }: 
 
   const isModal = typeof isOpen === 'boolean';
   
-  // 🟢 HÀM CHUẨN HÓA MẠNH MẼ: 
-  // "Quản lý" -> "quanly"
-  // "admin" -> "admin"
-  // "thosanxuat" -> "thosanxuat"
   const normalizeRole = (str: string) => {
       if (!str) return 'khach';
       return str.normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "") // Bỏ dấu tiếng Việt
-                .toLowerCase()                   // Chữ thường
-                .replace(/[^a-z0-9]/g, "")       // Bỏ ký tự đặc biệt và khoảng trắng
+                .replace(/[\u0300-\u036f]/g, "") 
+                .toLowerCase()                   
+                .replace(/[^a-z0-9]/g, "")       
                 .trim();
   };
 
@@ -89,8 +85,7 @@ export default function CongDangNhap({ isOpen, onClose, isGateKeeper = false }: 
 
     const email = user.name.trim();
     const phone = user.phone.trim();
-    let nextPath = '/';
-
+    
     try {
         // 1. Đăng nhập Supabase
         const { error: authError } = await supabase.auth.signInWithPassword({ email: email, password: phone });
@@ -113,8 +108,8 @@ export default function CongDangNhap({ isOpen, onClose, isGateKeeper = false }: 
         }
 
         // 4. Chuẩn hóa Role
-        const viTriGoc = nhanVien.vi_tri || ''; // VD: "Quản lý", "admin"
-        const roleChuan = normalizeRole(viTriGoc); // VD: "quanly", "admin"
+        const viTriGoc = nhanVien.vi_tri || ''; 
+        const roleChuan = normalizeRole(viTriGoc); 
 
         const userInfo = {
             id: nhanVien.id,
@@ -129,35 +124,12 @@ export default function CongDangNhap({ isOpen, onClose, isGateKeeper = false }: 
         localStorage.setItem('USER_INFO', JSON.stringify(userInfo));
         localStorage.setItem('USER_ROLE', roleChuan);
 
-        // 🟢 5. ĐIỀU HƯỚNG CHÍNH XÁC (Dựa trên dữ liệu CSV thực tế)
+        // 🟢 5. LOGIC ĐIỀU HƯỚNG MỚI: 
+        // Thay vì chia ra các cổng Portal phức tạp, 
+        // TẤT CẢ mọi người sau khi đăng nhập sẽ về trang "/trangchu"
+        // Ở đó sẽ có MenuDuoi để họ tự chọn phòng.
         
-        // ADMIN -> Phòng Admin
-        if (roleChuan === 'admin' || roleChuan.includes('admin')) {
-            nextPath = '/phongadmin';
-        }
-        // QUẢN LÝ ("Quản lý" -> "quanly") -> Phòng Quản Lý
-        else if (roleChuan === 'quanly' || roleChuan.includes('quanly')) {
-            nextPath = '/phongquanly';
-        }
-        // SALES ("sales" -> "sales") -> Phòng Sales
-        else if (roleChuan === 'sales' || roleChuan.includes('sale') || roleChuan.includes('kinhdoanh')) {
-            nextPath = '/phongsales';
-        }
-        // THỢ ("thosanxuat" -> "thosanxuat") -> Phòng Thợ
-        else if (roleChuan === 'thosanxuat' || roleChuan.includes('tho') || roleChuan.includes('kythuat')) {
-            nextPath = '/phongtho';
-        }
-        // PART-TIME (Nếu có) -> Phòng Parttime
-        else if (roleChuan.includes('parttime') || roleChuan.includes('thoivu')) {
-            nextPath = '/phongparttime';
-        }
-        // CTV ("congtacvien" -> "congtacvien") -> Phòng CTV
-        else if (roleChuan === 'congtacvien' || roleChuan.includes('ctv')) {
-            nextPath = '/phongctv';
-        }
-        else {
-            nextPath = '/'; // Về trang chủ nếu role lạ
-        }
+        const nextPath = '/trangchu';
         
         setTimeout(() => {
             router.replace(nextPath);

@@ -3,6 +3,8 @@ import { Inter } from 'next/font/google';
 import './globals.css'; 
 
 import ForceFullScreen from '@/app/components/ForceFullScreen';
+// 🟢 IMPORT HỆ THỐNG PHÂN QUYỀN
+import { SecurityProvider } from '@/app/HeThongPhanQuyen'; 
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -38,17 +40,22 @@ export const viewport: Viewport = {
   userScalable: false,
   viewportFit: 'cover',
   themeColor: '#000000',
-  interactiveWidget: 'resizes-content', // Quan trọng: Giúp app co giãn đúng khi có bàn phím ảo/thanh điều hướng
+  interactiveWidget: 'resizes-visual',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="vi">
-      <body className={`${inter.className} bg-black min-h-[100dvh] overflow-hidden`}>
-        <ForceFullScreen />
-        <main className="w-full h-full relative flex flex-col">
+      <body className={`${inter.className} bg-black min-h-screen overflow-hidden overscroll-none`}>
+        {/* 🟢 BỌC PROVIDER Ở ĐÂY ĐỂ DÙNG ĐƯỢC TOÀN APP */}
+        <SecurityProvider>
+            <ForceFullScreen />
             {children}
-        </main>
+        </SecurityProvider>
       </body>
     </html>
   );

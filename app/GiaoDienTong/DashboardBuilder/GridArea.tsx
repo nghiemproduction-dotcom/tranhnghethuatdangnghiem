@@ -3,7 +3,7 @@ import React from 'react';
 import { DndContext, closestCenter, useSensor, useSensors, PointerSensor, KeyboardSensor, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import { Plus, ArrowUpDown, PlusCircle, GripHorizontal } from 'lucide-react';
-import { ModuleConfig } from '../KieuDuLieuModule';
+import { ModuleConfig } from './KieuDuLieuModule';
 import ModuleItem from '../ModuleItem';
 
 interface Props {
@@ -25,7 +25,6 @@ export default function GridArea({
     
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(KeyboardSensor));
 
-    // Phân nhóm Modules theo Row
     const rows: Record<string, ModuleConfig[]> = {};
     const rowHeights: Record<string, number> = {};
     const uniqueRowIds = Array.from(new Set(modules.map(m => m.rowId || 'default')));
@@ -36,7 +35,8 @@ export default function GridArea({
     });
 
     return (
-        <div className="pt-20 px-2 md:px-4 space-y-2 pb-32">
+        // 🟢 ĐÃ SỬA: Đổi pt-20 thành pt-2 để sát lên trên
+        <div className="pt-2 px-2 md:px-4 space-y-2 pb-32">
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
                 {uniqueRowIds.map(rowId => {
                     const rowModules = rows[rowId];
@@ -76,15 +76,6 @@ export default function GridArea({
                     );
                 })}
             </DndContext>
-
-            {isAdmin && (
-                <div className="flex justify-center pt-4 border-t border-dashed border-white/5">
-                    <button onClick={onCreateNewRow} className="flex items-center gap-3 px-8 py-3 bg-[#1A1A1A] hover:bg-[#222] border border-white/10 hover:border-[#C69C6D]/50 rounded-full shadow-lg transition-all active:scale-95 group">
-                        <PlusCircle size={20} className="text-[#C69C6D] group-hover:scale-110 transition-transform"/>
-                        <span className="text-xs font-bold text-gray-300 group-hover:text-white uppercase tracking-widest">Tạo Hàng Lưới Mới</span>
-                    </button>
-                </div>
-            )}
         </div>
     );
 }

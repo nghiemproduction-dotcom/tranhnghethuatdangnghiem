@@ -2,7 +2,7 @@
 
 import React from 'react';
 import DashboardBuilder from '@/app/GiaoDienTong/DashboardBuilder/DashboardBuilder';
-import { ModuleConfig } from '@/app/GiaoDienTong/KieuDuLieuModule';
+import { ModuleConfig } from '@/app/GiaoDienTong/DashboardBuilder/KieuDuLieuModule';
 
 export default function ModulesPage() {
     

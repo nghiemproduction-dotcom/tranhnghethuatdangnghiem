@@ -3,8 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import MenuDuoi from './MenuDuoi'; 
-import CongDangNhap from '../CongDangNhap/CongDangNhap'; // Import Component Đăng nhập để làm Cổng rào
+
+// 🟢 CẬP NHẬT IMPORT
+import MenuDuoi from './MenuDuoi/MenuDuoi'; 
+import CongDangNhap from '../CongDangNhap/CongDangNhap'; 
 
 export default function KhungGiaoDienTong({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -67,10 +69,8 @@ export default function KhungGiaoDienTong({ children }: { children: React.ReactN
           if (pathname !== homeBase) {
               router.replace(homeBase);
           }
-          // Tạm thời cho hiện nội dung trong lúc chuyển trang
           setIsAuthorized(true); 
       } else {
-          // Đi đúng phòng
           setIsAuthorized(true);
       }
       
@@ -86,32 +86,24 @@ export default function KhungGiaoDienTong({ children }: { children: React.ReactN
       </div>
   );
 
-  // 🛑 CỔNG RÀO BẢO MẬT
-  // Nếu chưa được phép (chưa login) -> Hiển thị Form Đăng nhập đè lên
   if (!isAuthorized) {
       return (
           <CongDangNhap 
             isOpen={true} 
-            isGateKeeper={true} // Chế độ Cổng rào: Không cho đóng, bắt buộc login
-            onClose={() => router.push('/')} // Nếu cố thoát thì về trang chủ
+            isGateKeeper={true} 
+            onClose={() => router.push('/')} 
           />
       );
   }
 
-  // ✅ VÙNG AN TOÀN -> Hiển thị nội dung trang
   return (
     <div className="flex flex-col min-h-screen bg-[#0a0a0a] text-gray-200 font-sans relative">
         <main className="flex-1 w-full max-w-[1920px] mx-auto p-3 pb-20 md:p-6 md:pb-20">
             {children}
         </main>
 
-        <MenuDuoi 
-            currentUser={currentUser} 
-            onAdd={(currentUser?.role?.includes('admin') || currentUser?.role?.includes('quanly')) 
-                ? () => console.log('Mở Modal thêm nhanh') 
-                : undefined
-            } 
-        />
+        {/* 🟢 CẬP NHẬT: Xóa prop onAdd vì MenuDuoi mới không hỗ trợ */}
+        <MenuDuoi currentUser={currentUser} />
     </div>
   );
 }
