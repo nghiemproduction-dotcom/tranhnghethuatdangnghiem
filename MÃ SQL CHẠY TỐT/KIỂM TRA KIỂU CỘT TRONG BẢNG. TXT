@@ -1,0 +1,11 @@
+SELECT 
+    column_name AS "Tên Cột", 
+    data_type AS "Kiểu Dữ Liệu Hiện Tại",
+    is_nullable AS "Cho Phép Rỗng"
+FROM 
+    information_schema.columns
+WHERE 
+    table_schema = 'public' 
+    AND table_name = 'nhan_su'
+ORDER BY 
+    ordinal_position;

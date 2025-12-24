@@ -16,13 +16,19 @@ interface Props {
     onEditModule: (mod: ModuleConfig) => void;
     onResizeWidth: (id: string, delta: number) => void;
     onCreateNewRow: () => void;
+    forceHidden?: boolean;
+    // 🟢 NHẬN HÀM MỞ CHI TIẾT
+    onOpenDetail?: (item: any, config: ModuleConfig) => void;
 }
 
 export default function GridArea({ 
     modules, isAdmin, onDragEnd, onAddToRow, onResizeRow, 
-    onDeleteModule, onEditModule, onResizeWidth, onCreateNewRow 
+    onDeleteModule, onEditModule, onResizeWidth, onCreateNewRow,
+    forceHidden = false, onOpenDetail
 }: Props) {
     
+    if (forceHidden) return null;
+
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(KeyboardSensor));
 
     const rows: Record<string, ModuleConfig[]> = {};
@@ -35,7 +41,6 @@ export default function GridArea({
     });
 
     return (
-        // 🟢 ĐÃ SỬA: Đổi pt-20 thành pt-2 để sát lên trên
         <div className="pt-2 px-2 md:px-4 space-y-2 pb-32">
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
                 {uniqueRowIds.map(rowId => {
@@ -67,6 +72,8 @@ export default function GridArea({
                                                 onDelete={() => onDeleteModule(mod.id)} 
                                                 onEdit={() => onEditModule(mod)} 
                                                 onResizeWidth={(delta) => onResizeWidth(mod.id, delta)}
+                                                // 🟢 TRUYỀN TIẾP XUỐNG DƯỚI
+                                                onOpenDetail={onOpenDetail}
                                             />
                                         ))}
                                     </div>

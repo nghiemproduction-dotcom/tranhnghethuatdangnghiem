@@ -1,79 +1,47 @@
 Đúng rồi, hiểu ý nhau rồi đó. Giờ thì tới những vấn đề (hoặc những mong muốn) thế này:
-
 1.
 2.
 3.
 4.
 5.
 6.
-
 Để giải quyết triệt để những vấn đề trên, mày cần tao cung cấp nội dung những file nào?
 Hãy liệt kê chính xác tên file. Tao sẽ upload nội dung file đó cho mày ở bước sau để mày có căn cứ sửa chính xác nhất.
-
 LỆNH CẤM: Tuyệt đối không được viết code sửa đổi ngay bây giờ. Hãy đợi tao đưa file nguồn lên đã.
 
 
--------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------
+
 
 
 ok. Tao tải lên các file mày cần đây!
-
 Nhiệm vụ: Dùng chính xác nội dung của những file tao vừa upload (chứ không lấy từ nội dung trả lời trước) để sửa code theo yêu cầu.
-
 QUY TẮC XỬ LÝ "SMART BATCH" (TUÂN THỦ TUYỆT ĐỐI):
-
 1. KHÔNG RÚT GỌN (NO TRUNCATION):
-
    -Tuyệt đối không xóa tùy tiện, chỉ chỉnh sửa hoặc thêm mới những chỗ cần thiết.
-
    - Mã trả về phải là FULL CODE để copy-paste (Drop-in replacement).
-
    - Tuyệt đối không dùng dấu "..." hay "// ... code cũ".
-
    - Hãy chia thành nhiều câu trả lời nếu mã viết hơn dài hơn 200 dòng.
-
    - Đếm file tải lên xem được bao nhiêu dòng và cho tôi biết trước khi viết mã là sẽ tạo ra mã dài bao nhiêu dòng. Nếu mã tạo ra quá ngắn so với mã trong file mà tôi tải lên thì như vậy có nghĩa là bạn đã rút gọn và như vậy là không được phép.
-
 2. TỐI ƯU HÓA DUNG LƯỢNG TRẢ LỜI:
-
    - Nếu file ngắn: Hãy gộp nhiều file vào 1 câu trả lời cho nhanh.
-
    - Nếu file quá dài: Hãy tách ra, viết đến hết dung lượng cho phép thì dừng lại.
-
-
-
 3. CHẾ ĐỘ BẢO ĐẢM:
-
     - Cam kết các file tạo ra không gây lỗi hoặc xung đột với file khác dù là nhỏ nhất.
-
     - Cam kết nếu cần thêm file để tham khảo thêm nữa thì sẽ yêu cầu thêm file chứ không ham tạo mã liền.
-
-
-
 4. CƠ CHẾ BÁO CÁO TIẾN ĐỘ (STATUS REPORT) - BẮT BUỘC Ở CUỐI CÂU TRẢ LỜI:
-
    - Cuối câu trả lời, mày PHẢI in ra một bảng trạng thái theo mẫu sau để tao biết đường ra lệnh tiếp:
-
-   --------------------------------------------------
-
    [TIẾN ĐỘ THỰC HIỆN]
-
    - Đã xong: [Tên các file đã in full code xong]
-
    - Đang dang dở: [Tên file đang viết dở - nếu có]
-
    - Còn lại (Chưa làm): [Danh sách các file còn lại trong yêu cầu]
-
    -> Trạng thái: [ĐÃ XONG HẾT / CẦN LÀM TIẾP]
-
-   --------------------------------------------------
-
 Giờ hãy bắt đầu xử lý. Nhớ in bảng tiến độ ở cuối.
 
 
 ------------------------------------------------------------------------------------------------------------------------------------------
-------------------------------------------------------------------------------------------------------------------------------------------
+
+
 
 OK tiếp tục đi, dựa vào bảng [TIẾN ĐỘ THỰC HIỆN] ở câu trả lời ngay vừa rồi của mày:
 
@@ -92,12 +60,7 @@ OK tiếp tục đi, dựa vào bảng [TIẾN ĐỘ THỰC HIỆN] ở câu tr�
 Làm tiếp đi!
 
 
-
-
-
-
-
-
+------------------------------------------------------------------------------------------------------------------------------------------
 
 
 Chưa được. chúng ta cần tạo cái này nữa mới được: app\GiaoDienTong\ModalDaCap\Giaodien với các file và folder như sau:

@@ -1,0 +1,28 @@
+
+
+
+SOURCE CODE CONTEXT: I have provided the content of the requested files above.
+
+EXECUTION RULES (STRICTLY FOLLOW):
+
+NO LAZY CODING: You are strictly forbidden from using placeholders like // ... rest of code, // ... existing code, or ``. You must output the FULL, VERBATIM CODE capable of a direct "Select All -> Copy -> Paste" replacement.
+
+INTEGRITY CHECK: Before generating, estimate the token count. If the file is too long for a single response, stop logically at a function boundary and wait for my "Continue" command. Do not break syntax mid-air.
+
+SAFETY: Do not hallucinate imports. Ensure the new code does not conflict with the existing architecture visible in the provided files.
+
+RESPONSE LANGUAGE: Explain your logic in VIETNAMESE. Code comments can be in English or Vietnamese (your choice).
+
+MANDATORY PROGRESS REPORT: At the very end of your response, you MUST append a status block in Markdown:
+
+Markdown
+
+### 🚦 TIẾN ĐỘ THỰC HIỆN
+| File Name | Status | Note |
+|-----------|--------|------|
+| [File 1] | ✅ DONE / ⏳ PENDING | [Lines generated / Total lines] |
+| [File 2] | ⏳ WAITING | [Waiting for next turn] |
+NEXT ACTION: [Instructions for user: e.g., "Copy code above", or "Type 'Next' to continue"]
+
+
+**Start coding now.**

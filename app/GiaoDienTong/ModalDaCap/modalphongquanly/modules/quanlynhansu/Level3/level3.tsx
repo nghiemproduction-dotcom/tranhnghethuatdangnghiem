@@ -1,20 +1,21 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
-import { Loader2, AlertCircle, UserPlus, Split } from 'lucide-react';
+import { Loader2, User, CreditCard, History, Split } from 'lucide-react';
 import { ModuleConfig, CotHienThi } from '../../../../../DashboardBuilder/KieuDuLieuModule';
 
-// 🟢 1. IMPORT GIAO DIỆN MỚI
 import ThanhDieuHuong from '@/app/GiaoDienTong/ModalDaCap/GiaoDien/ThanhDieuHuong';
 import NoidungModal from '@/app/GiaoDienTong/ModalDaCap/GiaoDien/NoidungModal';
+import ThanhTab, { TabItem } from '@/app/GiaoDienTong/ModalDaCap/GiaoDien/ThanhTab'; 
 
-// 🟢 2. IMPORT FILE NÚT CHỨC NĂNG VỪA TẠO
+import { VN_BANKS } from '@/app/GiaoDienTong/ModalDaCap/QuyTac/DuLieuMacDinh';
+import { mapSqlTypeToUiType, getLabelFromColumn } from '@/app/GiaoDienTong/ModalDaCap/QuyTac/QuyTacMapCot';
+
 import NutChucNangLevel3 from './NutChucNang';
-
-// Components con
-import AvatarSection from './AvatarSection';
+import ThongTinChung from './thongtinchung';
 import TabContent from './TabContent';
+import { Level3Provider } from './Level3Context';
 
 interface Props {
     isOpen: boolean;
@@ -26,250 +27,211 @@ interface Props {
     userEmail?: string;
 }
 
-const toVietnameseTitleCase = (str: string) => {
-    if (!str) return '';
-    return str.toLowerCase().split(' ').map(word => 
-        word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
+const toVietnameseTitleCase = (str: string) => str ? str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
+
+// Rule cột giữ nguyên như cũ để đảm bảo logic
+const COLUMN_RULES: Record<string, Partial<CotHienThi>> = {
+    'tien_cong': { readOnly: true, permRead: ['admin', 'quanly', 'owner'] },
+    'luong_thang': { permRead: ['admin', 'quanly', 'owner'], permEdit: ['admin', 'quanly'] },
+    'id': { readOnly: true }, 'created_at': { readOnly: true }, 'updated_at': { readOnly: true }, 'nguoi_tao': { readOnly: true },
 };
 
 export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config, initialData, userRole, userEmail }: Props) {
-    // STATE FORM
+    const [dynamicColumns, setDynamicColumns] = useState<CotHienThi[]>([]);
+    const [orderedColumns, setOrderedColumns] = useState<CotHienThi[]>([]);
+    const activeConfig: ModuleConfig = { ...config, danhSachCot: orderedColumns.length > 0 ? orderedColumns : (config.danhSachCot || dynamicColumns) };
+
     const [formData, setFormData] = useState<any>({});
     const [loading, setLoading] = useState(false);
     const [uploadingImg, setUploadingImg] = useState(false);
     const [error, setError] = useState('');
+    const [fetching, setFetching] = useState(false);
     
-    // STATE UI
-    const [isEditing, setIsEditing] = useState(false);
+    // Biến kiểm tra chế độ tạo mới
+    const isCreateMode = !initialData;
+    
+    const [isEditing, setIsEditing] = useState(isCreateMode); 
+    const [isArranging, setIsArranging] = useState(false);
     const [activeTab, setActiveTab] = useState('form'); 
     const [dynamicOptions, setDynamicOptions] = useState<Record<string, string[]>>({});
     const [virtualData, setVirtualData] = useState<Record<string, any[]>>({});
 
-    // LOGIC MODE & QUYỀN
-    const isCreateMode = !initialData;
-    const isOwner = initialData?.email === userEmail;
-    const canEditRecord = isCreateMode || ['admin', 'quanly'].includes(userRole) || isOwner;
-    const isAdmin = ['admin', 'boss'].includes(userRole);
-    const loadedIdRef = useRef<string | null>(null);
+    const isOwner = formData?.email && userEmail && formData.email.trim().toLowerCase() === userEmail.trim().toLowerCase();
+    const canEditRecord = isCreateMode || ['admin', 'quanly', 'boss'].includes(userRole) || isOwner;
 
+    // Logic quyền hạn
     const canEditColumn = (col: CotHienThi) => {
         if (isCreateMode) return !col.tuDong && !col.readOnly;
+        if (col.readOnly) return false;
         const allowed = col.permEdit || ['admin', 'quanly'];
-        if (allowed.includes('all')) return true;
-        if (allowed.includes(userRole)) return true;
-        if (allowed.includes('owner') && isOwner) return true;
-        return false;
+        return allowed.includes('all') || allowed.includes(userRole) || (isOwner && allowed.includes('owner'));
     };
 
-    // --- INIT ---
-    useEffect(() => {
-        if (isOpen) {
-            const currentId = initialData?.id || 'new';
-            if (loadedIdRef.current !== currentId) {
-                setFormData(initialData ? JSON.parse(JSON.stringify(initialData)) : {});
-                setError('');
-                setIsEditing(isCreateMode);
-                loadedIdRef.current = currentId;
+    const fetchSchema = useCallback(async () => {
+        if (config.danhSachCot?.length) { setOrderedColumns(config.danhSachCot); return; }
+        const { data } = await supabase.rpc('get_table_schema', { t_name: config.bangDuLieu });
+        if (data) {
+            const mappedCols = data.map((col: any) => {
+                const colKey = col.column_name;
+                const detected = mapSqlTypeToUiType(col.data_type, colKey);
+                const rule = COLUMN_RULES[colKey] || {};
+                
+                // 🟢 KHAI BÁO BIẾN isSystemCol ĐỂ DÙNG BÊN DƯỚI
+                const isSystemCol = ['id', 'created_at', 'updated_at', 'nguoi_tao'].includes(colKey);
 
-                // Load dữ liệu phụ
-                config.danhSachCot.forEach(col => {
-                    if (col.kieuDuLieu === 'select_dynamic') loadDynamicOptions(col);
-                });
-                if (!isCreateMode && initialData?.id && config.virtualColumns) {
-                    config.virtualColumns.forEach(v => fetchVirtualData(v));
-                }
-            }
-        } else {
-            loadedIdRef.current = null;
+                return {
+                    key: colKey, 
+                    label: getLabelFromColumn(colKey), 
+                    kieuDuLieu: rule.kieuDuLieu || detected,
+                    hienThiList: !isSystemCol, 
+                    hienThiDetail: true, 
+                    tuDong: isSystemCol,
+                    readOnly: rule.readOnly || ['id', 'created_at'].includes(colKey),
+                    // 🟢 Giờ biến isSystemCol đã tồn tại nên không còn lỗi
+                    batBuoc: col.is_nullable === 'NO' && !isSystemCol,
+                    formatType: detected === 'email' ? 'email' : (detected === 'phone' ? 'phone' : undefined),
+                    permRead: rule.permRead || ['all'], 
+                    permEdit: isSystemCol ? [] : (rule.permEdit || ['admin', 'quanly', 'owner'])
+                };
+            });
+            setDynamicColumns(mappedCols); setOrderedColumns(mappedCols);
         }
-    }, [isOpen, initialData, config, isCreateMode]);
+    }, [config.bangDuLieu, config.danhSachCot]);
 
-    // --- LOGIC XỬ LÝ DỮ LIỆU ---
-    const loadDynamicOptions = async (col: CotHienThi) => { /* ...Giữ nguyên logic cũ... */ };
-    const fetchVirtualData = async (vCol: any) => { /* ...Giữ nguyên logic cũ... */ };
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => { /* ...Giữ nguyên logic cũ... */ };
+    const refreshData = useCallback(async () => {
+        if (isCreateMode) return; 
+        setFetching(true);
+        const { data } = await (supabase as any).from(config.bangDuLieu).select('*').eq('id', initialData.id).single();
+        if (data) setFormData(data);
+        if (config.virtualColumns) config.virtualColumns.forEach(v => fetchVirtualData(v, initialData.id));
+        setFetching(false);
+    }, [initialData, config, isCreateMode]);
 
-    // --- HÀM LƯU DỮ LIỆU (SAVE) ---
+    useEffect(() => { 
+        if (isOpen) { 
+            fetchSchema(); 
+            if (!isCreateMode) refreshData(); else setFormData({}); 
+        } 
+    }, [isOpen]);
+
+    useEffect(() => {
+        activeConfig.danhSachCot.forEach(col => { if (col.kieuDuLieu === 'select_dynamic') loadDynamicOptions(col); });
+    }, [dynamicColumns, orderedColumns]); 
+
+    const loadDynamicOptions = async (col: CotHienThi) => {
+        try {
+            const { data } = await (supabase as any).from(config.bangDuLieu).select(col.key).not(col.key, 'is', null);
+            let dbOptions = data ? Array.from(new Set(data.map((r: any) => r[col.key]))).filter(Boolean) as string[] : [];
+            let finalOptions = (col.key.includes('ngan_hang') || col.key.includes('bank')) ? Array.from(new Set([...VN_BANKS, ...dbOptions])) : dbOptions;
+            setDynamicOptions(p => ({ ...p, [col.key]: finalOptions.sort() }));
+        } catch (e) {}
+    };
+
+    const handleAddNewOption = (key: string) => {
+        const title = activeConfig.danhSachCot.find(c => c.key === key)?.label || key;
+        const newVal = prompt(`Nhập giá trị mới cho "${title}":`);
+        if (newVal && newVal.trim()) {
+            const cleanVal = toVietnameseTitleCase(newVal.trim());
+            setDynamicOptions(prev => ({ ...prev, [key]: [...(prev[key] || []), cleanVal].sort() }));
+            setFormData((prev: any) => ({ ...prev, [key]: cleanVal }));
+        }
+    };
+
+    const fetchVirtualData = async (vCol: any, recordId: string) => {
+        if (vCol.type === 'related_list') {
+             const { data } = await (supabase as any).from(vCol.targetTable).select('*').eq(vCol.matchColumn, recordId); 
+             if (data) setVirtualData(p => ({ ...p, [vCol.key]: data }));
+        }
+    };
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files?.length) return;
+        setUploadingImg(true);
+        try {
+            const file = e.target.files[0];
+            const filePath = `avatars/${Date.now()}.${file.name.split('.').pop()}`;
+            await supabase.storage.from('avatars').upload(filePath, file);
+            const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
+            const imgCol = activeConfig.danhSachCot.find(c => c.key === 'hinh_anh' || c.key === 'avatar');
+            if (imgCol) setFormData((p: any) => ({ ...p, [imgCol.key]: publicUrl }));
+        } catch (err: any) { alert('Lỗi: ' + err.message); } finally { setUploadingImg(false); }
+    };
+
     const handleSave = async () => {
         setLoading(true); setError('');
         try {
             const cleanPayload: any = {};
-            for (const col of config.danhSachCot) {
+            for (const col of activeConfig.danhSachCot) {
                 if (!canEditColumn(col) && !isCreateMode) continue;
-                if (col.tuDong && !col.computedCode) continue;
-
+                if (col.tuDong) continue;
                 let val = formData[col.key];
-                if (col.batBuoc && (val === undefined || val === null || val === '')) throw new Error(`"${col.label}" là bắt buộc.`);
-                
-                if (col.formatType === 'capitalize' && val) val = toVietnameseTitleCase(String(val));
-                if (['number', 'currency', 'percent', 'int4', 'numeric'].includes(col.kieuDuLieu)) {
-                    val = val === '' || val === null ? null : Number(String(val).replace(/,/g, ''));
-                }
+                if (col.batBuoc && !val) throw new Error(`"${col.label}" là bắt buộc.`);
+                if (['number', 'currency', 'int4', 'bigint'].includes(col.kieuDuLieu)) val = val ? Number(String(val).replace(/,/g, '')) : null;
                 cleanPayload[col.key] = val;
             }
-
-            if (!isCreateMode) {
-                delete cleanPayload.id; 
-                const { error: err } = await (supabase.from(config.bangDuLieu) as any).update(cleanPayload).eq('id', initialData.id);
-                if (err) throw err;
-            } else {
-                const { error: err } = await (supabase.from(config.bangDuLieu) as any).insert(cleanPayload);
-                if (err) throw err;
-            }
-            onSuccess(); onClose();
-        } catch (err: any) { 
-            console.error(err);
-            setError(err.message); 
-        } 
-        finally { setLoading(false); }
+            const { error } = isCreateMode ? await (supabase.from(activeConfig.bangDuLieu) as any).insert(cleanPayload) : await (supabase.from(activeConfig.bangDuLieu) as any).update(cleanPayload).eq('id', initialData.id);
+            if (error) throw error;
+            if (isCreateMode) { onSuccess(); onClose(); } else { await refreshData(); setIsEditing(false); onSuccess(); }
+        } catch (err: any) { setError(err.message); } finally { setLoading(false); }
     };
 
-    // --- HÀM XÓA ---
-    const handleDelete = async () => {
-        if (!confirm('Xóa vĩnh viễn hồ sơ này?')) return;
+    const handleSaveLayout = async () => {
         setLoading(true);
-        const { error } = await (supabase.from(config.bangDuLieu) as any).delete().eq('id', initialData.id);
+        try {
+            const { error } = await supabase.from('cau_hinh_modules').update({ config_json: { ...config, danhSachCot: orderedColumns } }).eq('module_id', config.id);
+            if (error) throw error;
+            alert("Đã lưu giao diện thành công!"); setIsArranging(false);
+        } catch (err: any) { alert("Lỗi lưu giao diện: " + err.message); } finally { setLoading(false); }
+    };
+
+    const handleDelete = async () => {
+        if (!confirm('Xóa vĩnh viễn?')) return;
+        setLoading(true);
+        const { error } = await (supabase.from(activeConfig.bangDuLieu) as any).delete().eq('id', initialData.id);
         setLoading(false);
         if (!error) { onSuccess(); onClose(); } else alert(error.message);
     };
 
-    // --- 🟢 HÀM AUTO FIX SQL (Logic tách từ component cũ) ---
-    const handleAutoFix = () => {
-        let sql = `-- SQL FIX CHO BẢNG: ${config.bangDuLieu}\n`;
-        sql += `CREATE TABLE IF NOT EXISTS ${config.bangDuLieu} (\n  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,\n  created_at timestamptz DEFAULT now()\n);\n\n`;
-        config.danhSachCot.forEach(col => {
-            if (['id', 'created_at'].includes(col.key)) return;
-            let type = 'text';
-            if (['number', 'int4'].includes(col.kieuDuLieu)) type = 'integer';
-            if (['int8'].includes(col.kieuDuLieu)) type = 'bigint';
-            if (['numeric', 'currency', 'percent'].includes(col.kieuDuLieu)) type = 'numeric';
-            if (col.kieuDuLieu === 'boolean') type = 'boolean';
-            if (col.kieuDuLieu === 'date') type = 'date';
-            if (col.kieuDuLieu === 'timestamptz' || col.kieuDuLieu === 'datetime') type = 'timestamptz';
-            if (['link_array', 'text[]'].includes(col.kieuDuLieu)) type = 'text[]';
-            sql += `ALTER TABLE ${config.bangDuLieu} ADD COLUMN IF NOT EXISTS ${col.key} ${type};\n`;
-        });
-        sql += `\nNOTIFY pgrst, 'reload schema';`;
-
-        navigator.clipboard.writeText(sql);
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-        const projectRef = supabaseUrl.split('//')[1]?.split('.')[0] || '_';
-        const url = `https://supabase.com/dashboard/project/${projectRef}/sql/new`;
-        
-        if(confirm("Đã copy lệnh sửa lỗi! Bấm OK để mở trang Supabase SQL Editor và chạy lệnh.")) {
-            window.open(url, '_blank');
-        }
-    };
-
-    const imgCol = config.danhSachCot.find(c => ['hinh_anh', 'avatar', 'image'].includes(c.key) || c.kieuDuLieu === 'image');
-    
-    // Tên tiêu đề động
-    const pageTitle = isCreateMode ? 'THÊM MỚI HỒ SƠ' : (initialData?.ho_ten || initialData?.ten || 'CHI TIẾT HỒ SƠ').toUpperCase();
+    const tabList: TabItem[] = [
+        { id: 'form', label: 'Hồ Sơ', icon: User }, 
+        { id: 'luong_thuong', label: 'Lương', icon: CreditCard }, 
+        { id: 'lich_su', label: 'Nhật Ký', icon: History }, 
+        ...(!isCreateMode && activeConfig.virtualColumns ? activeConfig.virtualColumns.map(v => ({ id: v.key, label: v.label, icon: Split, count: virtualData[v.key]?.length || 0 })) : [])
+    ];
 
     if (!isOpen) return null;
 
+    const contextValue = {
+        config: activeConfig, formData, setFormData, isEditing, isArranging, dynamicOptions,
+        onAddNewOption: handleAddNewOption, onImageUpload: handleImageUpload, uploadingImg,
+        canEditColumn, userRole, isOwner, onUpdateColumnOrder: setOrderedColumns
+    };
+
     return (
-        <div className="fixed top-0 left-0 right-0 bottom-[clamp(65px,16vw,85px)] z-[2300] bg-[#0a0807] flex flex-col animate-in slide-in-from-right-20 duration-300 shadow-2xl">
-            
-            {/* 🟢 HEADER MỚI: Chỉ dùng ThanhDieuHuong */}
-            <div className="shrink-0 z-50 bg-[#0a0807]/95 backdrop-blur-xl border-b border-[#8B5E3C]/30 shadow-lg">
-                <ThanhDieuHuong 
-                    danhSachCap={[
-                        { id: 'close', ten: 'Quay Lại', onClick: onClose }, 
-                        { id: 'module', ten: config.tenModule, onClick: onClose },
-                        { id: 'detail', ten: pageTitle } // Tiêu đề chính
-                    ]} 
-                />
-            </div>
-
-            <NoidungModal>
-                <div className="flex flex-col min-h-full pb-24 relative"> {/* Thêm padding bottom để không bị nút che */}
-                    
-                    {/* Tabs */}
-                    <div className="flex bg-[#161210] border-b border-[#8B5E3C]/20 px-6 gap-6 sticky top-0 z-40 overflow-x-auto no-scrollbar">
-                        <button onClick={() => setActiveTab('form')} className={`py-4 text-xs font-bold uppercase tracking-widest border-b-2 transition-all whitespace-nowrap ${activeTab === 'form' ? 'text-[#C69C6D] border-[#C69C6D]' : 'text-gray-500 border-transparent hover:text-white'}`}>Thông Tin Chính</button>
-                        
-                        {/* Tab Người giới thiệu ví dụ */}
-                        <button onClick={() => setActiveTab('nguoi_gioi_thieu')} className={`py-4 text-xs font-bold uppercase tracking-widest border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${activeTab === 'nguoi_gioi_thieu' ? 'text-[#C69C6D] border-[#C69C6D]' : 'text-gray-500 border-transparent hover:text-white'}`}>
-                            <UserPlus size={14}/> Người Giới Thiệu
-                        </button>
-
-                        {!isCreateMode && config.virtualColumns && config.virtualColumns.map(v => (
-                            <button key={v.key} onClick={() => setActiveTab(v.key)} className={`py-4 text-xs font-bold uppercase tracking-widest border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${activeTab === v.key ? 'text-[#C69C6D] border-[#C69C6D]' : 'text-gray-500 border-transparent hover:text-white'}`}>
-                                <Split size={12}/> {v.label} <span className="bg-[#1a120f] px-1.5 rounded text-[9px] border border-[#8B5E3C]/20 text-[#8B5E3C]">{virtualData[v.key]?.length || 0}</span>
-                            </button>
-                        ))}
-                    </div>
-
-                    <div className="p-6 md:p-10 max-w-5xl mx-auto w-full">
-                        {/* Thông báo lỗi */}
-                        {error && (
-                            <div className="mb-6 p-4 bg-red-950/20 border border-red-500/30 rounded-xl flex items-center gap-3 text-red-300 text-xs animate-in fade-in slide-in-from-top-2">
-                                <AlertCircle size={20} className="shrink-0"/> 
-                                <span>{error}</span>
-                            </div>
-                        )}
-
-                        {/* Avatar */}
-                        {imgCol && activeTab === 'form' && (
-                            <div className="flex justify-center mb-10 pb-8 border-b border-[#8B5E3C]/10">
-                                <AvatarSection 
-                                    imgUrl={formData[imgCol.key]} 
-                                    onUpload={handleImageUpload} 
-                                    uploading={uploadingImg} 
-                                    canEdit={isEditing && canEditColumn(imgCol)}
-                                    label={imgCol.label}
-                                />
-                            </div>
-                        )}
-
-                        {/* Loading Overlay khi lưu */}
-                        {loading && (
-                            <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] z-50 flex flex-col items-center justify-center rounded-xl">
-                                <Loader2 className="animate-spin text-[#C69C6D]" size={40}/>
-                                <p className="text-[#C69C6D] text-xs font-bold mt-2 animate-pulse">ĐANG XỬ LÝ...</p>
-                            </div>
-                        )}
-
-                        {/* Form Fields */}
-                        <TabContent 
-                            activeTab={activeTab} 
-                            config={config} 
-                            formData={formData} 
-                            setFormData={setFormData} 
-                            virtualData={virtualData} 
-                            isEditing={isEditing} 
-                            canEditColumn={canEditColumn} 
-                            dynamicOptions={dynamicOptions} 
-                            onAddNewOption={(k) => {
-                                const newVal = prompt("Thêm mới:");
-                                if(newVal) {
-                                    setDynamicOptions(p => ({...p, [k]: [...(p[k]||[]), newVal]}));
-                                    setFormData({...formData, [k]: newVal});
-                                }
-                            }}
-                        />
-                    </div>
+        <Level3Provider value={contextValue}>
+            <div className="fixed inset-0 bottom-[80px] z-[2300] bg-[#0a0807] flex flex-col shadow-2xl animate-in slide-in-from-right-20">
+                <div className="shrink-0 z-[100] bg-[#0a0807] border-b border-[#8B5E3C]/30 shadow-lg">
+                    <ThanhDieuHuong danhSachCap={[{ id: 'c', ten: 'Quay Lại', onClick: onClose }, { id: 'm', ten: activeConfig.tenModule, onClick: onClose }, { id: 'd', ten: (formData?.ten_hien_thi || 'CHI TIẾT').toUpperCase() }]} />
                 </div>
-            </NoidungModal>
 
-            {/* 🟢 FOOTER MỚI: NÚT NỔI (NutChucNangLevel3) */}
-            <NutChucNangLevel3 
-                isCreateMode={isCreateMode}
-                isEditing={isEditing}
-                loading={loading}
-                canEditRecord={canEditRecord}
-                isAdmin={isAdmin}
-                hasError={!!error}
-                onSave={handleSave}
-                onEdit={() => setIsEditing(true)}
-                onCancel={() => { setIsEditing(false); setError(''); }}
-                onDelete={handleDelete}
-                onClose={onClose}
-                onFixDB={handleAutoFix}
-            />
+                <NoidungModal>
+                    <div className="flex flex-col h-full bg-[#0F0C0B] overflow-hidden">
+                        <ThongTinChung /> 
 
-        </div>
+                        <div className="shrink-0 bg-[#0a0807] border-b border-[#8B5E3C]/20 z-20">
+                            <ThanhTab danhSachTab={tabList} tabHienTai={activeTab} onChuyenTab={setActiveTab} />
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto custom-scroll p-6 md:p-10 relative">
+                            {fetching && <div className="absolute inset-0 bg-[#0a0807]/80 z-50 flex items-center justify-center"><Loader2 className="animate-spin text-[#C69C6D]" size={40}/></div>}
+                            {isArranging && <div className="mb-6 p-4 bg-[#C69C6D]/10 border border-[#C69C6D] border-dashed rounded-xl text-center pulse"><p className="text-[#C69C6D] font-bold text-sm uppercase">🔧 Chế độ sắp xếp giao diện</p></div>}
+                            <TabContent activeTab={activeTab} virtualData={virtualData} /> 
+                        </div>
+                    </div>
+                </NoidungModal>
+                
+                <NutChucNangLevel3 isCreateMode={isCreateMode} isEditing={isEditing} isArranging={isArranging} loading={loading} canEditRecord={canEditRecord} canDeleteRecord={['admin'].includes(userRole)} isAdmin={userRole === 'admin'} hasError={!!error} onSave={handleSave} onEdit={() => setIsEditing(true)} onCancel={() => setIsEditing(false)} onDelete={handleDelete} onClose={onClose} onFixDB={() => {}} onToggleArrange={() => setIsArranging(!isArranging)} onSaveLayout={handleSaveLayout} />
+            </div>
+        </Level3Provider>
     );
 }

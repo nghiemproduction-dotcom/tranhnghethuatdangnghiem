@@ -10,7 +10,9 @@ import { arrayMove } from '@dnd-kit/sortable';
 import AccessDenied from './AccessDenied';
 import GridArea from './GridArea';
 import MenuDuoi from '../MenuDuoi/MenuDuoi';
-import Level3_FormChiTiet from '../Level3_FormChiTiet'; 
+
+// 🟢 FIX QUAN TRỌNG: Trỏ đúng vào file Level 3 của module Nhân sự (Nơi có code xịn)
+import Level3_FormChiTiet from '@/app/GiaoDienTong/ModalDaCap/modalphongquanly/modules/quanlynhansu/Level3/level3'; 
 
 interface Props {
     pageId: string; 
@@ -31,12 +33,22 @@ export default function DashboardBuilder({ pageId, title, allowedRoles, initialM
     const [accessDenied, setAccessDenied] = useState(false);
     const [redirectPath, setRedirectPath] = useState('/phongtrungbay');
     const [userRoleDisplay, setUserRoleDisplay] = useState('');
+    
+    // 🟢 THÊM STATE EMAIL
+    const [userEmail, setUserEmail] = useState('');
 
+    // State cho Level 3 (Chi tiết)
     const [detailItem, setDetailItem] = useState<any>(null);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
     const [detailConfig, setDetailConfig] = useState<ModuleConfig | any>(null);
 
-    // Logic kiểm tra quyền (Giữ nguyên)
+    // --- 1. HÀM MỞ LEVEL 3 (Đường dây nóng) ---
+    const handleOpenDetail = (item: any, config: ModuleConfig) => {
+        setDetailItem(item);
+        setDetailConfig(config);
+        setIsDetailOpen(true);
+    };
+
     const getSmartRedirectPath = (role: string): string => {
         const r = role.toLowerCase();
         if (r.includes('admin') || r.includes('quantri')) return '/phongadmin';
@@ -51,10 +63,12 @@ export default function DashboardBuilder({ pageId, title, allowedRoles, initialM
             if (typeof window === 'undefined') return;
 
             const storedRole = localStorage.getItem('USER_ROLE');
+            const storedEmail = localStorage.getItem('USER_EMAIL') || ''; // 🟢 Lấy Email
             const laAdminCung = localStorage.getItem('LA_ADMIN_CUNG') === 'true';
             let currentUserRole = storedRole || 'khach';
             
             setUserRoleDisplay(currentUserRole);
+            setUserEmail(storedEmail);
             setRedirectPath(getSmartRedirectPath(currentUserRole));
 
             if (laAdminCung || currentUserRole.includes('admin')) {
@@ -90,7 +104,6 @@ export default function DashboardBuilder({ pageId, title, allowedRoles, initialM
         loadModules();
     }, [pageId, hasAccess]);
 
-    // Các hàm xử lý (Giữ nguyên)
     const handleCreateQuickModule = async () => {
         if (!isAdmin) return;
         const newId = `mod_${Date.now()}`;
@@ -119,56 +132,62 @@ export default function DashboardBuilder({ pageId, title, allowedRoles, initialM
         await supabase.from('cau_hinh_modules').delete().eq('module_id', id);
     };
 
-    // 🟢 SỬA LOADING: Bỏ min-h-screen, dùng h-full để không bị tràn modal
     if (isChecking) return <div className="h-full w-full flex items-center justify-center text-[#C69C6D]"><Loader2 className="animate-spin mr-2"/> Checking...</div>;
     
     if (accessDenied) return <AccessDenied userRole={userRoleDisplay} targetTitle={title} allowedRoles={allowedRoles} onRedirect={() => router.replace(redirectPath)} />;
     if (!hasAccess) return null;
 
+    // 🟢 GIAO DIỆN
     return (
-        // 🟢 CSS FIX:
-        // 1. bg-transparent: Xóa nền xám, để lộ nền modal bên dưới
-        // 2. min-h-full: Thay cho min-h-screen để vừa vặn trong modal
-        // 3. pt-2: Giảm khoảng cách phía trên (để module sát với thanh điều hướng hơn)
         <div className="w-full min-h-full bg-transparent text-white font-sans pt-2 pb-10">
             
-            <GridArea 
-                modules={modules} isAdmin={isAdmin} 
-                onDragEnd={(e) => {
-                    const { active, over } = e;
-                    if (over && active.id !== over.id) {
-                        setModules((items) => {
-                            const oldIndex = items.findIndex((item) => item.id === active.id);
-                            const newIndex = items.findIndex((item) => item.id === over.id);
-                            return arrayMove(items, oldIndex, newIndex);
-                        });
-                    }
-                }}
-                onAddToRow={(rid) => { setActiveRowId(rid); handleCreateQuickModule(); }}
-                onCreateNewRow={() => { setActiveRowId(`row_${Date.now()}`); handleCreateQuickModule(); }}
-                onResizeRow={(rid, delta) => {
-                    setModules(prev => prev.map(m => (m.rowId || 'default') === rid ? { ...m, rowHeight: (m.rowHeight || 250) + delta } : m));
-                }}
-                onResizeWidth={(id, delta) => {
-                    setModules(prev => prev.map(m => m.id === id ? { ...m, doRong: Math.max(1, Math.min(2, (m.doRong || 1) + delta)) } : m));
-                }}
-                onDeleteModule={handleDelete}
-                onEditModule={handleEditModule}
-            />
-
-            {!hideAddButton && isAdmin && (
-                <MenuDuoi /> 
-            )}
-            
-            {isDetailOpen && detailConfig && (
+            {isDetailOpen && detailConfig ? (
+                // ✅ LEVEL 3: Render file xịn
                 <Level3_FormChiTiet 
                     isOpen={isDetailOpen} 
                     onClose={() => setIsDetailOpen(false)} 
-                    onSuccess={() => {}} 
+                    onSuccess={() => {
+                        // Reload data nếu cần
+                    }} 
                     config={detailConfig} 
                     initialData={detailItem} 
-                    userRole={isAdmin ? 'admin' : 'user'}
+                    userRole={isAdmin ? 'admin' : userRoleDisplay} // Truyền role hiện tại
+                    userEmail={userEmail} // 🟢 Truyền Email vào Level 3
                 />
+            ) : (
+                // ✅ LEVEL 2: Danh sách
+                <>
+                    <GridArea 
+                        modules={modules} isAdmin={isAdmin} 
+                        onDragEnd={(e) => {
+                            const { active, over } = e;
+                            if (over && active.id !== over.id) {
+                                setModules((items) => {
+                                    const oldIndex = items.findIndex((item) => item.id === active.id);
+                                    const newIndex = items.findIndex((item) => item.id === over.id);
+                                    return arrayMove(items, oldIndex, newIndex);
+                                });
+                            }
+                        }}
+                        onAddToRow={(rid) => { setActiveRowId(rid); handleCreateQuickModule(); }}
+                        onCreateNewRow={() => { setActiveRowId(`row_${Date.now()}`); handleCreateQuickModule(); }}
+                        onResizeRow={(rid, delta) => {
+                            setModules(prev => prev.map(m => (m.rowId || 'default') === rid ? { ...m, rowHeight: (m.rowHeight || 250) + delta } : m));
+                        }}
+                        onResizeWidth={(id, delta) => {
+                            setModules(prev => prev.map(m => m.id === id ? { ...m, doRong: Math.max(1, Math.min(2, (m.doRong || 1) + delta)) } : m));
+                        }}
+                        onDeleteModule={handleDelete}
+                        onEditModule={handleEditModule}
+                        
+                        onOpenDetail={handleOpenDetail}
+                        forceHidden={false} 
+                    />
+
+                    {!hideAddButton && isAdmin && (
+                        <MenuDuoi /> 
+                    )}
+                </>
             )}
         </div>
     );

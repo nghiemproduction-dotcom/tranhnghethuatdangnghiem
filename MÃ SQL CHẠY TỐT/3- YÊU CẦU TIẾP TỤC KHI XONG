@@ -1,0 +1,20 @@
+
+
+
+CONTINUATION PROMPT: Review the [TIẾN ĐỘ THỰC HIỆN] table from your last response.
+
+YOUR TASK:
+
+RESUME: Continue generating code exactly where you left off.
+
+If a file was cut off: Resume from the exact line/character to ensure syntax continuity (do not repeat the already printed code).
+
+If a file was finished: Move to the next file in the list.
+
+CONTEXT LOCK: Do not reset context. Remember the original requirements.
+
+FORMAT: Still strictly FULL CODE (No placeholders).
+
+REPORT: Update and print the ### 🚦 TIẾN ĐỘ THỰC HIỆN table at the end.
+
+Language: Respond in Vietnamese.

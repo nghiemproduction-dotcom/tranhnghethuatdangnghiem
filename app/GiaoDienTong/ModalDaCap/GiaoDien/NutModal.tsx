@@ -18,14 +18,13 @@ export default function NutModal({ danhSachTacVu, children }: Props) {
     const validTasks = danhSachTacVu.filter((t): t is TacVuModal => t !== null);
 
     return (
-        // 🟢 QUAN TRỌNG: 
-        // 1. w-fit: Để nó chỉ rộng bằng cái nút, không bè ra cả màn hình.
-        // 2. pointer-events-none: Để chuột BẤM XUYÊN QUA khoảng trắng (không bị cái khung chặn).
-        // 3. bg-transparent: Đảm bảo không có màu nền đen.
-        <div className="flex flex-col items-end gap-3 w-fit bg-transparent pointer-events-none p-2">
+        // 🟢 FIX GIAO DIỆN:
+        // 1. fixed: Ghim cứng vào màn hình
+        // 2. bottom-6 right-6: Căn góc phải dưới (thay vì trôi nổi bên trái)
+        // 3. z-[3000]: Đảm bảo nổi lên trên mọi modal/overlay khác
+        <div className="fixed bottom-6 right-6 flex flex-col items-end gap-3 w-fit bg-transparent pointer-events-none p-2 z-[3000]">
             
             {/* 🟢 Render nút con (NutDongBo) */}
-            {/* Cần bọc div pointer-events-auto để nút này bấm được */}
             <div className="pointer-events-auto relative z-50">
                 {children}
             </div>

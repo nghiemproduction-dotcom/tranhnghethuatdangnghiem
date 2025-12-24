@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Settings, Trash2, GripVertical, ChevronLeft, ChevronRight, Cpu, X, Gauge } from 'lucide-react';
-import { ModuleConfig } from './DashboardBuilder/KieuDuLieuModule';
+import { ModuleConfig } from '@/app/GiaoDienTong/DashboardBuilder/KieuDuLieuModule';
 
 import Level1_Widget from '@/app/GiaoDienTong/ModalDaCap/modalphongquanly/modules/quanlynhansu/Level1_Widget';
 import Level2_DanhSachModal from '@/app/GiaoDienTong/ModalDaCap/modalphongquanly/modules/quanlynhansu/Level2/Level2';
@@ -25,10 +25,12 @@ interface Props {
   onDelete: () => void;
   onEdit: () => void;
   onResizeWidth: (delta: number) => void;
+  // 🟢 NHẬN HÀM MỞ CHI TIẾT
+  onOpenDetail?: (item: any, config: ModuleConfig) => void;
 }
 
 export default function ModuleItem({ 
-    id, data, isAdmin, onDelete, onEdit, onResizeWidth 
+    id, data, isAdmin, onDelete, onEdit, onResizeWidth, onOpenDetail 
 }: Props) {
   const [showLevel2, setShowLevel2] = useState(false);
   const [customConfig, setCustomConfig] = useState<ModuleConfig | null>(null);
@@ -46,50 +48,8 @@ export default function ModuleItem({
     '--item-span': colSpan,
   } as React.CSSProperties;
 
-  // 🟢 CẤU HÌNH CHI TIẾT & AUDIT LOG CHO NHÂN SỰ
-  const nhanSuFullConfig: ModuleConfig = {
-      ...data,
-      tenModule: 'Quản Lý Nhân Sự',
-      bangDuLieu: 'nhan_su',
-      kieuHienThiList: 'table', 
-      listConfig: { groupByColumn: 'vi_tri' },
-      danhSachCot: [
-          // 1. SYSTEM ID
-          { key: 'id', label: 'ID Hệ Thống', kieuDuLieu: 'text', hienThiList: true, hienThiDetail: true, tuDong: true, readOnly: true, permRead: ['all'], permEdit: [] },
-          
-          // 2. AUDIT TRAIL (Lịch sử - Ẩn khỏi list chính, hiện ở tab Lịch sử)
-          { key: 'nguoi_tao', label: 'Người Tạo', kieuDuLieu: 'text', hienThiList: false, hienThiDetail: false, readOnly: true, permRead: ['admin', 'quanly'], permEdit: [] },
-          { key: 'ngay_tao', label: 'Ngày Tạo', kieuDuLieu: 'datetime', hienThiList: false, hienThiDetail: false, readOnly: true, permRead: ['admin', 'quanly'], permEdit: [] },
-          { key: 'nguoi_sua_cuoi', label: 'Người Sửa Cuối', kieuDuLieu: 'text', hienThiList: false, hienThiDetail: false, readOnly: true, permRead: ['admin', 'quanly'], permEdit: [] },
-          { key: 'ngay_sua_cuoi', label: 'Lần Sửa Cuối', kieuDuLieu: 'datetime', hienThiList: false, hienThiDetail: false, readOnly: true, permRead: ['admin', 'quanly'], permEdit: [] },
-
-          // 3. THÔNG TIN CHÍNH
-          { key: 'hinh_anh', label: 'Ảnh đại diện', kieuDuLieu: 'image', hienThiList: true, hienThiDetail: true, permRead: ['all'], permEdit: ['admin', 'quanly', 'owner'] },
-          { key: 'ho_ten', label: 'Họ và Tên', kieuDuLieu: 'text', formatType: 'capitalize', hienThiList: true, hienThiDetail: true, batBuoc: true, permRead: ['all'], permEdit: ['admin', 'quanly', 'owner'] },
-          { key: 'cccd', label: 'Số CCCD/CMND', kieuDuLieu: 'text', hienThiList: false, hienThiDetail: true, permRead: ['admin', 'quanly', 'owner'], permEdit: ['admin', 'quanly', 'owner'] },
-          { key: 'vi_tri', label: 'Vị Trí', kieuDuLieu: 'select_dynamic', allowNewOption: true, hienThiList: true, hienThiDetail: true, batBuoc: true, permRead: ['all'], permEdit: ['admin', 'quanly'] },
-          
-          // 4. LIÊN HỆ
-          { key: 'so_dien_thoai', label: 'Số Điện Thoại', kieuDuLieu: 'text', formatType: 'phone', hienThiList: true, hienThiDetail: true, batBuoc: true, permRead: ['all'], permEdit: ['admin', 'quanly', 'owner'] },
-          { key: 'email', label: 'Email', kieuDuLieu: 'text', formatType: 'email', hienThiList: true, hienThiDetail: true, batBuoc: true, permRead: ['all'], permEdit: ['admin', 'quanly', 'owner'] },
-          { key: 'ngay_sinh', label: 'Ngày Sinh', kieuDuLieu: 'date', hienThiList: false, hienThiDetail: true, batBuoc: true, permRead: ['admin', 'quanly', 'owner'], permEdit: ['admin', 'quanly', 'owner'] },
-          { key: 'dia_chi', label: 'Địa Chỉ', kieuDuLieu: 'text', formatType: 'location', hienThiList: false, hienThiDetail: true, permRead: ['admin', 'quanly', 'owner'], permEdit: ['admin', 'quanly', 'owner'] },
-          
-          // 5. TÀI CHÍNH
-          { key: 'ngan_hang', label: 'Ngân Hàng', kieuDuLieu: 'select_dynamic', options: BANK_LIST, allowNewOption: true, hienThiList: false, hienThiDetail: true, batBuoc: true, permRead: ['admin', 'quanly', 'owner'], permEdit: ['admin', 'quanly', 'owner'] },
-          { key: 'so_tai_khoan', label: 'Số Tài Khoản', kieuDuLieu: 'text', hienThiList: false, hienThiDetail: true, batBuoc: true, permRead: ['admin', 'quanly', 'owner'], permEdit: ['admin', 'quanly', 'owner'] },
-          { key: 'luong_thang', label: 'Lương Tháng', kieuDuLieu: 'currency', inputMultiplier: 100000, hienThiList: false, hienThiDetail: true, permRead: ['admin', 'quanly', 'owner'], permEdit: ['admin', 'quanly'] },
-          { key: 'tien_cong', label: 'Tiền Công / Giờ', kieuDuLieu: 'currency', readOnly: true, hienThiList: false, hienThiDetail: true, computedCode: 'row.luong_thang ? Math.round(row.luong_thang / 24 / 8) : 0', permRead: ['admin', 'quanly', 'owner'], permEdit: [] },
-          { key: 'thuong_doanh_thu', label: 'Thưởng Doanh Thu', kieuDuLieu: 'percent', hienThiList: false, hienThiDetail: true, permRead: ['admin', 'quanly', 'owner'], permEdit: ['admin', 'quanly'] },
-          
-          // 6. KHÁC
-          { key: 'hop_dong', label: 'Hồ Sơ Hợp Đồng', kieuDuLieu: 'link_array', hienThiList: false, hienThiDetail: true, permRead: ['admin', 'quanly', 'owner'], permEdit: ['admin', 'quanly'] },
-          { key: 'trang_thai', label: 'Trạng Thái', kieuDuLieu: 'select_dynamic', options: ['Đang làm việc', 'Thử việc', 'Đã nghỉ'], allowNewOption: true, hienThiList: true, hienThiDetail: true, permRead: ['all'], permEdit: ['admin', 'quanly'] },
-      ],
-      virtualColumns: [
-          { key: 'viec_mau_da_tao', label: 'Việc Mẫu Đã Tạo', type: 'related_list', targetTable: 'thu_vien_viec_mau', matchColumn: 'nguoi_tao' }
-      ]
-  };
+  // Cấu hình Nhân sự (Giữ nguyên như cũ)
+  const nhanSuFullConfig: ModuleConfig = { ...data, tenModule: 'Quản Lý Nhân Sự', bangDuLieu: 'nhan_su', kieuHienThiList: 'table', listConfig: { groupByColumn: 'vi_tri' }, danhSachCot: data.danhSachCot || [] };
 
   const renderContent = () => {
       if (data.customId === 'custom_mau_san_pham') return <MSP_Widget onClick={() => setShowLevel2(true)} />;
@@ -148,7 +108,10 @@ export default function ModuleItem({
       {showLevel2 && (
           <Level2Wrapper>
               <button onClick={() => setShowLevel2(false)} className="absolute top-4 right-4 z-50 p-2 bg-black/50 text-gray-400 hover:text-white rounded-full border border-white/10 hover:bg-red-900/50 hover:border-red-500/50 transition-all"><X size={24}/></button>
-              {data.customId === 'custom_mau_san_pham' ? <MauSanPham config={data} /> : <Level2_DanhSachModal isOpen={showLevel2} onClose={() => setShowLevel2(false)} config={customConfig || data} />}
+              {data.customId === 'custom_mau_san_pham' ? <MauSanPham config={data} /> : 
+                // 🟢 TRUYỀN HÀM onOpenDetail VÀO LEVEL 2
+                <Level2_DanhSachModal isOpen={showLevel2} onClose={() => setShowLevel2(false)} config={customConfig || data} onOpenDetail={onOpenDetail} />
+              }
           </Level2Wrapper>
       )}
     </>

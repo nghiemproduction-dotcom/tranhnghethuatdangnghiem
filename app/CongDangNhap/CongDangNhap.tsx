@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase'; 
-import { X, Square, CheckSquare, Eye, EyeOff } from 'lucide-react'; 
+import { X, Square, CheckSquare } from 'lucide-react'; 
 
 import NenHieuUng from './NenHieuUng';
 import TieuDe from './TieuDe';
@@ -61,9 +61,9 @@ export default function CongDangNhap({ isOpen, onClose, isGateKeeper = false }: 
       try {
         const elem = document.documentElement as any;
         if (elem.requestFullscreen) elem.requestFullscreen();
-        else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
-        else if (elem.mozRequestFullScreen) elem.mozRequestFullScreen();
-        else if (elem.msRequestFullscreen) elem.msRequestFullscreen();
+        else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen(); // Safari
+        else if (elem.mozRequestFullScreen) elem.mozRequestFullScreen(); // Firefox
+        else if (elem.msRequestFullscreen) elem.msRequestFullscreen(); // IE/Edge
       } catch (err) {
         console.warn("Fullscreen error:", err);
       }
@@ -87,11 +87,13 @@ export default function CongDangNhap({ isOpen, onClose, isGateKeeper = false }: 
     const phone = user.phone.trim();
     
     try {
-        // 1. Đăng nhập Supabase
+        // 1. Đăng nhập Supabase 
+        // (Lúc này createBrowserClient sẽ tự động set Cookies cho Middleware)
         const { error: authError } = await supabase.auth.signInWithPassword({ email: email, password: phone });
         if (authError) throw new Error("Thông tin đăng nhập không chính xác.");
 
         // 2. Lấy Role từ bảng NHAN_SU
+        // (Nhờ có Cookies, RLS sẽ cho phép đọc dòng của chính mình)
         const { data: nhanVien, error: dbError } = await supabase
             .from('nhan_su')
             .select('*')
@@ -107,7 +109,7 @@ export default function CongDangNhap({ isOpen, onClose, isGateKeeper = false }: 
             localStorage.removeItem('SAVED_CREDS');
         }
 
-        // 4. Chuẩn hóa Role
+        // 4. Chuẩn hóa Role & Lưu LocalStorage (Cho UI dùng tạm)
         const viTriGoc = nhanVien.vi_tri || ''; 
         const roleChuan = normalizeRole(viTriGoc); 
 
@@ -124,17 +126,16 @@ export default function CongDangNhap({ isOpen, onClose, isGateKeeper = false }: 
         localStorage.setItem('USER_INFO', JSON.stringify(userInfo));
         localStorage.setItem('USER_ROLE', roleChuan);
 
-        // 🟢 5. LOGIC ĐIỀU HƯỚNG MỚI: 
-        // Thay vì chia ra các cổng Portal phức tạp, 
-        // TẤT CẢ mọi người sau khi đăng nhập sẽ về trang "/trangchu"
-        // Ở đó sẽ có MenuDuoi để họ tự chọn phòng.
-        
+        // 5. ĐIỀU HƯỚNG AN TOÀN
         const nextPath = '/trangchu';
+        
+        // 🟢 QUAN TRỌNG: Làm mới router để Middleware nhận diện cookie mới
+        router.refresh(); 
         
         setTimeout(() => {
             router.replace(nextPath);
             if(onClose && !isGateKeeper) onClose();
-        }, 150); 
+        }, 500); // Tăng delay xíu để Cookie kịp ghi
 
     } catch (err: any) { 
         console.error("Lỗi:", err.message);
