@@ -29,11 +29,30 @@ interface Props {
 
 const toVietnameseTitleCase = (str: string) => str ? str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
 
-// Rule cột giữ nguyên như cũ để đảm bảo logic
+// 🟢 CẬP NHẬT COLUMN_RULES: PHÂN QUYỀN CHẶT CHẼ
 const COLUMN_RULES: Record<string, Partial<CotHienThi>> = {
+    // 1. TÀI CHÍNH: Chỉ Admin/Quản lý sửa - Owner chỉ được xem
     'tien_cong': { readOnly: true, permRead: ['admin', 'quanly', 'owner'] },
     'luong_thang': { permRead: ['admin', 'quanly', 'owner'], permEdit: ['admin', 'quanly'] },
-    'id': { readOnly: true }, 'created_at': { readOnly: true }, 'updated_at': { readOnly: true }, 'nguoi_tao': { readOnly: true },
+    'thuong_doanh_thu': { permRead: ['admin', 'quanly', 'owner'], permEdit: ['admin', 'quanly'] },
+    'phu_cap': { permRead: ['admin', 'quanly', 'owner'], permEdit: ['admin', 'quanly'] },
+
+    // 2. THÔNG TIN CÁ NHÂN: Cho phép Owner tự sửa
+    'so_dien_thoai': { permEdit: ['admin', 'quanly', 'owner'] },
+    'dia_chi': { permEdit: ['admin', 'quanly', 'owner'] },
+    'ngan_hang': { permEdit: ['admin', 'quanly', 'owner'] },
+    'so_tai_khoan': { permEdit: ['admin', 'quanly', 'owner'] },
+    'hinh_anh': { permEdit: ['admin', 'quanly', 'owner'] },
+    'avatar': { permEdit: ['admin', 'quanly', 'owner'] },
+    'email': { permEdit: ['admin', 'quanly', 'owner'] },
+    'ten_hien_thi': { permEdit: ['admin', 'quanly', 'owner'] },
+
+    // 3. HỆ THỐNG: Read Only tuyệt đối
+    'id': { readOnly: true },
+    'created_at': { readOnly: true },
+    'updated_at': { readOnly: true },
+    'nguoi_tao': { readOnly: true },
+    'lich_su_dang_nhap': { readOnly: true, permRead: ['admin'] }, // Chỉ Admin xem log
 };
 
 export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config, initialData, userRole, userEmail }: Props) {
@@ -56,15 +75,26 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
     const [dynamicOptions, setDynamicOptions] = useState<Record<string, string[]>>({});
     const [virtualData, setVirtualData] = useState<Record<string, any[]>>({});
 
+    // Logic Owner: Kiểm tra email đăng nhập có khớp với email trong hồ sơ không
     const isOwner = formData?.email && userEmail && formData.email.trim().toLowerCase() === userEmail.trim().toLowerCase();
+    
+    // Quyền sửa bản ghi: Tạo mới OR Admin/Quản lý OR Chính chủ
     const canEditRecord = isCreateMode || ['admin', 'quanly', 'boss'].includes(userRole) || isOwner;
 
-    // Logic quyền hạn
+    // Logic quyền sửa từng cột
     const canEditColumn = (col: CotHienThi) => {
         if (isCreateMode) return !col.tuDong && !col.readOnly;
         if (col.readOnly) return false;
+        
+        // Lấy quyền từ config hoặc mặc định là Admin/Quản lý
         const allowed = col.permEdit || ['admin', 'quanly'];
-        return allowed.includes('all') || allowed.includes(userRole) || (isOwner && allowed.includes('owner'));
+        
+        if (allowed.includes('all')) return true;
+        if (allowed.includes(userRole)) return true;
+        // Nếu là chính chủ và cột cho phép 'owner' sửa -> OK
+        if (isOwner && allowed.includes('owner')) return true;
+        
+        return false;
     };
 
     const fetchSchema = useCallback(async () => {
@@ -75,8 +105,6 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
                 const colKey = col.column_name;
                 const detected = mapSqlTypeToUiType(col.data_type, colKey);
                 const rule = COLUMN_RULES[colKey] || {};
-                
-                // 🟢 KHAI BÁO BIẾN isSystemCol ĐỂ DÙNG BÊN DƯỚI
                 const isSystemCol = ['id', 'created_at', 'updated_at', 'nguoi_tao'].includes(colKey);
 
                 return {
@@ -87,9 +115,9 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
                     hienThiDetail: true, 
                     tuDong: isSystemCol,
                     readOnly: rule.readOnly || ['id', 'created_at'].includes(colKey),
-                    // 🟢 Giờ biến isSystemCol đã tồn tại nên không còn lỗi
                     batBuoc: col.is_nullable === 'NO' && !isSystemCol,
                     formatType: detected === 'email' ? 'email' : (detected === 'phone' ? 'phone' : undefined),
+                    // Áp dụng quyền đọc/sửa từ rule
                     permRead: rule.permRead || ['all'], 
                     permEdit: isSystemCol ? [] : (rule.permEdit || ['admin', 'quanly', 'owner'])
                 };
@@ -210,8 +238,12 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
     return (
         <Level3Provider value={contextValue}>
             <div className="fixed inset-0 bottom-[80px] z-[2300] bg-[#0a0807] flex flex-col shadow-2xl animate-in slide-in-from-right-20">
+                
                 <div className="shrink-0 z-[100] bg-[#0a0807] border-b border-[#8B5E3C]/30 shadow-lg">
-                    <ThanhDieuHuong danhSachCap={[{ id: 'c', ten: 'Quay Lại', onClick: onClose }, { id: 'm', ten: activeConfig.tenModule, onClick: onClose }, { id: 'd', ten: (formData?.ten_hien_thi || 'CHI TIẾT').toUpperCase() }]} />
+                    <ThanhDieuHuong danhSachCap={[
+                        { id: 'c', ten: 'Quay Lại', onClick: onClose }, 
+                        { id: 'd', ten: (formData?.ten_hien_thi || 'CHI TIẾT').toUpperCase() }
+                    ]} />
                 </div>
 
                 <NoidungModal>

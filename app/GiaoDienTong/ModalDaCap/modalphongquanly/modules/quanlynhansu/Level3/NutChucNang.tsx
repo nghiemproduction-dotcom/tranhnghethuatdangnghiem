@@ -1,12 +1,12 @@
 'use client';
 import React from 'react';
-import { Save, Edit, Trash2, RotateCcw, LayoutDashboard, Check } from 'lucide-react';
+import { Save, Edit, Trash2, RotateCcw, LayoutDashboard, Check, ArrowLeft } from 'lucide-react';
 import NutModal, { TacVuModal } from '@/app/GiaoDienTong/ModalDaCap/GiaoDien/NutModal';
 
 export interface NutChucNangLevel3Props {
     isCreateMode: boolean;
     isEditing: boolean;
-    isArranging: boolean; // 🟢 Mới: Chế độ sắp xếp
+    isArranging: boolean;
     loading: boolean;
     canEditRecord: boolean; 
     canDeleteRecord: boolean; 
@@ -20,7 +20,6 @@ export interface NutChucNangLevel3Props {
     onClose: () => void;
     onFixDB: () => void;
     
-    // 🟢 Mới: Hàm xử lý sắp xếp
     onToggleArrange: () => void; 
     onSaveLayout: () => void;
 }
@@ -32,7 +31,7 @@ export default function NutChucNangLevel3({
 
     const danhSachTacVu: (TacVuModal | null)[] = [
         
-        // A. KHI ĐANG SẮP XẾP GIAO DIỆN (Ưu tiên cao nhất)
+        // A. KHI ĐANG SẮP XẾP GIAO DIỆN
         ...(isArranging ? [
             {
                 id: 'save_layout',
@@ -50,7 +49,7 @@ export default function NutChucNangLevel3({
             }
         ] : []),
 
-        // B. KHI ĐANG NHẬP LIỆU / SỬA (Chỉ hiện khi ko sắp xếp)
+        // B. KHI ĐANG NHẬP LIỆU / SỬA
         ...(!isArranging && isEditing ? [
             {
                 id: 'save',
@@ -70,7 +69,7 @@ export default function NutChucNangLevel3({
 
         // C. KHI ĐANG XEM (VIEW MODE)
         ...(!isArranging && !isEditing ? [
-            // Nút Sửa
+            // 1. Nút Sửa
             (canEditRecord ? {
                 id: 'edit',
                 icon: Edit,
@@ -79,7 +78,7 @@ export default function NutChucNangLevel3({
                 onClick: onEdit
             } : null),
 
-            // Nút Xóa
+            // 2. Nút Xóa
             (canDeleteRecord ? {
                 id: 'delete',
                 icon: Trash2,
@@ -88,14 +87,23 @@ export default function NutChucNangLevel3({
                 onClick: onDelete
             } : null),
             
-            // 🟢 NÚT CHỈNH GIAO DIỆN (Chỉ Admin thấy)
+            // 3. Nút Sắp Xếp (Admin)
             (isAdmin ? {
                 id: 'arrange',
                 icon: LayoutDashboard,
                 nhan: 'Sắp Xếp Cột',
                 mauSac: 'text-[#8B5E3C] border-[#8B5E3C] hover:bg-[#8B5E3C] hover:text-[#1a120f]',
                 onClick: onToggleArrange
-            } : null)
+            } : null),
+
+            // 🟢 4. Nút Quay Lại (Thay thế vị trí nút Đóng ở cuối cùng)
+            {
+                id: 'back',
+                icon: ArrowLeft,
+                nhan: 'Quay Lại',
+                mauSac: 'text-gray-400 border-gray-600 hover:text-white hover:border-white',
+                onClick: onClose // Gọi hàm đóng Level 3 để lộ ra Level 2
+            }
         ] : [])
     ];
 

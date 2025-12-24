@@ -2,14 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import { UserCircle } from 'lucide-react';
 
-import NutMenu from '../GiaoDien/NutMenu';
-// 🟢 ĐÃ XÓA IMPORT ThanhTieuDe
-import ThanhDieuHuong from '../../ModalDaCap/GiaoDien/ThanhDieuHuong';
-import NoidungModal from '../../ModalDaCap/GiaoDien/NoidungModal';
-import GiaoDienChiTiet from './GiaoDienChiTiet';
+import NutMenu from '@/app/GiaoDienTong/MenuDuoi/GiaoDien/NutMenu';
+// 🟢 IMPORT LEVEL 3 (Đường dẫn tương đối có thể khác tùy máy bạn, hãy chỉnh lại nếu cần)
+import Level3_FormChiTiet from '../../ModalDaCap/modalphongquanly/modules/quanlynhansu/Level3/level3';
 
 interface Props {
-    nguoiDung: any;
+    nguoiDung: any; 
     isOpen: boolean;       
     onToggle: () => void;  
     onClose: () => void;
@@ -28,43 +26,47 @@ export default function NutCaNhan({ nguoiDung, isOpen, onToggle, onClose }: Prop
         }
     }, [isOpen]);
 
+    // 🟢 CẤU HÌNH GIẢ LẬP (ĐÃ FIX LỖI TYPESCRIPT)
+    // Thêm 'as any' để TypeScript không bắt bẻ các trường thiếu lặt vặt khác
+    const personalConfig: any = {
+        id: 'personal_profile',
+        tenModule: 'Hồ Sơ Cá Nhân',
+        bangDuLieu: 'nhan_su', // Quan trọng: Trỏ đúng vào bảng nhân sự
+        loaiDuLieu: 'sql',
+        danhSachCot: [],
+        
+        // 🟢 BỔ SUNG CÁC TRƯỜNG THIẾU ĐỂ KHÔNG BÁO LỖI
+        version: '1.0', 
+        updatedAt: new Date().toISOString()
+    };
+
     return (
         <>
             <div className="relative z-[3000]">
                 <NutMenu 
                     label="Cá Nhân" 
                     icon={UserCircle} 
-                    active={isOpen || Object.values(openStates).some(v => v)} 
+                    active={isOpen} 
                     onClick={() => {
-                        const isAnyChildOpen = Object.values(openStates).some(v => v);
-                        if (isAnyChildOpen) {
-                            closeAllModals();
-                            if (!isOpen) onToggle();
-                        } else {
-                            onToggle();
-                        }
+                        if (isOpen) onClose();
+                        else onToggle();
                     }} 
                 />
             </div>
 
-            {isOpen && (
-                <div className="fixed top-0 left-0 right-0 bottom-[clamp(60px,15vw,80px)] z-[2000] bg-[#0a0807] flex flex-col animate-in fade-in duration-200 border-b border-[#8B5E3C]/30 shadow-2xl">
-                    
-                    {/* 🟢 THANH ĐIỀU HƯỚNG KIÊM TIÊU ĐỀ */}
-                    <ThanhDieuHuong 
-                        danhSachCap={[
-                            { id: 'home', ten: 'Trang Chủ', onClick: onClose },
-                            { id: 'canhan', ten: 'HỒ SƠ CÁ NHÂN' } // Tự động thành tiêu đề to
-                        ]} 
-                    />
-                    {/* 🟢 ĐÃ XÓA ThanhTieuDe Ở ĐÂY */}
-
-                    <NoidungModal>
-                        <div className="pb-20">
-                            <GiaoDienChiTiet nguoiDung={nguoiDung} />
-                        </div>
-                    </NoidungModal>
-                </div>
+            {/* 🟢 KHI MỞ, GỌI THẲNG LEVEL 3 RA */}
+            {isOpen && nguoiDung && (
+                <Level3_FormChiTiet
+                    isOpen={true}
+                    onClose={onClose}
+                    onSuccess={() => {
+                        alert("Cập nhật hồ sơ thành công!");
+                    }}
+                    config={personalConfig}     // Config đã fix
+                    initialData={nguoiDung}     // Dữ liệu người dùng
+                    userRole={nguoiDung.role || 'user'} 
+                    userEmail={nguoiDung.email} // Để nhận diện chính chủ
+                />
             )}
         </>
     );
