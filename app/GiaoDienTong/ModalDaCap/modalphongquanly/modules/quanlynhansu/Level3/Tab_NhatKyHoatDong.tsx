@@ -49,7 +49,7 @@ export default function Tab_NhatKyHoatDong({ nhanSuId, loginHistory }: { nhanSuI
                 color: 'text-[#C69C6D]'
             }));
 
-            // 🟢 SỬA LỖI 7: Kiểm tra Array.isArray trước khi map để tránh crash
+            // 🟢 FIX LỖI CRASH: Kiểm tra loginHistory có phải là Array không trước khi map
             const safeLoginHistory = Array.isArray(loginHistory) ? loginHistory : [];
             
             const formattedLogins = safeLoginHistory.map((log: any, index: number) => ({

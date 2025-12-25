@@ -34,7 +34,7 @@ export default function Level2_DanhSachModal({ isOpen, onClose, config, onOpenDe
     const ITEMS_PER_PAGE = 20;
 
     const [userRole, setUserRole] = useState('khach');
-    const [userEmail, setUserEmail] = useState(''); // 🟢 State Email
+    const [userEmail, setUserEmail] = useState(''); 
     
     const [isLevel3Open, setIsLevel3Open] = useState(false);
     const [selectedItem, setSelectedItem] = useState<any>(null);
@@ -44,7 +44,7 @@ export default function Level2_DanhSachModal({ isOpen, onClose, config, onOpenDe
 
     useEffect(() => {
         const role = localStorage.getItem('USER_ROLE') || 'khach';
-        const email = localStorage.getItem('USER_EMAIL') || ''; // 🟢 Lấy email
+        const email = localStorage.getItem('USER_EMAIL') || ''; 
         setUserRole(role);
         setUserEmail(email);
     }, []);
@@ -90,8 +90,11 @@ export default function Level2_DanhSachModal({ isOpen, onClose, config, onOpenDe
     const handleSearch = (keyword: string) => { setSearch(keyword); setPage(1); fetchData(1, activeTab, keyword); };
 
     const handleOpenLevel3 = (item: any) => {
-        if (onOpenDetail) onOpenDetail(item, config);
-        else { setSelectedItem(item); setIsLevel3Open(true); }
+        setSelectedItem(item); 
+        setIsLevel3Open(true);
+        if (onOpenDetail) {
+             // onOpenDetail(item, config); 
+        }
     };
 
     let columns = config.danhSachCot || [];
@@ -122,12 +125,27 @@ export default function Level2_DanhSachModal({ isOpen, onClose, config, onOpenDe
                     </div>
                 </div>
             </NoidungModal>
-            {totalPages > 1 && <ThanhPhanTrang trangHienTai={page} tongSoTrang={totalPages} onLui={() => page > 1 && fetchData(page - 1)} onToi={() => page < totalPages && fetchData(page + 1)} />}
             
-            <NutChucNang config={config} canAdd={canAdd} canConfig={canConfig} viewMode={viewMode} onToggleView={() => setViewMode(prev => prev === 'card' ? 'table' : 'card')} onAdd={() => handleOpenLevel3(null)} onRefresh={handleRefresh} onClose={onClose} onSearchData={handleSearch} currentSearch={search} onSaveConfig={handleSavePermission} />
+            {/* 🟢 FIX: Ẩn thanh phân trang & nút chức năng của Level 2 khi Level 3 đang mở */}
+            {!isLevel3Open && totalPages > 1 && (
+                <ThanhPhanTrang trangHienTai={page} tongSoTrang={totalPages} onLui={() => page > 1 && fetchData(page - 1)} onToi={() => page < totalPages && fetchData(page + 1)} />
+            )}
             
-            {/* 🟢 TRUYỀN USER_EMAIL VÀO */}
-            <Level3_FormChiTiet isOpen={isLevel3Open} onClose={() => setIsLevel3Open(false)} onSuccess={() => fetchData(page)} config={config} initialData={selectedItem} userRole={userRole} userEmail={userEmail} />
+            {!isLevel3Open && (
+                <NutChucNang config={config} canAdd={canAdd} canConfig={canConfig} viewMode={viewMode} onToggleView={() => setViewMode(prev => prev === 'card' ? 'table' : 'card')} onAdd={() => handleOpenLevel3(null)} onRefresh={handleRefresh} onClose={onClose} onSearchData={handleSearch} currentSearch={search} onSaveConfig={handleSavePermission} />
+            )}
+            
+            {/* 🟢 LEVEL 3: MỞ TRÊN NỀN LEVEL 2 */}
+            <Level3_FormChiTiet 
+                isOpen={isLevel3Open} 
+                onClose={() => setIsLevel3Open(false)} 
+                onSuccess={() => fetchData(page)} 
+                config={config} 
+                initialData={selectedItem} 
+                userRole={userRole} 
+                userEmail={userEmail}
+                parentTitle={config.tenModule ? config.tenModule.toUpperCase() : 'DANH SÁCH'} 
+            />
         </div>
     );
 }

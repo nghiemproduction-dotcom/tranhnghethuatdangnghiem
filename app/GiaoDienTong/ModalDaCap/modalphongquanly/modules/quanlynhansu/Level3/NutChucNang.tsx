@@ -109,5 +109,18 @@ export default function NutChucNangLevel3({
 
     const validTasks = danhSachTacVu.filter((t): t is TacVuModal => t !== null);
 
-    return <NutModal danhSachTacVu={validTasks} />;
+    return (
+        // 🟢 FIX MẠNH: Dùng translate-y để nhấc bổng nút lên cao khỏi vùng nguy hiểm
+        // pointer-events-none để div bao ngoài không chặn click vào các thành phần bên dưới
+        <div className="fixed inset-x-0 bottom-0 z-[100] pointer-events-none pb-[env(safe-area-inset-bottom)]"> 
+            <div className="w-full h-full relative">
+                {/* -translate-y-24: Đẩy lên 6rem (96px). 
+                    Nếu vẫn thấp, bạn có thể tăng lên -translate-y-28 hoặc -32 
+                */}
+                <div className="absolute bottom-0 right-0 pointer-events-auto transform -translate-y-24 md:-translate-y-10 pr-4">
+                    <NutModal danhSachTacVu={validTasks} />
+                </div>
+            </div>
+        </div>
+    );
 }

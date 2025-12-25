@@ -1,0 +1,67 @@
+CODE AUDIT / REVIEW CONTEXT:
+Tôi đã upload/paste ĐẦY ĐỦ nội dung của rất nhiều file trong dự án (có thể là toàn bộ module hoặc phần lớn codebase). Danh sách file bao gồm các model, controller, route, migration SQL Supabase, Vue/Nuxt components, composables, stores, utils, v.v.
+
+MỤC ĐÍCH KIỂM TRA:
+Tôi muốn bạn thực hiện một cuộc review/code audit chuyên sâu để phát hiện các vấn đề sau (ưu tiên theo thứ tự):
+
+1. Bug tiềm ẩn hoặc lỗi logic rõ ràng (ví dụ: null reference, sai điều kiện auth, xử lý lỗi upload Supabase không đúng...).
+2. Lỗ hổng bảo mật nghiêm trọng (RLS chưa bật/chưa đúng policy, bucket public không kiểm soát, Supabase key lộ, hardcode secret...).
+3. Hardcode dữ liệu ở frontend (label, message, status, options list... thay vì fetch từ Supabase).
+4. Code smell / anti-pattern (code lặp lại nhiều, component quá lớn, logic business nằm ở frontend, query Supabase không optimal...).
+5. Thiếu migration SQL hoặc RLS policy cho các bảng đã dùng trong code.
+6. Các vấn đề khác: performance, validation yếu, error handling kém, naming không nhất quán...
+
+YÊU CẦU CỤ THỂ (nếu có):
+ 
+
+
+ 
+EXECUTION RULES - FOLLOW STRICTLY WITH NO EXCEPTIONS:
+
+1. ANALYSIS ONLY - NO CODE CHANGES YET:
+   - DO NOT output any modified code, suggested fixes as code blocks, or new files in this step.
+   - Only provide detailed analysis, findings, and recommendations in text.
+   - If fixes are needed later, I will ask separately.
+
+2. SUPABASE-FOCUSED AUDIT:
+   - Check every table referenced in code: verify if RLS is enabled and policies exist (or should exist).
+   - Check Storage bucket usage: verify policies for insert/update/delete/select.
+   - Detect any direct public bucket access without auth check.
+   - Flag any hardcoded table names, bucket names, or policy logic in frontend.
+
+3. COMPREHENSIVE COVERAGE:
+   - Review ALL provided files thoroughly.
+   - Group findings by severity: Critical (bảo mật, bug gây crash), High, Medium, Low (code smell).
+
+4. RESPONSE LANGUAGE RULES - MANDATORY:
+   - ALL analysis, findings, explanations, severity assessment, and recommendations MUST BE IN VIETNAMESE ONLY.
+   - Use clear, structured Vietnamese with bullet points and tables where appropriate.
+
+5. OUTPUT STRUCTURE (follow exactly - no extra text):
+
+### 🔍 TỔNG QUAN REVIEW
+[Tóm tắt ngắn: số lượng vấn đề phát hiện, mức độ nghiêm trọng nhất, khu vực ảnh hưởng nhiều nhất]
+
+### ⚠️ DANH SÁCH VẤN ĐỀ PHÁT HIỆN
+Sử dụng bảng sau để liệt kê từng vấn đề:
+
+| STT | File(s) liên quan                  | Mức độ    | Mô tả vấn đề chi tiết                                                                 | Hậu quả tiềm ẩn                          | Gợi ý khắc phục ngắn gọn                  |
+|-----|------------------------------------|-----------|--------------------------------------------------------------------------------------|------------------------------------------|-------------------------------------------|
+| 1   | resources/js/components/X.vue      | Critical  | Hardcode danh sách status trong component, không fetch từ Supabase                   | Dữ liệu không đồng bộ khi admin thay đổi | Migrate sang bảng statuses + RLS + fetch API |
+| 2   | composables/useSupabase.js         | High      | Bucket 'avatars' được set public: true mà không có policy kiểm soát upload           | Ai cũng upload được vào bucket           | Tạo storage policy chỉ cho user đã auth   |
+| ... | ...                                | ...       | ...                                                                                  | ...                                      | ...                                       |
+
+### 🛡️ SUPABASE SECURITY CHECK SUMMARY
+- Các bảng đã bật RLS: [danh sách]
+- Các bảng chưa bật RLS hoặc thiếu policy: [danh sách + khuyến nghị]
+- Bucket tồn tại và policy: [tóm tắt]
+
+### 💡 KHUYẾN NGHỊ ƯU TIÊN
+Liệt kê thứ tự cần fix trước (1 → cao nhất)
+
+1. ...
+2. ...
+
+NEXT ACTION: [Hướng dẫn bằng tiếng Việt, ví dụ: "Bạn thấy báo cáo này thế nào? Chọn vấn đề nào muốn tôi fix trước (theo STT), tôi sẽ yêu cầu triển khai chi tiết", hoặc "Nếu muốn tôi fix vấn đề STT 1 và 3, hãy nói rõ"]
+
+BẮT ĐẦU PHÂN TÍCH VÀ REVIEW TOÀN BỘ FILE NGAY BÂY GIỜ. KHÔNG NÓI THÊM LỜI THỪA.

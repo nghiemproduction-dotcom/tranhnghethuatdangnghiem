@@ -26,6 +26,7 @@ interface Props {
     initialData?: any; 
     userRole: string; 
     userEmail?: string;
+    parentTitle?: string;
 }
 
 const BUCKET_NAME = 'images'; 
@@ -36,10 +37,10 @@ const ICON_MAP: any = {
     'box': Box, 'file': FileText, 'settings': Settings, 'chart': BarChart
 };
 
-// 🟢 DANH SÁCH CỘT CẦN ẨN HOÀN TOÀN (Sửa lỗi số 3 & 6: Ẩn 'ho_ten' để không gửi update cột generated)
+// 🟢 DANH SÁCH CỘT CẦN ẨN VÀ LOẠI BỎ KHỎI QUERY
 const HIDDEN_COLS = ['luong_theo_gio', 'lan_dang_nhap_ts', 'nguoi_tao_id', 'ten_nguoi_tao', 'ho_ten'];
 
-export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config, initialData, userRole, userEmail }: Props) {
+export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config, initialData, userRole, userEmail, parentTitle }: Props) {
     const [dynamicColumns, setDynamicColumns] = useState<CotHienThi[]>([]);
     const [orderedColumns, setOrderedColumns] = useState<CotHienThi[]>([]);
     
@@ -79,7 +80,6 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
         const { data: dbConfig } = await supabase.from('cau_hinh_cot').select('*').eq('bang_du_lieu', config.bangDuLieu).order('thu_tu', { ascending: true });
 
         if (tableInfo) {
-            // Lọc bỏ ngay từ đầu các cột nằm trong danh sách đen
             const filteredTableInfo = tableInfo.filter((col: any) => !HIDDEN_COLS.includes(col.column_name));
 
             const mappedCols = filteredTableInfo.map((col: any) => {
@@ -88,19 +88,16 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
                 const detectedType = mapSqlTypeToUiType(col.data_type, colKey);
                 const isSystemCol = ['id', 'created_at', 'updated_at', 'nguoi_tao'].includes(colKey);
 
-                // 🟢 XỬ LÝ NHÃN VÀ LOGIC ĐẶC BIỆT (Sửa lỗi 1, 2, 4, 5)
                 const isLoginHistory = colKey === 'lich_su_dang_nhap';
-                const isTienCong = colKey === 'tien_cong'; // Cột tiền công
+                const isTienCong = colKey === 'tien_cong'; 
                 
                 let finalLabel = setting.tieu_de || getLabelFromColumn(colKey);
                 
-                // Override Label Tiếng Việt có dấu
                 if (colKey === 'ten_day_du') finalLabel = 'TÊN ĐẦY ĐỦ';
                 else if (colKey === 'ten_hien_thi') finalLabel = 'TÊN HIỂN THỊ';
                 else if (colKey === 'hop_dong') finalLabel = 'HỢP ĐỒNG';
                 else if (isLoginHistory) finalLabel = 'LỊCH SỬ ĐĂNG NHẬP';
 
-                // Logic ReadOnly đặc biệt
                 const forceReadOnly = isLoginHistory || isTienCong || (setting.cho_phep_sua === false) || isSystemCol;
 
                 return {
@@ -140,7 +137,20 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
         setFetching(false);
     }, [initialData, config, isCreateMode]);
 
-    useEffect(() => { if (isOpen) { fetchSchema(); if (!isCreateMode) refreshData(); else setFormData({}); } }, [isOpen]);
+    // 🟢 SỬA LỖI Ở ĐÂY: Reset lại state Edit khi mở Modal
+    useEffect(() => { 
+        if (isOpen) { 
+            fetchSchema();
+            
+            // 🟢 QUAN TRỌNG: Ép buộc trạng thái hiển thị đúng logic
+            // Nếu là tạo mới -> Edit Mode = true
+            // Nếu là xem chi tiết -> Edit Mode = false
+            setIsEditing(isCreateMode); 
+
+            if (!isCreateMode) refreshData(); 
+            else setFormData({}); 
+        } 
+    }, [isOpen, initialData]); // Thêm initialData vào dependencies
 
     useEffect(() => {
         activeConfig.danhSachCot.forEach(col => { if (col.kieuDuLieu === 'select_dynamic') loadDynamicOptions(col); });
@@ -220,12 +230,10 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
         try {
             const cleanPayload: any = {};
             for (const col of activeConfig.danhSachCot) {
-                // Logic lọc payload
                 if (!col.hienThiDetail) continue; 
                 if (col.readOnly) continue;
                 if (col.tuDong) continue;
                 if (!canEditColumn(col) && !isCreateMode) continue;
-                // Double check: Không bao giờ gửi cột ho_ten (generated column)
                 if (col.key === 'ho_ten') continue; 
 
                 let val = formData[col.key];
@@ -295,12 +303,14 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
     return (
         <Level3Provider value={contextValue}>
             <div className="fixed inset-0 bottom-[80px] z-[2300] bg-[#0a0807] flex flex-col shadow-2xl animate-in slide-in-from-right-20">
+                
                 <div className="shrink-0 z-[100] bg-[#0a0807] border-b border-[#8B5E3C]/30 shadow-lg">
                     <ThanhDieuHuong danhSachCap={[
-                        { id: 'c', ten: 'Quay Lại', onClick: onClose }, 
+                        { id: 'back', ten: parentTitle || 'Quay Lại', onClick: onClose }, 
                         { id: 'd', ten: ((config as any).tieuDeCot && formData[(config as any).tieuDeCot]) ? formData[(config as any).tieuDeCot].toUpperCase() : (formData?.ten_hien_thi || 'CHI TIẾT').toUpperCase() }
                     ]} />
                 </div>
+
                 <NoidungModal>
                     <div className="flex flex-col h-full bg-[#0F0C0B] overflow-hidden">
                         <ThongTinChung /> 
