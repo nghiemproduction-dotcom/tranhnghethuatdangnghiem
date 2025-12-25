@@ -1,12 +1,11 @@
 'use client';
 import React, { useRef } from 'react';
-import { User, GripVertical } from 'lucide-react';
+import { GripVertical } from 'lucide-react'; 
 import InputRenderer from './InputRenderer';
 import { CotHienThi } from '../../../../../DashboardBuilder/KieuDuLieuModule';
-import { useLevel3Context } from './Level3Context'; // 🟢
+import { useLevel3Context } from './Level3Context'; 
 
 export default function Tab_ThongTin() {
-    // 🟢 Lấy hết từ kho, không cần props nữa
     const { 
         config, isEditing, isArranging, canEditColumn, onUpdateColumnOrder 
     } = useLevel3Context();
@@ -34,8 +33,16 @@ export default function Tab_ThongTin() {
     };
 
     const renderField = (col: CotHienThi, index: number) => {
-        if (!isArranging && col.permRead && !col.permRead.includes('all') && !canEditColumn(col)) return null;
-        if (!isArranging && ['hinh_anh', 'avatar'].includes(col.key)) return null;
+        if (!isArranging) {
+            // 1. LOGIC ẨN CỘT TỪ DB
+            if (col.hienThiDetail === false) return null;
+
+            // 🟢 2. LOGIC CỤ THỂ CHO TAB NÀY (Đã thêm ho_ten)
+            if (['hinh_anh', 'avatar', 'logo', 'lich_su_dang_nhap', 'luong_theo_gio', 'lan_dang_nhap_ts', 'nguoi_tao_id', 'ten_nguoi_tao', 'ho_ten'].includes(col.key)) return null;
+            
+            // Check quyền
+            if (col.permRead && !col.permRead.includes('all') && !canEditColumn(col)) return null;
+        }
 
         return (
             <div 
@@ -46,20 +53,22 @@ export default function Tab_ThongTin() {
                 onDragEnd={handleDragEnd}
                 onDragOver={(e) => e.preventDefault()}
                 className={`
-                    group transition-all duration-200 flex items-center gap-4
-                    ${isArranging ? 'cursor-move border border-dashed border-[#C69C6D]/50 bg-[#C69C6D]/5 p-2 rounded-lg' : 'py-1'}
+                    group transition-all duration-200 
+                    flex flex-col md:flex-row md:items-baseline gap-1 md:gap-4
+                    ${isArranging ? 'cursor-move border border-dashed border-[#C69C6D]/50 bg-[#C69C6D]/5 p-2 rounded-lg' : 'py-2 md:py-2'}
                 `}
             >
-                <div className="w-[120px] shrink-0 text-right flex justify-end items-center gap-2">
+                {/* Label */}
+                <div className="w-full md:w-[130px] shrink-0 flex items-center md:justify-end gap-2 mb-1 md:mb-0">
                     {isArranging && <GripVertical size={14} className="text-[#C69C6D] cursor-grab"/>}
-                    <label className="text-[11px] font-bold text-[#8B5E3C] uppercase leading-tight">
+                    <label className="text-[11px] font-bold text-[#8B5E3C] uppercase leading-tight md:text-right w-full">
                         {col.label}
                         {!isArranging && isEditing && col.batBuoc && !col.readOnly && <span className="text-red-500 ml-0.5">*</span>}
                     </label>
                 </div>
                 
-                <div className={`flex-1 ${isArranging ? 'pointer-events-none opacity-60' : ''}`}>
-                    {/* 🟢 InputRenderer tự lo liệu, chỉ cần biết tên cột */}
+                {/* Input Area */}
+                <div className={`w-full flex-1 ${isArranging ? 'pointer-events-none opacity-60' : ''}`}>
                     <InputRenderer col={col} /> 
                 </div>
             </div>
@@ -68,9 +77,9 @@ export default function Tab_ThongTin() {
 
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 w-full px-2">
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-16 gap-y-6">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-12 gap-y-2">
                 {config.danhSachCot.map((col: CotHienThi, index: number) => renderField(col, index))}
             </div>
         </div>
     );
-}   
+}

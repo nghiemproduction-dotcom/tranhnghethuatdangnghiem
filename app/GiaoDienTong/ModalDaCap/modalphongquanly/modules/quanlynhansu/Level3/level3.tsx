@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
-import { Loader2, User, CreditCard, History, Split } from 'lucide-react';
+import { Loader2, User, CreditCard, History, Split, Box, FileText, Settings, BarChart } from 'lucide-react';
 import { ModuleConfig, CotHienThi } from '../../../../../DashboardBuilder/KieuDuLieuModule';
 
 import ThanhDieuHuong from '@/app/GiaoDienTong/ModalDaCap/GiaoDien/ThanhDieuHuong';
@@ -16,6 +16,7 @@ import NutChucNangLevel3 from './NutChucNang';
 import ThongTinChung from './thongtinchung';
 import TabContent from './TabContent';
 import { Level3Provider } from './Level3Context';
+import Tab_NhatKyHoatDong from './Tab_NhatKyHoatDong'; 
 
 interface Props {
     isOpen: boolean;
@@ -27,37 +28,21 @@ interface Props {
     userEmail?: string;
 }
 
+const BUCKET_NAME = 'images'; 
 const toVietnameseTitleCase = (str: string) => str ? str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
 
-// 🟢 CẬP NHẬT COLUMN_RULES: PHÂN QUYỀN CHẶT CHẼ
-const COLUMN_RULES: Record<string, Partial<CotHienThi>> = {
-    // 1. TÀI CHÍNH: Chỉ Admin/Quản lý sửa - Owner chỉ được xem
-    'tien_cong': { readOnly: true, permRead: ['admin', 'quanly', 'owner'] },
-    'luong_thang': { permRead: ['admin', 'quanly', 'owner'], permEdit: ['admin', 'quanly'] },
-    'thuong_doanh_thu': { permRead: ['admin', 'quanly', 'owner'], permEdit: ['admin', 'quanly'] },
-    'phu_cap': { permRead: ['admin', 'quanly', 'owner'], permEdit: ['admin', 'quanly'] },
-
-    // 2. THÔNG TIN CÁ NHÂN: Cho phép Owner tự sửa
-    'so_dien_thoai': { permEdit: ['admin', 'quanly', 'owner'] },
-    'dia_chi': { permEdit: ['admin', 'quanly', 'owner'] },
-    'ngan_hang': { permEdit: ['admin', 'quanly', 'owner'] },
-    'so_tai_khoan': { permEdit: ['admin', 'quanly', 'owner'] },
-    'hinh_anh': { permEdit: ['admin', 'quanly', 'owner'] },
-    'avatar': { permEdit: ['admin', 'quanly', 'owner'] },
-    'email': { permEdit: ['admin', 'quanly', 'owner'] },
-    'ten_hien_thi': { permEdit: ['admin', 'quanly', 'owner'] },
-
-    // 3. HỆ THỐNG: Read Only tuyệt đối
-    'id': { readOnly: true },
-    'created_at': { readOnly: true },
-    'updated_at': { readOnly: true },
-    'nguoi_tao': { readOnly: true },
-    'lich_su_dang_nhap': { readOnly: true, permRead: ['admin'] }, // Chỉ Admin xem log
+const ICON_MAP: any = {
+    'user': User, 'money': CreditCard, 'history': History, 
+    'box': Box, 'file': FileText, 'settings': Settings, 'chart': BarChart
 };
+
+// 🟢 DANH SÁCH CỘT CẦN ẨN HOÀN TOÀN (Sửa lỗi số 3 & 6: Ẩn 'ho_ten' để không gửi update cột generated)
+const HIDDEN_COLS = ['luong_theo_gio', 'lan_dang_nhap_ts', 'nguoi_tao_id', 'ten_nguoi_tao', 'ho_ten'];
 
 export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config, initialData, userRole, userEmail }: Props) {
     const [dynamicColumns, setDynamicColumns] = useState<CotHienThi[]>([]);
     const [orderedColumns, setOrderedColumns] = useState<CotHienThi[]>([]);
+    
     const activeConfig: ModuleConfig = { ...config, danhSachCot: orderedColumns.length > 0 ? orderedColumns : (config.danhSachCot || dynamicColumns) };
 
     const [formData, setFormData] = useState<any>({});
@@ -66,63 +51,83 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
     const [error, setError] = useState('');
     const [fetching, setFetching] = useState(false);
     
-    // Biến kiểm tra chế độ tạo mới
     const isCreateMode = !initialData;
-    
     const [isEditing, setIsEditing] = useState(isCreateMode); 
     const [isArranging, setIsArranging] = useState(false);
     const [activeTab, setActiveTab] = useState('form'); 
     const [dynamicOptions, setDynamicOptions] = useState<Record<string, string[]>>({});
     const [virtualData, setVirtualData] = useState<Record<string, any[]>>({});
 
-    // Logic Owner: Kiểm tra email đăng nhập có khớp với email trong hồ sơ không
     const isOwner = formData?.email && userEmail && formData.email.trim().toLowerCase() === userEmail.trim().toLowerCase();
-    
-    // Quyền sửa bản ghi: Tạo mới OR Admin/Quản lý OR Chính chủ
     const canEditRecord = isCreateMode || ['admin', 'quanly', 'boss'].includes(userRole) || isOwner;
 
-    // Logic quyền sửa từng cột
     const canEditColumn = (col: CotHienThi) => {
         if (isCreateMode) return !col.tuDong && !col.readOnly;
         if (col.readOnly) return false;
-        
-        // Lấy quyền từ config hoặc mặc định là Admin/Quản lý
-        const allowed = col.permEdit || ['admin', 'quanly'];
-        
+        const allowed = col.permEdit && col.permEdit.length > 0 ? col.permEdit : ['admin', 'quanly'];
         if (allowed.includes('all')) return true;
         if (allowed.includes(userRole)) return true;
-        // Nếu là chính chủ và cột cho phép 'owner' sửa -> OK
         if (isOwner && allowed.includes('owner')) return true;
-        
         return false;
     };
 
+    // FETCH SCHEMA & CONFIG TỪ DB
     const fetchSchema = useCallback(async () => {
         if (config.danhSachCot?.length) { setOrderedColumns(config.danhSachCot); return; }
-        const { data } = await supabase.rpc('get_table_schema', { t_name: config.bangDuLieu });
-        if (data) {
-            const mappedCols = data.map((col: any) => {
+
+        const { data: tableInfo } = await supabase.rpc('get_table_schema', { t_name: config.bangDuLieu });
+        const { data: dbConfig } = await supabase.from('cau_hinh_cot').select('*').eq('bang_du_lieu', config.bangDuLieu).order('thu_tu', { ascending: true });
+
+        if (tableInfo) {
+            // Lọc bỏ ngay từ đầu các cột nằm trong danh sách đen
+            const filteredTableInfo = tableInfo.filter((col: any) => !HIDDEN_COLS.includes(col.column_name));
+
+            const mappedCols = filteredTableInfo.map((col: any) => {
                 const colKey = col.column_name;
-                const detected = mapSqlTypeToUiType(col.data_type, colKey);
-                const rule = COLUMN_RULES[colKey] || {};
+                const setting = dbConfig?.find((c: any) => c.cot_du_lieu === colKey) || {};
+                const detectedType = mapSqlTypeToUiType(col.data_type, colKey);
                 const isSystemCol = ['id', 'created_at', 'updated_at', 'nguoi_tao'].includes(colKey);
+
+                // 🟢 XỬ LÝ NHÃN VÀ LOGIC ĐẶC BIỆT (Sửa lỗi 1, 2, 4, 5)
+                const isLoginHistory = colKey === 'lich_su_dang_nhap';
+                const isTienCong = colKey === 'tien_cong'; // Cột tiền công
+                
+                let finalLabel = setting.tieu_de || getLabelFromColumn(colKey);
+                
+                // Override Label Tiếng Việt có dấu
+                if (colKey === 'ten_day_du') finalLabel = 'TÊN ĐẦY ĐỦ';
+                else if (colKey === 'ten_hien_thi') finalLabel = 'TÊN HIỂN THỊ';
+                else if (colKey === 'hop_dong') finalLabel = 'HỢP ĐỒNG';
+                else if (isLoginHistory) finalLabel = 'LỊCH SỬ ĐĂNG NHẬP';
+
+                // Logic ReadOnly đặc biệt
+                const forceReadOnly = isLoginHistory || isTienCong || (setting.cho_phep_sua === false) || isSystemCol;
 
                 return {
                     key: colKey, 
-                    label: getLabelFromColumn(colKey), 
-                    kieuDuLieu: rule.kieuDuLieu || detected,
-                    hienThiList: !isSystemCol, 
-                    hienThiDetail: true, 
+                    label: finalLabel, 
+                    kieuDuLieu: setting.loai_hien_thi || detectedType,
+                    hienThiList: !isSystemCol && !isLoginHistory, 
+                    hienThiDetail: isLoginHistory ? false : (setting.an_hien_thi === true ? false : true), 
                     tuDong: isSystemCol,
-                    readOnly: rule.readOnly || ['id', 'created_at'].includes(colKey),
-                    batBuoc: col.is_nullable === 'NO' && !isSystemCol,
-                    formatType: detected === 'email' ? 'email' : (detected === 'phone' ? 'phone' : undefined),
-                    // Áp dụng quyền đọc/sửa từ rule
-                    permRead: rule.permRead || ['all'], 
-                    permEdit: isSystemCol ? [] : (rule.permEdit || ['admin', 'quanly', 'owner'])
+                    readOnly: forceReadOnly,
+                    batBuoc: (col.is_nullable === 'NO' || setting.bat_buoc_nhap === true) && !isSystemCol,
+                    formatType: detectedType === 'email' ? 'email' : (detectedType === 'phone' ? 'phone' : undefined),
+                    permRead: setting.quyen_xem || ['all'], 
+                    permEdit: forceReadOnly ? [] : (setting.quyen_sua || ['admin', 'quanly', 'owner'])
                 };
             });
-            setDynamicColumns(mappedCols); setOrderedColumns(mappedCols);
+
+            if (dbConfig && dbConfig.length > 0) {
+                mappedCols.sort((a: any, b: any) => {
+                    const idxA = dbConfig.findIndex((c: any) => c.cot_du_lieu === a.key);
+                    const idxB = dbConfig.findIndex((c: any) => c.cot_du_lieu === b.key);
+                    return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+                });
+            }
+
+            setDynamicColumns(mappedCols); 
+            setOrderedColumns(mappedCols);
         }
     }, [config.bangDuLieu, config.danhSachCot]);
 
@@ -135,12 +140,7 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
         setFetching(false);
     }, [initialData, config, isCreateMode]);
 
-    useEffect(() => { 
-        if (isOpen) { 
-            fetchSchema(); 
-            if (!isCreateMode) refreshData(); else setFormData({}); 
-        } 
-    }, [isOpen]);
+    useEffect(() => { if (isOpen) { fetchSchema(); if (!isCreateMode) refreshData(); else setFormData({}); } }, [isOpen]);
 
     useEffect(() => {
         activeConfig.danhSachCot.forEach(col => { if (col.kieuDuLieu === 'select_dynamic') loadDynamicOptions(col); });
@@ -172,17 +172,47 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
         }
     };
 
+    const compressImage = async (file: File): Promise<Blob> => {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.src = URL.createObjectURL(file);
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                const MAX_SIZE = 500; 
+                if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } } 
+                else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
+                
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if(!ctx) return reject("Canvas Error");
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob((blob) => { if (blob) resolve(blob); else reject("Compression Error"); }, 'image/jpeg', 0.8);
+            };
+            img.onerror = (err) => reject(err);
+        });
+    };
+
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.length) return;
         setUploadingImg(true);
         try {
-            const file = e.target.files[0];
-            const filePath = `avatars/${Date.now()}.${file.name.split('.').pop()}`;
-            await supabase.storage.from('avatars').upload(filePath, file);
-            const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
-            const imgCol = activeConfig.danhSachCot.find(c => c.key === 'hinh_anh' || c.key === 'avatar');
+            const originalFile = e.target.files[0];
+            const compressedBlob = await compressImage(originalFile);
+            const newFile = new File([compressedBlob], `avatar_${Date.now()}.jpg`, { type: 'image/jpeg' });
+            const filePath = `${Date.now()}_${newFile.name}`; 
+            
+            const { error: uploadError } = await supabase.storage.from(BUCKET_NAME).upload(filePath, newFile, { cacheControl: '3600', upsert: false });
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filePath);
+            
+            const imgCol = activeConfig.danhSachCot.find(c => c.kieuDuLieu === 'image') || activeConfig.danhSachCot.find(c => c.key === 'hinh_anh' || c.key === 'avatar');
             if (imgCol) setFormData((p: any) => ({ ...p, [imgCol.key]: publicUrl }));
-        } catch (err: any) { alert('Lỗi: ' + err.message); } finally { setUploadingImg(false); }
+            
+        } catch (err: any) { alert(`Lỗi tải ảnh: ` + (err.message || err)); } finally { setUploadingImg(false); }
     };
 
     const handleSave = async () => {
@@ -190,17 +220,35 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
         try {
             const cleanPayload: any = {};
             for (const col of activeConfig.danhSachCot) {
-                if (!canEditColumn(col) && !isCreateMode) continue;
+                // Logic lọc payload
+                if (!col.hienThiDetail) continue; 
+                if (col.readOnly) continue;
                 if (col.tuDong) continue;
+                if (!canEditColumn(col) && !isCreateMode) continue;
+                // Double check: Không bao giờ gửi cột ho_ten (generated column)
+                if (col.key === 'ho_ten') continue; 
+
                 let val = formData[col.key];
-                if (col.batBuoc && !val) throw new Error(`"${col.label}" là bắt buộc.`);
-                if (['number', 'currency', 'int4', 'bigint'].includes(col.kieuDuLieu)) val = val ? Number(String(val).replace(/,/g, '')) : null;
+                if (col.batBuoc && (val === null || val === undefined || val === '')) throw new Error(`Trường "${col.label}" là bắt buộc nhập.`);
+                if (['number', 'currency', 'percent', 'int4', 'bigint', 'numeric'].includes(col.kieuDuLieu)) val = val ? Number(String(val).replace(/,/g, '')) : null;
+                
                 cleanPayload[col.key] = val;
             }
-            const { error } = isCreateMode ? await (supabase.from(activeConfig.bangDuLieu) as any).insert(cleanPayload) : await (supabase.from(activeConfig.bangDuLieu) as any).update(cleanPayload).eq('id', initialData.id);
-            if (error) throw error;
+
+            if (Object.keys(cleanPayload).length === 0) console.warn("Không có dữ liệu thay đổi.");
+
+            let result;
+            if (isCreateMode) {
+                result = await (supabase.from(activeConfig.bangDuLieu) as any).insert(cleanPayload);
+            } else {
+                if (!initialData.id) throw new Error("Không tìm thấy ID bản ghi.");
+                result = await (supabase.from(activeConfig.bangDuLieu) as any).update(cleanPayload).eq('id', initialData.id);
+            }
+
+            if (result.error) throw result.error;
+            alert("Đã lưu thành công!");
             if (isCreateMode) { onSuccess(); onClose(); } else { await refreshData(); setIsEditing(false); onSuccess(); }
-        } catch (err: any) { setError(err.message); } finally { setLoading(false); }
+        } catch (err: any) { setError(err.message); alert("Lỗi lưu: " + err.message); } finally { setLoading(false); }
     };
 
     const handleSaveLayout = async () => {
@@ -221,10 +269,19 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
     };
 
     const tabList: TabItem[] = [
-        { id: 'form', label: 'Hồ Sơ', icon: User }, 
-        { id: 'luong_thuong', label: 'Lương', icon: CreditCard }, 
-        { id: 'lich_su', label: 'Nhật Ký', icon: History }, 
-        ...(!isCreateMode && activeConfig.virtualColumns ? activeConfig.virtualColumns.map(v => ({ id: v.key, label: v.label, icon: Split, count: virtualData[v.key]?.length || 0 })) : [])
+        { id: 'form', label: 'Thông Tin', icon: User },
+        ...((config as any).tabs || []).map((t: any) => ({
+            id: t.id,
+            label: t.label,
+            icon: ICON_MAP[t.icon] || FileText 
+        })),
+        { id: 'nhat_ky_hoat_dong', label: 'Hoạt Động', icon: History },
+        ...(!isCreateMode && activeConfig.virtualColumns ? activeConfig.virtualColumns.map(v => ({ 
+            id: v.key, 
+            label: v.label, 
+            icon: Split, 
+            count: virtualData[v.key]?.length || 0 
+        })) : [])
     ];
 
     if (!isOpen) return null;
@@ -238,22 +295,18 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
     return (
         <Level3Provider value={contextValue}>
             <div className="fixed inset-0 bottom-[80px] z-[2300] bg-[#0a0807] flex flex-col shadow-2xl animate-in slide-in-from-right-20">
-                
                 <div className="shrink-0 z-[100] bg-[#0a0807] border-b border-[#8B5E3C]/30 shadow-lg">
                     <ThanhDieuHuong danhSachCap={[
                         { id: 'c', ten: 'Quay Lại', onClick: onClose }, 
-                        { id: 'd', ten: (formData?.ten_hien_thi || 'CHI TIẾT').toUpperCase() }
+                        { id: 'd', ten: ((config as any).tieuDeCot && formData[(config as any).tieuDeCot]) ? formData[(config as any).tieuDeCot].toUpperCase() : (formData?.ten_hien_thi || 'CHI TIẾT').toUpperCase() }
                     ]} />
                 </div>
-
                 <NoidungModal>
                     <div className="flex flex-col h-full bg-[#0F0C0B] overflow-hidden">
                         <ThongTinChung /> 
-
                         <div className="shrink-0 bg-[#0a0807] border-b border-[#8B5E3C]/20 z-20">
                             <ThanhTab danhSachTab={tabList} tabHienTai={activeTab} onChuyenTab={setActiveTab} />
                         </div>
-
                         <div className="flex-1 overflow-y-auto custom-scroll p-6 md:p-10 relative">
                             {fetching && <div className="absolute inset-0 bg-[#0a0807]/80 z-50 flex items-center justify-center"><Loader2 className="animate-spin text-[#C69C6D]" size={40}/></div>}
                             {isArranging && <div className="mb-6 p-4 bg-[#C69C6D]/10 border border-[#C69C6D] border-dashed rounded-xl text-center pulse"><p className="text-[#C69C6D] font-bold text-sm uppercase">🔧 Chế độ sắp xếp giao diện</p></div>}
@@ -261,7 +314,6 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
                         </div>
                     </div>
                 </NoidungModal>
-                
                 <NutChucNangLevel3 isCreateMode={isCreateMode} isEditing={isEditing} isArranging={isArranging} loading={loading} canEditRecord={canEditRecord} canDeleteRecord={['admin'].includes(userRole)} isAdmin={userRole === 'admin'} hasError={!!error} onSave={handleSave} onEdit={() => setIsEditing(true)} onCancel={() => setIsEditing(false)} onDelete={handleDelete} onClose={onClose} onFixDB={() => {}} onToggleArrange={() => setIsArranging(!isArranging)} onSaveLayout={handleSaveLayout} />
             </div>
         </Level3Provider>
