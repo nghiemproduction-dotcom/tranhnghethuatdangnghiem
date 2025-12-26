@@ -9,7 +9,7 @@ import { ModuleConfig } from '@/app/GiaoDienTong/DashboardBuilder/KieuDuLieuModu
 import Level1_Widget_Generic from '@/app/GiaoDienTong/ModalDaCap/modalphongquanly/modules/generic/Level1_Widget';
 import Level2_Generic from '@/app/GiaoDienTong/ModalDaCap/modalphongquanly/modules/generic/Level2';
 import Level3_FormChiTiet from '@/app/GiaoDienTong/ModalDaCap/modalphongquanly/modules/quanlynhansu/Level3/level3';
- 
+
 import NhanSuWidget from '@/app/GiaoDienTong/ModalDaCap/modalphongquanly/modules/quanlynhansu/NhanSuWidget';
 import Level2_DanhSachModal from '@/app/GiaoDienTong/ModalDaCap/modalphongquanly/modules/quanlynhansu/Level2/Level2';
 
@@ -30,7 +30,10 @@ export default function ModuleItem({
   const [showLevel2, setShowLevel2] = useState(false);
   const [customConfig, setCustomConfig] = useState<ModuleConfig | null>(null);
 
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
+      id,
+      disabled: !isAdmin
+  });
   
   const colSpan = data.doRong || 1;
   const rowHeight = data.rowHeight || 400; 
@@ -42,6 +45,7 @@ export default function ModuleItem({
     height: `${rowHeight}px`, 
     zIndex: isDragging ? 50 : 'auto',
     opacity: isDragging ? 0.5 : 1,
+    // 🟢 GRID COLUMN LUÔN THEO COLSPAN, KHÔNG RESPONSIVE
     gridColumn: `span ${colSpan}`,
   } as React.CSSProperties;
 
@@ -52,8 +56,7 @@ export default function ModuleItem({
 
   const nhanSuFullConfig: ModuleConfig = { ...data, tenModule: 'Quản Lý Nhân Sự', bangDuLieu: 'nhan_su', kieuHienThiList: 'table', listConfig: { groupByColumn: 'vi_tri' }, danhSachCot: data.danhSachCot || [] };
 
-  const renderContent = () => {
- 
+  const renderContent = () => { 
       if (data.customId === 'custom_nhan_su') return <NhanSuWidget onClick={() => { setCustomConfig(nhanSuFullConfig); handleToggleLevel2(true); }} />;
 
       if (data.moduleType === 'generic') {
@@ -91,16 +94,16 @@ export default function ModuleItem({
   return (
     <>
       <div ref={setNodeRef} style={style} className="module-item relative flex flex-col bg-[#110d0c] overflow-hidden group/module transition-all duration-300">
+        
+        {/* 🟢 ĐÃ XÓA TOÀN BỘ @MEDIA QUERY */}
+        {/* Style này giờ chỉ để đảm bảo grid-column hoạt động tốt nếu inline style bị fail (fallback) */}
         <style jsx>{`
-            .module-item { grid-column: span 1 !important; } 
-            @media (min-width: 640px) { .module-item { grid-column: span ${Math.min(colSpan, 2)} !important; } }
-            @media (min-width: 1280px) { .module-item { grid-column: span ${colSpan} !important; } }
+            .module-item { grid-column: span ${colSpan} !important; }
         `}</style>
         
         <div className="h-[32px] px-2 flex items-center justify-between bg-gradient-to-r from-[#1a120f] via-[#2a1e1b] to-[#1a120f] shrink-0 absolute top-0 left-0 right-0 z-20 opacity-0 group-hover/module:opacity-100 transition-opacity duration-200 pointer-events-none group-hover/module:pointer-events-auto">
             <div className="flex items-center gap-1 pl-1 overflow-hidden w-full">
                 
-                {/* 🟢 CHỈ HIỆN NÚT NẮM KÉO NẾU LÀ ADMIN */}
                 {isAdmin ? (
                     <div {...attributes} {...listeners} className="text-[#8B5E3C] hover:text-[#C69C6D] cursor-grab active:cursor-grabbing p-1 transition-colors">
                         <GripVertical size={16} />
@@ -140,8 +143,7 @@ export default function ModuleItem({
                   ) : (
                       <Level2_Generic isOpen={true} onClose={() => handleToggleLevel2(false)} config={data} onOpenDetail={onOpenDetail} />
                   )
-              ) : (
-          
+              ) : ( 
                   <Level2_DanhSachModal isOpen={showLevel2} onClose={() => handleToggleLevel2(false)} config={customConfig || data} onOpenDetail={onOpenDetail} />
               )}
           </Level2Wrapper>

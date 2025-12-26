@@ -1,15 +1,14 @@
 'use client';
 import React from 'react';
-import { Settings2, GripHorizontal } from 'lucide-react'; // Thêm icon Grip
+import { Settings2, GripHorizontal } from 'lucide-react';
 import { DndContext, useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 
 // SUB-COMPONENT: CARD
-const KanbanCard = ({ id, data, titleKey, subCols, imageCol, onClick, canEdit }: any) => {
-    // 🟢 KHÓA KÉO THẢ: Nếu !canEdit -> disabled = true
+const KanbanCard = ({ id, data, titleKey, subCols, imageCol, onClick, canEdit, isSelected, onSelect }: any) => {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ 
         id,
-        disabled: !canEdit // Quan trọng!
+        disabled: !canEdit 
     });
 
     const style = { 
@@ -23,20 +22,32 @@ const KanbanCard = ({ id, data, titleKey, subCols, imageCol, onClick, canEdit }:
         <div 
             ref={setNodeRef} style={style} {...listeners} {...attributes} 
             className={`
-                bg-[#1a120f] p-3 rounded-lg border border-[#8B5E3C]/30 shadow-sm group relative touch-none select-none transition-all duration-200
-                ${canEdit ? 'hover:border-[#C69C6D] cursor-grab active:cursor-grabbing' : 'cursor-default opacity-90'}
+                bg-[#1a120f] p-3 rounded-lg border shadow-sm group relative touch-none select-none transition-all duration-200
+                ${isSelected ? 'border-[#C69C6D] shadow-[0_0_10px_rgba(198,156,109,0.3)]' : 'border-[#8B5E3C]/30 hover:border-[#C69C6D]'}
+                ${canEdit ? 'cursor-grab active:cursor-grabbing' : 'cursor-default opacity-90'}
             `}
         >
             <div className="absolute inset-0 z-10" onDoubleClick={onClick}></div>
             
-            {/* Grip Icon chỉ hiện khi có quyền Edit */}
+            {/* 🟢 Checkbox chọn thẻ */}
+            <div className="absolute top-2 left-2 z-20" onPointerDown={(e) => e.stopPropagation()}>
+                 <input 
+                    type="checkbox" 
+                    className="w-4 h-4 rounded border-gray-600 bg-black/50 text-[#C69C6D] focus:ring-[#C69C6D] accent-[#C69C6D] cursor-pointer opacity-0 group-hover:opacity-100 data-[checked=true]:opacity-100 transition-opacity"
+                    checked={isSelected}
+                    data-checked={isSelected}
+                    onChange={() => onSelect && onSelect(id)}
+                />
+            </div>
+
+            {/* Grip Icon */}
             {canEdit && (
                 <div className="absolute top-2 right-2 text-[#8B5E3C]/30 group-hover:text-[#C69C6D] opacity-0 group-hover:opacity-100 transition-opacity">
                     <GripHorizontal size={12} />
                 </div>
             )}
 
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-3 pl-5"> {/* pl-5 để né checkbox */}
                 {imageCol && data[imageCol.key] ? (
                     <img src={data[imageCol.key]} className="w-10 h-10 rounded-full object-cover bg-[#222] shrink-0 border border-[#8B5E3C]/20" alt=""/>
                 ) : (
@@ -83,18 +94,20 @@ interface Props {
     onRowClick: (item: any) => void;
     sensors: any;
     onDragEnd: (e: any) => void;
-    canEdit: boolean; // 🟢 Nhận prop check quyền
+    canEdit: boolean;
+    // 🟢 Thêm props chọn
+    selectedIds?: string[];
+    onSelect?: (id: string) => void;
 }
 
-export default function KanbanView({ data, kanbanGroupBy, columns, imgCol, titleCol, onRowClick, sensors, onDragEnd, canEdit }: Props) {
+export default function KanbanView({ data, kanbanGroupBy, columns, imgCol, titleCol, onRowClick, sensors, onDragEnd, canEdit, selectedIds = [], onSelect }: Props) {
     if (!kanbanGroupBy) return (
         <div className="flex flex-col items-center justify-center h-full text-[#8B5E3C] gap-3">
             <Settings2 size={48} strokeWidth={1} />
-            <span className="text-sm uppercase tracking-widest font-bold">Vui lòng chọn cột phân nhóm</span>
+            <span className="text-sm uppercase tracking-widest font-bold">Vui lòng chọn cột phân nhóm (Góc trên phải)</span>
         </div>
     );
     
-    // Group Data logic
     const groups: Record<string, any[]> = {};
     data.forEach(row => { 
         const val = String(row[kanbanGroupBy] || 'Chưa phân loại'); 
@@ -108,12 +121,7 @@ export default function KanbanView({ data, kanbanGroupBy, columns, imgCol, title
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
             <div className="flex gap-4 h-full p-4 items-start custom-scroll overflow-x-auto w-full">
                 {sortedKeys.map((groupName) => (
-                    <KanbanColumn 
-                        key={groupName} 
-                        id={groupName} 
-                        title={groupName} 
-                        count={groups[groupName].length}
-                    >
+                    <KanbanColumn key={groupName} id={groupName} title={groupName} count={groups[groupName].length}>
                         {groups[groupName].map((row) => (
                             <KanbanCard 
                                 key={row.id} 
@@ -123,7 +131,9 @@ export default function KanbanView({ data, kanbanGroupBy, columns, imgCol, title
                                 subCols={columns.slice(1,3)} 
                                 imageCol={imgCol} 
                                 onClick={() => onRowClick(row)}
-                                canEdit={canEdit} // 🟢 Truyền quyền xuống Card
+                                canEdit={canEdit}
+                                isSelected={selectedIds.includes(row.id)}
+                                onSelect={onSelect}
                             />
                         ))}
                     </KanbanColumn>

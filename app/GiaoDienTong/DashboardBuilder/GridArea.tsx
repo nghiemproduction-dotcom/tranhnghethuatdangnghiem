@@ -8,7 +8,7 @@ import {
 import { arrayMove, SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import { Plus, GripHorizontal, Trash2, ArrowUpDown, PlusCircle } from 'lucide-react';
 import { ModuleConfig } from './KieuDuLieuModule';
-import ModuleItem from '@/app/GiaoDienTong/ModuleItem'; // 🟢 Giữ nguyên import theo file bạn gửi
+import ModuleItem from '@/app/GiaoDienTong/ModuleItem'; 
 
 interface Props {
     modules: ModuleConfig[];
@@ -47,6 +47,7 @@ export default function GridArea({
         }
     }, [modules]);
 
+    // 🟢 KHÓA KÉO THẢ NẾU KHÔNG PHẢI ADMIN
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
         useSensor(KeyboardSensor)
@@ -58,6 +59,7 @@ export default function GridArea({
     };
 
     const handleDragOver = (event: DragOverEvent) => {
+        if (!isAdmin) return; 
         const { active, over } = event;
         if (!over) return;
         const activeId = active.id as string;
@@ -78,6 +80,7 @@ export default function GridArea({
     };
 
     const handleDragEnd = (event: DragEndEvent) => {
+        if (!isAdmin) return;
         const { active, over } = event;
         setActiveId(null);
         if (!over) return;
@@ -103,7 +106,6 @@ export default function GridArea({
     };
 
     return (
-        // 🟢 Padding tổng thể nhỏ (p-2) để tối ưu diện tích
         <div className="w-full min-h-screen p-2 pb-40 space-y-2"> 
             <DndContext 
                 sensors={sensors} collisionDetection={closestCorners} 
@@ -115,11 +117,7 @@ export default function GridArea({
                     const rowHeight = rowModules[0]?.rowHeight || 400;
 
                     return (
-                        // 🟢 ĐÃ XÓA SẠCH: border, rounded, bg, p-4
-                        // Chỉ giữ lại group/row để hiện tool và relative để định vị
                         <div key={rowId} className="group/row relative transition-all py-1">
-                            
-                            {/* THANH CÔNG CỤ HÀNG (Floating) */}
                             {isAdmin && (
                                 <div className="absolute -top-4 left-0 flex items-center gap-2 bg-[#1a120f] px-2 py-1 z-30 opacity-0 group-hover/row:opacity-100 transition-opacity pointer-events-none group-hover/row:pointer-events-auto">
                                     <span className="text-[10px] font-bold text-[#8B5E3C] uppercase tracking-wider flex items-center gap-1 cursor-grab active:cursor-grabbing">
@@ -142,21 +140,18 @@ export default function GridArea({
                                 </div>
                             )}
 
-                            {/* DROPPABLE AREA */}
                             <SortableContext id={rowId} items={rowModules.map(m => m.id)} strategy={rectSortingStrategy}>
                                 <div 
                                     className="grid w-full transition-all"
                                     style={{
-                                        gridTemplateColumns: 'repeat(1, 1fr)',
-                                        gap: '8px', // Khoảng cách giữa các module
+                                        // 🟢 BẮT BUỘC 4 CỘT TRÊN MỌI THIẾT BỊ
+                                        gridTemplateColumns: 'repeat(4, 1fr)',
+                                        gap: '8px', 
                                         gridAutoRows: `${rowHeight}px`,
                                         minHeight: rowModules.length === 0 ? '100px' : `${rowHeight}px`
                                     }}
                                 >
-                                    <style jsx>{`
-                                        @media (min-width: 768px) { div.grid { grid-template-columns: repeat(2, 1fr) !important; } }
-                                        @media (min-width: 1280px) { div.grid { grid-template-columns: repeat(4, 1fr) !important; } }
-                                    `}</style>
+                                    {/* 🟢 ĐÃ XÓA TOÀN BỘ STYLE @MEDIA QUERY TẠI ĐÂY */}
 
                                     {rowModules.length === 0 && isAdmin && (
                                         <div className="col-span-full h-full flex items-center justify-center border-2 border-dashed border-[#8B5E3C]/10 text-[#5D4037] text-xs uppercase tracking-widest bg-[#0a0807]/20">

@@ -2,10 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
-// 🟢 THÊM: Import LogOut icon
-import { Loader2, User, CreditCard, History, Split, Box, FileText, Settings, BarChart, LogOut } from 'lucide-react';
+import { Loader2, User, CreditCard, History, Split, Box, FileText, Settings, BarChart, Users } from 'lucide-react'; // 🟢 Thêm icon Users
 import { ModuleConfig, CotHienThi } from '../../../../../DashboardBuilder/KieuDuLieuModule';
-// 🟢 THÊM: Import useRouter
 import { useRouter } from 'next/navigation';
 
 import ThanhDieuHuong from '@/app/GiaoDienTong/ModalDaCap/GiaoDien/ThanhDieuHuong';
@@ -20,6 +18,9 @@ import ThongTinChung from './thongtinchung';
 import TabContent from './TabContent';
 import { Level3Provider } from './Level3Context';
 import Tab_NhatKyHoatDong from './Tab_NhatKyHoatDong'; 
+
+// 🟢 Import Tab Mới
+import Tab_KhachHangPhuTrach from './Tab_KhachHangPhuTrach';
 
 interface Props {
     isOpen: boolean;
@@ -40,11 +41,9 @@ const ICON_MAP: any = {
     'box': Box, 'file': FileText, 'settings': Settings, 'chart': BarChart
 };
 
-// 🟢 DANH SÁCH CỘT CẦN ẨN VÀ LOẠI BỎ KHỎI QUERY
 const HIDDEN_COLS = ['luong_theo_gio', 'lan_dang_nhap_ts', 'nguoi_tao_id', 'ten_nguoi_tao', 'ho_ten'];
 
 export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config, initialData, userRole, userEmail, parentTitle }: Props) {
-    // 🟢 THÊM: Khởi tạo Router
     const router = useRouter();
 
     const [dynamicColumns, setDynamicColumns] = useState<CotHienThi[]>([]);
@@ -78,7 +77,6 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
         return false;
     };
 
-    // FETCH SCHEMA & CONFIG TỪ DB
     const fetchSchema = useCallback(async () => {
         if (config.danhSachCot?.length) { setOrderedColumns(config.danhSachCot); return; }
 
@@ -276,15 +274,6 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
         if (!error) { onSuccess(); onClose(); } else alert(error.message);
     };
 
-    // 🟢 THÊM: HÀM XỬ LÝ ĐĂNG XUẤT
-    const handleLogout = async () => {
-        if (confirm("⚠️ BẠN CÓ CHẮC CHẮN MUỐN ĐĂNG XUẤT?")) {
-            await supabase.auth.signOut();
-            router.push('/'); 
-            window.location.reload(); 
-        }
-    };
-
     const tabList: TabItem[] = [
         { id: 'form', label: 'Thông Tin', icon: User },
         ...((config as any).tabs || []).map((t: any) => ({
@@ -301,6 +290,16 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
         })) : [])
     ];
 
+    // 🟢 THÊM TAB KHÁCH HÀNG (CHỈ HIỆN KHI KHÔNG PHẢI TẠO MỚI VÀ MODULE NHAN_SU)
+    if (!isCreateMode && config.bangDuLieu === 'nhan_su') {
+        // Chèn vào vị trí số 2 (sau tab Thông Tin)
+        tabList.splice(1, 0, {
+            id: 'khach_hang_phu_trach',
+            label: `KHÁCH HÀNG (${initialData?.total_khach || 0})`,
+            icon: Users
+        });
+    }
+
     if (!isOpen) return null;
 
     const contextValue = {
@@ -313,7 +312,6 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
         <Level3Provider value={contextValue}>
             <div className="fixed inset-0 bottom-[80px] z-[2300] bg-[#0a0807] flex flex-col shadow-2xl animate-in slide-in-from-right-20">
                 
-                {/* 🟢 CẬP NHẬT: Header dùng Flexbox để chứa nút đăng xuất */}
                 <div className="shrink-0 z-[100] bg-[#0a0807] border-b border-[#8B5E3C]/30 shadow-lg flex items-center justify-between pr-4">
                     <div className="flex-1">
                         <ThanhDieuHuong danhSachCap={[
@@ -321,31 +319,52 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
                             { id: 'd', ten: ((config as any).tieuDeCot && formData[(config as any).tieuDeCot]) ? formData[(config as any).tieuDeCot].toUpperCase() : (formData?.ten_hien_thi || 'CHI TIẾT').toUpperCase() }
                         ]} />
                     </div>
-                    
-                    {/* 🟢 THÊM: Nút đăng xuất nổi bật */}
-                    <button 
-                        onClick={handleLogout}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-red-900/20 text-red-500 border border-red-500/30 rounded hover:bg-red-600 hover:text-white transition-all text-xs font-bold uppercase tracking-wider shadow-[0_0_10px_rgba(220,38,38,0.2)] hover:shadow-[0_0_15px_rgba(220,38,38,0.5)]"
-                    >
-                        <LogOut size={14} />
-                        <span className="hidden sm:inline">Đăng Xuất</span>
-                    </button>
                 </div>
 
                 <NoidungModal>
                     <div className="flex flex-col h-full bg-[#0F0C0B] overflow-hidden">
-                        <ThongTinChung /> 
+                        
+                        {/* Chỉ hiện Thông Tin Chung khi ở tab form */}
+                        {activeTab === 'form' && <ThongTinChung />}
+
                         <div className="shrink-0 bg-[#0a0807] border-b border-[#8B5E3C]/20 z-20">
                             <ThanhTab danhSachTab={tabList} tabHienTai={activeTab} onChuyenTab={setActiveTab} />
                         </div>
                         <div className="flex-1 overflow-y-auto custom-scroll p-6 md:p-10 relative">
                             {fetching && <div className="absolute inset-0 bg-[#0a0807]/80 z-50 flex items-center justify-center"><Loader2 className="animate-spin text-[#C69C6D]" size={40}/></div>}
                             {isArranging && <div className="mb-6 p-4 bg-[#C69C6D]/10 border border-[#C69C6D] border-dashed rounded-xl text-center pulse"><p className="text-[#C69C6D] font-bold text-sm uppercase">🔧 Chế độ sắp xếp giao diện</p></div>}
-                            <TabContent activeTab={activeTab} virtualData={virtualData} /> 
+                            
+                            {/* 🟢 RENDER NỘI DUNG TAB */}
+                            {activeTab === 'khach_hang_phu_trach' ? (
+                                <Tab_KhachHangPhuTrach nhanSuId={initialData?.id} />
+                            ) : activeTab === 'nhat_ky_hoat_dong' ? (
+                                <Tab_NhatKyHoatDong nhanSuId={initialData?.id} loginHistory={formData?.lich_su_dang_nhap} />
+                            ) : (
+                                <TabContent activeTab={activeTab} virtualData={virtualData} /> 
+                            )}
                         </div>
                     </div>
                 </NoidungModal>
-                <NutChucNangLevel3 isCreateMode={isCreateMode} isEditing={isEditing} isArranging={isArranging} loading={loading} canEditRecord={canEditRecord} canDeleteRecord={['admin'].includes(userRole)} isAdmin={userRole === 'admin'} hasError={!!error} onSave={handleSave} onEdit={() => setIsEditing(true)} onCancel={() => setIsEditing(false)} onDelete={handleDelete} onClose={onClose} onFixDB={() => {}} onToggleArrange={() => setIsArranging(!isArranging)} onSaveLayout={handleSaveLayout} />
+                
+                <NutChucNangLevel3 
+                    isCreateMode={isCreateMode} 
+                    isEditing={isEditing} 
+                    isArranging={isArranging} 
+                    loading={loading} 
+                    canEditRecord={canEditRecord} 
+                    canDeleteRecord={['admin'].includes(userRole)} 
+                    isAdmin={userRole === 'admin'} 
+                    hasError={!!error} 
+                    onSave={handleSave} 
+                    onEdit={() => setIsEditing(true)} 
+                    onCancel={() => setIsEditing(false)} 
+                    onDelete={handleDelete} 
+                    onClose={onClose} 
+                    onFixDB={() => {}} 
+                    onToggleArrange={() => setIsArranging(!isArranging)} 
+                    onSaveLayout={handleSaveLayout}
+                    // Bỏ nút logout như code cũ
+                />
             </div>
         </Level3Provider>
     );
