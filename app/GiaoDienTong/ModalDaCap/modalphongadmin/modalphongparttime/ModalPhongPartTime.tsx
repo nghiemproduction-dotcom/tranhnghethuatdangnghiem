@@ -3,8 +3,8 @@ import React from 'react';
 import DashboardBuilder from '@/app/GiaoDienTong/DashboardBuilder/DashboardBuilder';
 import { ModuleConfig } from '@/app/GiaoDienTong/DashboardBuilder/KieuDuLieuModule';
 
-import ThanhDieuHuong from '../GiaoDien/ThanhDieuHuong';
-import NoidungModal from '../GiaoDien/NoidungModal';
+import ThanhDieuHuong from '../../GiaoDien/ThanhDieuHuong';
+import NoidungModal from '../../GiaoDien/NoidungModal';
 
 interface Props {
   isOpen: boolean;

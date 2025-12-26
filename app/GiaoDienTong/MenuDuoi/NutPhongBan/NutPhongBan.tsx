@@ -16,7 +16,7 @@ import ModalPhongAdmin from '@/app/GiaoDienTong/ModalDaCap/modalphongadmin/Modal
 import ModalPhongSales from '@/app/GiaoDienTong/ModalDaCap/modalphongsales/ModalPhongSales';
 import ModalPhongTho from '@/app/GiaoDienTong/ModalDaCap/modalphongtho/ModalPhongTho';
 import ModalPhongCTV from '@/app/GiaoDienTong/ModalDaCap/modalphongctv/ModalPhongCTV';
-import ModalPhongPartTime from '@/app/GiaoDienTong/ModalDaCap/modalphongparttime/ModalPhongPartTime'; 
+import ModalPhongPartTime from '@/app/GiaoDienTong/ModalDaCap/modalphongadmin/modalphongparttime/ModalPhongPartTime'; 
 import ModalPhongThietKe from '@/app/GiaoDienTong/ModalDaCap/modalphongthietke/ModalPhongThietKe'; 
 
 interface Props {

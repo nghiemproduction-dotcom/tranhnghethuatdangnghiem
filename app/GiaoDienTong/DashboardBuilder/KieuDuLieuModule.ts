@@ -1,37 +1,22 @@
 export interface CotHienThi {
   key: string;       
   label: string;     
-  
-  // Các kiểu dữ liệu
   kieuDuLieu: string; 
-  
   hienThiList: boolean; 
   hienThiDetail: boolean; 
-  
-  // Ràng buộc
   batBuoc?: boolean; 
   tuDong?: boolean;  
-  readOnly?: boolean; // Cấm sửa tuyệt đối (cho ID, Công thức)
-  
-  // Logic Mở Rộng
+  readOnly?: boolean; 
   defaultValue?: any;   
   linkedTable?: string; 
-  
-  // FORM THÔNG MINH
   options?: string[];           
   allowNewOption?: boolean;     
   formatType?: 'currency' | 'percent' | 'phone' | 'email' | 'link' | 'location' | 'capitalize'; 
   inputMultiplier?: number;     
   computedCode?: string;        
-  
-  // PHÂN QUYỀN
   permRead?: string[];   
   permEdit?: string[];   
-  
-  // Logic Code cũ
   logicCode?: string;    
-
-  // Ref
   isRef?: boolean;          
   refTable?: string;        
   isPartOf?: boolean;       
@@ -59,22 +44,35 @@ export interface ModuleConfig {
   rowHeight?: number;  
   page_id?: string; 
 
-  // Widget
-  viewType?: 'list' | 'chart' | 'stat'; 
+  // 🟢 CẬP NHẬT: Thêm các viewType mới
+  viewType?: 'list' | 'chart' | 'stat' | 'button' | 'direct_l2' | 'direct_l3'; 
+  
+  // Widget Config
   widgetData?: {
-      chartType?: 'Bar' | 'Line' | 'Pie' | 'Area';
+      chartType?: 'Bar' | 'Line' | 'Pie' | 'Donut' | 'Area';
       displayFields?: string[]; 
       labelField?: string;
       valueField?: string;
+      
+      groupBy?: string;    
+      titleField?: string; 
+      subField?: string;   
+
+      // Cấu hình cho Button Widget
+      buttonLabel?: string;
+      buttonColor?: string;
+      buttonIcon?: string;
+
       relations?: {
           sourceCol: string;
           targetTable: string;
           targetCol: string;
           type: string;
       }[];
+      
+      [key: string]: any; 
   };
 
-  // List Config
   kieuHienThiList?: 'table' | 'card' | 'kanban';
   listConfig?: {
       columns?: string[]; 

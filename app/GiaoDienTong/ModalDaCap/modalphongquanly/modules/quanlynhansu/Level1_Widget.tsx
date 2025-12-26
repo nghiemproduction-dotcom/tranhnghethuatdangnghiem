@@ -1,152 +1,181 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { ModuleConfig } from '@/app/GiaoDienTong/DashboardBuilder/KieuDuLieuModule'; 
-import { LayoutGrid, Loader2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
+import { PieChart, Loader2, Database, List, Hash, User } from 'lucide-react';
+import { ModuleConfig } from '@/app/GiaoDienTong/DashboardBuilder/KieuDuLieuModule';
 
 interface Props {
     config: ModuleConfig;
     onClick: () => void;
 }
 
-export default function Level1_Widget({ config, onClick }: Props) {
-    const [data, setData] = useState<any[]>([]);
-    const [totalCount, setTotalCount] = useState(0);
-    const [loading, setLoading] = useState(false);
+export default function Level1_Widget_Generic({ config, onClick }: Props) {
+    const [stats, setStats] = useState<{label: string, value: number, color: string}[]>([]);
+    const [listData, setListData] = useState<any[]>([]);
+    const [total, setTotal] = useState(0);
+    const [loading, setLoading] = useState(true);
+
+    const COLORS = ['#C69C6D', '#8B5E3C', '#5D4037', '#A1887F', '#3E2723', '#D7CCC8'];
+    const VIEW_TYPE = config.viewType || 'chart'; // Mặc định là chart
+    
+    // Lấy cấu hình cột từ widgetData (do DashboardBuilder gửi xuống)
+    const groupByField = config.widgetData?.groupBy || 'trang_thai';
+    const titleField = config.widgetData?.titleField || 'ho_ten';
+    const subField = config.widgetData?.subField || 'so_dien_thoai';
 
     useEffect(() => {
-        if (!config.bangDuLieu) return;
         const fetchData = async () => {
+            if (!config.bangDuLieu) return;
             setLoading(true);
+
             try {
-                // 1. Nếu là STAT -> Chỉ đếm số lượng (Siêu nhanh)
-                if (config.viewType === 'stat') {
-                    const { count } = await supabase.from(config.bangDuLieu).select('*', { count: 'exact', head: true });
-                    setTotalCount(count || 0);
+                // 1. Lấy tổng số lượng
+                const { count } = await supabase.from(config.bangDuLieu).select('*', { count: 'exact', head: true });
+                setTotal(count || 0);
+
+                // 2. Xử lý theo từng loại hiển thị
+                if (VIEW_TYPE === 'stat') {
+                    // Chỉ cần count là đủ
                 } 
-                // 2. Nếu là CHART/LIST -> Lấy dữ liệu mẫu (Giới hạn 100 để vẽ chart)
-                else {
-                    const { data: res } = await supabase.from(config.bangDuLieu).select('*').limit(100).order('created_at', { ascending: false });
-                    if (res) setData(res);
+                else if (VIEW_TYPE === 'list') {
+                    // Lấy 4 bản ghi mới nhất
+                    const { data } = await supabase
+                        .from(config.bangDuLieu)
+                        .select('*')
+                        .order('created_at', { ascending: false })
+                        .limit(4);
+                    setListData(data || []);
                 }
-            } catch (err) { console.error(err); } 
-            finally { setLoading(false); }
+                else {
+                    // Mặc định: CHART -> Group theo cột được chọn
+                    const { data } = await supabase.from(config.bangDuLieu).select(groupByField).limit(100);
+                    
+                    if (data && data.length > 0) {
+                        const counts: Record<string, number> = {};
+                        data.forEach((item: any) => {
+                            const key = item[groupByField] || 'Khác';
+                            counts[key] = (counts[key] || 0) + 1;
+                        });
+
+                        const formatted = Object.entries(counts).map(([label, value], index) => ({
+                            label,
+                            value,
+                            color: COLORS[index % COLORS.length]
+                        }));
+                        setStats(formatted);
+                    }
+                }
+            } catch (error) {
+                console.error("Widget Error:", error);
+            } finally {
+                setLoading(false);
+            }
         };
         fetchData();
-    }, [config.bangDuLieu, config.viewType]);
+    }, [config.bangDuLieu, VIEW_TYPE, groupByField]);
 
-    // WRAPPER: Đảm bảo click ăn 100% diện tích
-    const Wrapper = ({ children }: { children: React.ReactNode }) => (
-        <div className="w-full h-full cursor-pointer overflow-hidden relative group bg-[#111] hover:bg-[#161616] transition-colors" onClick={(e) => { e.stopPropagation(); onClick(); }}>
-            {children}
-        </div>
-    );
+    // --- RENDER UI ---
 
-    if (loading) return <Wrapper><div className="w-full h-full flex items-center justify-center"><Loader2 className="animate-spin text-[#8B5E3C]"/></div></Wrapper>;
+    const renderContent = () => {
+        if (loading) return <div className="flex-1 flex items-center justify-center"><Loader2 className="animate-spin text-[#C69C6D]" size={24}/></div>;
 
-    // --- 1. STAT WIDGET (SỐ LIỆU) ---
-    if (config.viewType === 'stat') {
-        return (
-            <Wrapper>
-                <div className="w-full h-full flex flex-col items-center justify-center p-2">
-                    <div className="w-12 h-12 rounded-full bg-[#1a120f] flex items-center justify-center text-[#C69C6D] mb-2 border border-[#8B5E3C]/20 shadow-[0_0_20px_rgba(198,156,109,0.1)]">
-                        <LayoutGrid size={24}/>
-                    </div>
-                    <h3 className="text-4xl lg:text-5xl font-black text-[#F5E6D3] tracking-tighter mb-1 leading-none drop-shadow-md">
-                        {totalCount.toLocaleString()}
-                    </h3>
-                    <p className="text-[10px] text-[#8B5E3C] uppercase font-bold tracking-[0.2em] opacity-80">Tổng Số Lượng</p>
+        // 1. Dạng THỐNG KÊ SỐ (Stat)
+        if (VIEW_TYPE === 'stat') {
+            return (
+                <div className="flex-1 flex flex-col items-center justify-center relative z-10">
+                    <Hash size={40} className="text-[#8B5E3C] opacity-20 mb-2"/>
+                    <span className="text-5xl font-black text-[#F5E6D3] tracking-tighter">{total}</span>
+                    <span className="text-xs text-[#8B5E3C] uppercase tracking-widest mt-1">Bản ghi</span>
                 </div>
-            </Wrapper>
-        );
-    }
+            );
+        }
 
-    // XỬ LÝ DỮ LIỆU CHART
-    const labelKey = config.widgetData?.labelField || 'id'; 
-    const valueKey = config.widgetData?.valueField; 
-    let chartData = [];
-
-    if (valueKey) {
-        // Cộng tổng nếu có valueKey
-        chartData = data.slice(0, 10).map(item => ({
-            label: String(item[labelKey] || 'N/A'),
-            value: Number(item[valueKey]) || 0
-        }));
-    } else {
-        // Đếm tần suất nếu không có valueKey
-        const counts: Record<string, number> = {};
-        data.forEach(item => { const label = String(item[labelKey] || 'N/A'); counts[label] = (counts[label] || 0) + 1; });
-        chartData = Object.entries(counts).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value).slice(0, 8);
-    }
-
-    // --- 2. LIST WIDGET ---
-    if (config.viewType === 'list') {
-        return (
-            <Wrapper>
-                <div className="w-full h-full flex flex-col bg-[#111]">
-                    <div className="flex-1 overflow-hidden flex flex-col justify-center px-4">
-                        {data.slice(0, 5).map((item, idx) => (
-                            <div key={idx} className="flex items-center justify-between py-2 border-b border-[#8B5E3C]/10 last:border-0 group-hover:border-[#8B5E3C]/20 text-xs">
-                                <span className="font-medium text-[#A1887F] group-hover:text-[#F5E6D3] truncate pr-2">{String(item[labelKey] || 'N/A')}</span>
-                                {valueKey && <span className="font-bold font-mono text-[#C69C6D]">{item[valueKey]}</span>}
+        // 2. Dạng DANH SÁCH (List)
+        if (VIEW_TYPE === 'list') {
+            return (
+                <div className="flex-1 flex flex-col gap-2 mt-3 overflow-hidden relative z-10">
+                    {listData.map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-3 p-2 rounded bg-[#0a0807]/40 border border-[#8B5E3C]/10 hover:border-[#C69C6D]/30 transition-colors">
+                            <div className="w-8 h-8 rounded-full bg-[#1a120f] border border-[#8B5E3C]/20 flex items-center justify-center shrink-0 text-[#C69C6D]">
+                                {item.hinh_anh ? <img src={item.hinh_anh} className="w-full h-full object-cover rounded-full"/> : <User size={14}/>}
                             </div>
-                        ))}
-                    </div>
-                </div>
-            </Wrapper>
-        );
-    }
-
-    const chartType = config.widgetData?.chartType || 'Bar';
-    const maxValue = Math.max(...chartData.map(d => d.value)) || 1;
-    const colors = ['#C69C6D', '#8B5E3C', '#5D4037', '#A1887F', '#3E2723'];
-
-    // --- 3. CHART WIDGETS ---
-    return (
-        <Wrapper>
-            <div className="w-full h-full p-4 flex flex-col">
-                
-                {/* BAR CHART */}
-                {chartType === 'Bar' && (
-                    <div className="flex items-end gap-1 h-full pb-4 border-b border-[#8B5E3C]/20">
-                        {chartData.map((item, idx) => (
-                            <div key={idx} className="flex-1 flex flex-col justify-end group/bar h-full relative" title={`${item.label}: ${item.value}`}>
-                                <div 
-                                    className="w-full rounded-t-sm transition-all duration-500 relative hover:brightness-110" 
-                                    style={{ height: `${(item.value / maxValue) * 100}%`, background: colors[idx % colors.length] }}
-                                ></div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {/* PIE CHART (CSS Conic) */}
-                {chartType === 'Pie' && (
-                    <div className="flex-1 flex items-center justify-center relative">
-                        <div 
-                            className="w-32 h-32 rounded-full shadow-xl relative"
-                            style={{ 
-                                background: `conic-gradient(${chartData.map((item, i, arr) => {
-                                    const total = arr.reduce((a, b) => a + b.value, 0);
-                                    const start = arr.slice(0, i).reduce((a, b) => a + b.value, 0) / total * 360;
-                                    const end = start + (item.value / total) * 360;
-                                    return `${colors[i % colors.length]} ${start}deg ${end}deg`;
-                                }).join(', ')})` 
-                            }}
-                        >
-                            <div className="absolute inset-4 bg-[#111] rounded-full flex items-center justify-center flex-col">
-                                <span className="text-[10px] text-[#8B5E3C] font-bold">TOTAL</span>
-                                <span className="text-xl font-bold text-[#F5E6D3]">{data.length}</span>
+                            <div className="min-w-0 flex-1">
+                                <div className="text-xs font-bold text-[#E8D4B9] truncate">{item[titleField] || 'Chưa đặt tên'}</div>
+                                <div className="text-[10px] text-[#5D4037] truncate">{item[subField] || '-'}</div>
                             </div>
                         </div>
-                    </div>
-                )}
+                    ))}
+                    {listData.length === 0 && <div className="text-center text-xs text-gray-600 mt-4">Chưa có dữ liệu</div>}
+                </div>
+            );
+        }
 
-                <div className="text-center text-[10px] text-[#5D4037] mt-2 font-bold uppercase tracking-widest truncate">
-                    {config.tenModule}
+        // 3. Dạng BIỂU ĐỒ (Chart) - Mặc định
+        return (
+            <div className="flex-1 flex flex-col relative z-10">
+                 <div className="absolute top-0 right-0 text-right">
+                    <p className="text-[10px] text-[#8B5E3C] font-bold uppercase">Tổng</p>
+                    <p className="text-3xl font-black text-[#F5E6D3] leading-none">{total}</p>
+                </div>
+                <div className="flex-1 flex items-center justify-center relative mt-2">
+                    <div 
+                        className="w-28 h-28 rounded-full shadow-2xl relative border-4 border-[#161210] group-hover:scale-105 transition-transform duration-500"
+                        style={{ 
+                            background: stats.length > 0 
+                            ? `conic-gradient(${stats.map((s, i, arr) => {
+                                const totalVal = arr.reduce((a, b) => a + b.value, 0);
+                                let start = 0;
+                                for(let j=0; j<i; j++) start += arr[j].value;
+                                const startPercent = (start / totalVal) * 100;
+                                const endPercent = startPercent + (s.value / totalVal) * 100;
+                                return `${s.color} ${startPercent}% ${endPercent}%`;
+                            }).join(', ')})`
+                            : '#333'
+                        }}
+                    >
+                        <div className="absolute inset-2 bg-[#110d0c] rounded-full flex items-center justify-center flex-col shadow-inner">
+                            <PieChart size={24} className="text-[#8B5E3C] opacity-50"/>
+                        </div>
+                    </div>
+                </div>
+                <div className="mt-auto w-full grid grid-cols-2 gap-x-2 gap-y-1 pt-2">
+                    {stats.slice(0, 4).map((s, i) => (
+                        <div key={i} className="flex items-center gap-1.5 text-[10px]">
+                            <span className="w-2 h-2 rounded-full shadow-[0_0_5px_currentColor]" style={{backgroundColor: s.color}}></span>
+                            <span className="text-[#A1887F] truncate flex-1">{s.label}</span>
+                            <span className="text-[#F5E6D3] font-bold">{s.value}</span>
+                        </div>
+                    ))}
                 </div>
             </div>
-        </Wrapper>
+        );
+    };
+
+    return (
+        <div 
+            onClick={onClick}
+            className="w-full h-full bg-[#161210] border border-[#8B5E3C]/20 rounded-2xl p-5 relative group cursor-pointer hover:border-[#C69C6D] transition-all overflow-hidden flex flex-col shadow-lg"
+        >
+            {/* Header */}
+            <div className="flex justify-between items-start z-10 mb-1">
+                <div className="flex items-center gap-2">
+                    <div className="p-2 bg-[#0a0807] rounded-lg border border-[#8B5E3C]/30 text-[#C69C6D] shadow-inner">
+                        {VIEW_TYPE === 'list' ? <List size={18}/> : (VIEW_TYPE === 'stat' ? <Hash size={18}/> : <Database size={18}/>)}
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="text-[#5D4037] font-bold text-[10px] uppercase tracking-wider group-hover:text-[#E8D4B9] transition-colors max-w-[120px] truncate">
+                            {config.tenModule}
+                        </span>
+                        {/* Hiển thị loại view nhỏ ở dưới */}
+                        <span className="text-[8px] text-[#8B5E3C]/50 uppercase">{VIEW_TYPE === 'chart' ? `Group: ${groupByField}` : VIEW_TYPE}</span>
+                    </div>
+                </div>
+            </div>
+
+            {renderContent()}
+            
+            <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-[#C69C6D] blur-[60px] opacity-10 rounded-full group-hover:opacity-20 transition-opacity pointer-events-none"></div>
+        </div>
     );
 }
