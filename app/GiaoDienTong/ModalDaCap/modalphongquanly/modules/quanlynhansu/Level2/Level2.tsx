@@ -126,7 +126,7 @@ export default function Level2_Generic({ isOpen, onClose, config, onOpenDetail, 
                 const filterString = cols.map(col => `${col}.ilike.%${keyword}%`).join(',');
                 if (filterString) query = query.or(filterString);
             }
-            query = query.order('created_at', { ascending: false }).range(from, to);
+            query = query.order('tao_luc', { ascending: false }).range(from, to);
             
             const { data: result, count, error } = await query;
             if (error) throw error;
@@ -199,7 +199,7 @@ export default function Level2_Generic({ isOpen, onClose, config, onOpenDetail, 
     
     let displayColumns = columns;
     if (displayColumns.length === 0 && data.length > 0) {
-        displayColumns = Object.keys(data[0]).filter(k => !['id','created_at','updated_at','nguoi_tao_id', 'khach_hang', 'total_khach'].includes(k)).map(k => ({ key: k, label: k.replace(/_/g, ' ').toUpperCase(), kieuDuLieu: 'text', hienThiList: true, hienThiDetail: true, tuDong: false, batBuoc: false }));
+        displayColumns = Object.keys(data[0]).filter(k => !['id','tao_luc','updated_at','nguoi_tao_id', 'khach_hang', 'total_khach'].includes(k)).map(k => ({ key: k, label: k.replace(/_/g, ' ').toUpperCase(), kieuDuLieu: 'text', hienThiList: true, hienThiDetail: true, tuDong: false, batBuoc: false }));
     }
     const imgCol = displayColumns.find(c => ['hinh_anh', 'avatar'].includes(c.key));
     const titleCol = displayColumns[0] || { key: 'id' };

@@ -39,7 +39,7 @@ export default function Level1_Widget_Generic({ config, onClick }: Props) {
                 setTotal(count || 0);
 
                 if (VIEW_TYPE === 'list') {
-                    const { data: res } = await supabase.from(config.bangDuLieu).select('*').order('created_at', { ascending: false }).limit(5);
+                    const { data: res } = await supabase.from(config.bangDuLieu).select('*').order('tao_luc', { ascending: false }).limit(5);
                     setData(res || []);
                 } else if (VIEW_TYPE === 'chart') {
                     const { data: res } = await supabase.from(config.bangDuLieu).select(groupByField).limit(100);

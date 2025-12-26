@@ -43,7 +43,7 @@ export default function Level1_Widget_Generic({ config, onClick }: Props) {
                     const { data } = await supabase
                         .from(config.bangDuLieu)
                         .select('*')
-                        .order('created_at', { ascending: false })
+                        .order('tao_luc', { ascending: false })
                         .limit(4);
                     setListData(data || []);
                 }

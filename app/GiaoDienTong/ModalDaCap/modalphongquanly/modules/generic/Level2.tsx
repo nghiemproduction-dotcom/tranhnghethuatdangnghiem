@@ -22,15 +22,15 @@ interface Props {
     config: ModuleConfig;
     onOpenDetail?: (item: any, config: ModuleConfig) => void;
     isEmbedded?: boolean;
-    extraFilter?: Record<string, any>; // Props lọc mở rộng (để Level 3 truyền vào)
+    extraFilter?: Record<string, any>; 
 }
 
 export default function Level2_Generic({ isOpen, onClose, config, onOpenDetail, isEmbedded = false, extraFilter }: Props) {
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     
-    // Search & Config
     const [searchableColumns, setSearchableColumns] = useState<string[]>([]);
+    const [existingColumns, setExistingColumns] = useState<string[]>([]); // 🟢 THÊM: Quản lý cột thực tế trong DB
     const columns: CotHienThi[] = useMemo(() => config.danhSachCot || [], [config.danhSachCot]);
     
     const getSmartGroupByColumn = () => {
@@ -50,7 +50,6 @@ export default function Level2_Generic({ isOpen, onClose, config, onOpenDetail, 
     const [total, setTotal] = useState(0);
     const ITEMS_PER_PAGE = isEmbedded ? 6 : 20; 
 
-    // User & View State
     const [userRole, setUserRole] = useState('khach');
     const [isLevel3Open, setIsLevel3Open] = useState(false);
     const [selectedItem, setSelectedItem] = useState<any>(null);
@@ -72,11 +71,17 @@ export default function Level2_Generic({ isOpen, onClose, config, onOpenDetail, 
          try {
             const { data: tableInfo } = await supabase.rpc('get_table_schema', { t_name: config.bangDuLieu });
             if (tableInfo) {
+                // 🟢 CẬP NHẬT: Lưu lại danh sách cột thực tế để check trước khi query
+                const allCols = tableInfo.map((col: any) => col.column_name);
+                setExistingColumns(allCols);
+
                 const textCols = tableInfo.filter((col: any) => ['text', 'character varying', 'varchar', 'char'].includes(col.data_type)).map((col: any) => col.column_name);
                 setSearchableColumns(textCols);
-                if (groupByCol === 'trang_thai' && !tableInfo.find((c: any) => c.column_name === 'trang_thai')) {
-                    const candidate = tableInfo.find((c: any) => ['vi_tri', 'loai', 'chuc_vu', 'role'].includes(c.column_name));
-                    if (candidate) setGroupByCol(candidate.column_name);
+                
+                // 🟢 CẬP NHẬT: Nếu cột phân loại không tồn tại trong DB thì đổi sang cột 'vi_tri' hoặc cột đầu tiên tìm thấy
+                if (!allCols.includes(groupByCol)) {
+                    const candidate = allCols.find((c: any) => ['vi_tri', 'loai', 'chuc_vu', 'role'].includes(c));
+                    if (candidate) setGroupByCol(candidate);
                 }
             }
         } catch (e) { console.error("Lỗi Schema:", e); }
@@ -84,19 +89,18 @@ export default function Level2_Generic({ isOpen, onClose, config, onOpenDetail, 
 
     useEffect(() => { if (isOpen && config.bangDuLieu) { fetchSchemaAndSetup().then(() => reloadAll()); } }, [isOpen, config.bangDuLieu]);
     useEffect(() => { if (isOpen) reloadAll(); }, [groupByCol]);
-
-    // TRIGGER RELOAD KHI EXTRA FILTER THAY ĐỔI
     useEffect(() => { if (isOpen && extraFilter) reloadAll(); }, [JSON.stringify(extraFilter)]);
 
     const reloadAll = () => { setPage(1); setActiveTab('ALL'); setSelectedIds([]); fetchTabOptions(); fetchData(1, 'ALL', search); };
     
     const fetchTabOptions = async () => {
+        // 🟢 CẬP NHẬT: Kiểm tra cột groupByCol có tồn tại không trước khi select để tránh lỗi 400
+        if (!groupByCol || !existingColumns.includes(groupByCol)) { setTabOptions([]); return; }
         try {
             const { data } = await supabase.from(config.bangDuLieu).select(groupByCol).not(groupByCol, 'is', null);
             if (data) {
-                // @ts-ignore
                 const unique = Array.from(new Set(data.map((item: any) => item[groupByCol])));
-                setTabOptions(unique.sort());
+                setTabOptions(unique.sort() as string[]);
             } else { setTabOptions([]); }
         } catch (error) { setTabOptions([]); }
     };
@@ -107,37 +111,45 @@ export default function Level2_Generic({ isOpen, onClose, config, onOpenDetail, 
             const from = (pageNumber - 1) * ITEMS_PER_PAGE;
             const to = from + ITEMS_PER_PAGE - 1;
             
-            // LOGIC: TỰ ĐỘNG ĐẾM KHÁCH HÀNG NẾU ĐANG XEM NHÂN SỰ
             let selectQuery = '*';
-            if (config.bangDuLieu === 'nhan_su') {
-                selectQuery = '*, khach_hang(count)'; // Liên kết để đếm
+            // 🟢 CẬP NHẬT: Kiểm tra quan hệ đếm khách hàng có hợp lệ không (dựa trên cột nguoi_tao)
+            if (config.bangDuLieu === 'nhan_su' && existingColumns.includes('id')) {
+                selectQuery = '*, khach_hang!nguoi_tao(count)';
             }
 
             let query = supabase.from(config.bangDuLieu).select(selectQuery, { count: 'exact' });
             
-            // ÁP DỤNG EXTRA FILTER (QUAN TRỌNG CHO EMBED)
             if (extraFilter) {
                 Object.entries(extraFilter).forEach(([key, value]) => {
-                    query = query.eq(key, value);
+                    // 🟢 CẬP NHẬT: Chỉ filter nếu cột đó thực sự tồn tại trong DB
+                    if (existingColumns.includes(key)) query = query.eq(key, value);
                 });
             }
 
-            if (currentTab !== 'ALL' && groupByCol) query = query.eq(groupByCol, currentTab);
+            // 🟢 CẬP NHẬT: Chỉ eq nếu cột phân loại tồn tại
+            if (currentTab !== 'ALL' && groupByCol && existingColumns.includes(groupByCol)) {
+                query = query.eq(groupByCol, currentTab);
+            }
             
             if (keyword.trim()) {
-                const cols = searchableColumns.length > 0 ? searchableColumns : ['ho_ten', 'ten', 'ten_hien_thi', 'email', 'so_dien_thoai', 'name', 'title', 'mo_ta'];
-                const filterString = cols.map(col => `${col}.ilike.%${keyword}%`).join(',');
+                const cols = searchableColumns.length > 0 ? searchableColumns : ['ho_ten', 'ten', 'email'];
+                const validSearchCols = cols.filter(c => existingColumns.includes(c));
+                const filterString = validSearchCols.map(col => `${col}.ilike.%${keyword}%`).join(',');
                 if (filterString) query = query.or(filterString);
             }
-            query = query.order('created_at', { ascending: false }).range(from, to);
+
+            // 🟢 CẬP NHẬT: Kiểm tra cột 'tao_luc' có tồn tại không trước khi order để tránh lỗi 400
+            const finalSortCol = existingColumns.includes('tao_luc') ? 'tao_luc' : (existingColumns.includes('id') ? 'id' : '');
+            if (finalSortCol) {
+                query = query.order(finalSortCol, { ascending: false });
+            }
+            
+            query = query.range(from, to);
             
             const { data: result, count, error } = await query;
             if (error) throw error;
 
-            // 🟢 FIX LỖI TYPESCRIPT Ở ĐÂY:
-            // Ép kiểu (result as any[]) để TS không báo lỗi GenericStringError
             const formattedData = (result as any[])?.map((item: any) => {
-                // Kiểm tra an toàn trước khi truy cập
                 if (item.khach_hang && Array.isArray(item.khach_hang)) {
                     const countObj = item.khach_hang[0];
                     return { ...item, total_khach: countObj ? countObj.count : 0 };
@@ -147,17 +159,16 @@ export default function Level2_Generic({ isOpen, onClose, config, onOpenDetail, 
 
             setData(formattedData || []);
             setTotal(count || 0);
-        } catch (err) { console.error(err); } finally { setLoading(false); }
+        } catch (err) { console.error("Lỗi Fetch:", err); } finally { setLoading(false); }
     };
 
     const handleToggleSelect = (id: string) => setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
     const handleSelectAll = () => {
-        const allOnPageSelected = data.every(item => selectedIds.includes(item.id));
+        const idsOnPage = data.map(i => i.id);
+        const allOnPageSelected = idsOnPage.every(id => selectedIds.includes(id));
         if (allOnPageSelected) {
-            const idsOnPage = data.map(i => i.id);
             setSelectedIds(prev => prev.filter(id => !idsOnPage.includes(id)));
         } else {
-            const idsOnPage = data.map(i => i.id);
             setSelectedIds(prev => Array.from(new Set([...prev, ...idsOnPage])));
         }
     };
@@ -205,7 +216,7 @@ export default function Level2_Generic({ isOpen, onClose, config, onOpenDetail, 
     
     let displayColumns = columns;
     if (displayColumns.length === 0 && data.length > 0) {
-        displayColumns = Object.keys(data[0]).filter(k => !['id','created_at','updated_at','nguoi_tao_id', 'khach_hang', 'total_khach'].includes(k)).map(k => ({ key: k, label: k.replace(/_/g, ' ').toUpperCase(), kieuDuLieu: 'text', hienThiList: true, hienThiDetail: true, tuDong: false, batBuoc: false }));
+        displayColumns = Object.keys(data[0]).filter(k => !['id','tao_luc','updated_at','nguoi_tao_id', 'khach_hang', 'total_khach', 'trang_thai'].includes(k)).map(k => ({ key: k, label: k.replace(/_/g, ' ').toUpperCase(), kieuDuLieu: 'text', hienThiList: true, hienThiDetail: true, tuDong: false, batBuoc: false }));
     }
     const imgCol = displayColumns.find(c => ['hinh_anh', 'avatar'].includes(c.key));
     const titleCol = displayColumns[0] || { key: 'id' };
@@ -216,7 +227,6 @@ export default function Level2_Generic({ isOpen, onClose, config, onOpenDetail, 
 
     const content = (
         <div className={`flex flex-col h-full bg-[#0F0C0B] ${isEmbedded ? '' : 'animate-in slide-in-from-right-10 duration-300'}`}>
-            {/* Header: Ẩn bớt nếu đang nhúng (Embed) */}
             {!isEmbedded && (
                 <div className="shrink-0 z-50 bg-[#0a0807] border-b border-[#8B5E3C]/30 shadow-lg flex flex-col">
                      <ThanhDieuHuong danhSachCap={[{ id: 'back', ten: 'Quay Lại', onClick: onClose || (() => {}) }, { id: 'current', ten: config.tenModule.toUpperCase() }]} />
@@ -225,7 +235,7 @@ export default function Level2_Generic({ isOpen, onClose, config, onOpenDetail, 
                             <ThanhTab danhSachTab={tabList} tabHienTai={activeTab} onChuyenTab={handleTabChange} />
                         </div>
                         <div className="flex items-center gap-1 ml-2">
-                            {groupableColumns.length > 0 && (
+                            {groupByCol && existingColumns.includes(groupByCol) && groupableColumns.length > 0 && (
                                 <div className="relative" ref={dropdownRef}>
                                     <button onClick={() => setShowGroupSelector(!showGroupSelector)} className={`p-2 rounded-lg transition-all border flex items-center gap-2 ${showGroupSelector ? 'bg-[#C69C6D] text-[#1a120f] border-[#C69C6D]' : 'bg-[#161210] text-[#8B5E3C] border-[#8B5E3C]/30 hover:text-[#C69C6D]'}`} title={`Đang lọc theo: ${groupByCol}`}>
                                         <ListFilter size={16} />
@@ -252,7 +262,6 @@ export default function Level2_Generic({ isOpen, onClose, config, onOpenDetail, 
                 </div>
             )}
             
-            {/* Body */}
             <div className={`flex-1 flex flex-col relative overflow-hidden bg-[#0F0C0B] ${isEmbedded ? 'rounded-b-xl' : ''}`}>
                 <div className="flex-1 relative overflow-hidden">
                     {loading && <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-20 backdrop-blur-[2px]"><Loader2 className="animate-spin text-[#C69C6D]" size={30}/></div>}
@@ -293,7 +302,6 @@ export default function Level2_Generic({ isOpen, onClose, config, onOpenDetail, 
                 )}
             </div>
 
-            {/* Action Bar */}
             {selectedIds.length > 0 && (
                 <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-[3000] animate-in slide-in-from-bottom-5 duration-300">
                     <div className="bg-[#1a120f] border border-[#8B5E3C] shadow-[0_0_20px_rgba(0,0,0,0.8)] rounded-full px-6 py-2 flex items-center gap-4">

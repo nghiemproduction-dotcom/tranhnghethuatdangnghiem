@@ -50,7 +50,7 @@ export default function NhanSuDetail({ id, onClose, onSuccess }: Props) {
     const handleSave = async () => {
         setLoading(true);
         const payload = { ...form };
-        delete payload.id; delete payload.created_at; // Xóa field hệ thống
+        delete payload.id; delete payload.tao_luc; // Xóa field hệ thống
 
         let error;
         if (isEdit) {

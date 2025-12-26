@@ -84,7 +84,7 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
             const mappedCols = tableInfo.map((col: any) => {
                 const colKey = col.column_name;
                 const setting = dbConfig?.find((c: any) => c.cot_du_lieu === colKey) || {};
-                const isSystemCol = ['id', 'created_at', 'updated_at', 'nguoi_tao'].includes(colKey);
+                const isSystemCol = ['id', 'tao_luc', 'updated_at', 'nguoi_tao'].includes(colKey);
 
                 return {
                     key: colKey, 

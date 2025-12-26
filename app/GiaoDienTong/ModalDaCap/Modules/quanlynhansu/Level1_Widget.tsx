@@ -27,7 +27,7 @@ export default function Level1_Widget({ config, onClick }: Props) {
                 } 
                 // 2. Nếu là CHART/LIST -> Lấy dữ liệu mẫu (Giới hạn 100 để vẽ chart)
                 else {
-                    const { data: res } = await supabase.from(config.bangDuLieu).select('*').limit(100).order('created_at', { ascending: false });
+                    const { data: res } = await supabase.from(config.bangDuLieu).select('*').limit(100).order('tao_luc', { ascending: false });
                     if (res) setData(res);
                 }
             } catch (err) { console.error(err); } 

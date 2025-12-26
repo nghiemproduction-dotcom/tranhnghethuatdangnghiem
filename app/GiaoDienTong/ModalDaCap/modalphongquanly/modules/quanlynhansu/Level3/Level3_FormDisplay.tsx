@@ -100,7 +100,7 @@ export default function Level3_FormDisplay({ columns, formData, isEditing, onCha
 
     // Lọc bỏ các cột hệ thống không cần hiển thị
     const displayCols = columns.filter(c => 
-        !['id', 'created_at', 'updated_at', 'nguoi_tao_id', 'total_khach', 'khach_hang', 'sale_id'].includes(c.key) &&
+        !['id', 'tao_luc', 'updated_at', 'nguoi_tao_id', 'total_khach', 'khach_hang', 'sale_id'].includes(c.key) &&
         (c.hienThiDetail !== false) // Chỉ hiện cột được phép hiện ở detail
     );
 

@@ -86,7 +86,7 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
                 const colKey = col.column_name;
                 const setting = dbConfig?.find((c: any) => c.cot_du_lieu === colKey) || {};
                 const detectedType = mapSqlTypeToUiType(col.data_type, colKey);
-                const isSystemCol = ['id', 'created_at', 'updated_at', 'nguoi_tao'].includes(colKey);
+                const isSystemCol = ['id', 'tao_luc', 'updated_at', 'nguoi_tao'].includes(colKey);
 
                 const isLoginHistory = colKey === 'lich_su_dang_nhap';
                 const isTienCong = colKey === 'tien_cong'; 

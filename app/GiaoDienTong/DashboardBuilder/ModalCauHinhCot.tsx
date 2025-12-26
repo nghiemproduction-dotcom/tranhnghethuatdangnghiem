@@ -65,7 +65,7 @@ export default function ModalCauHinhCot({ isOpen, onClose, module, onSave }: Pro
                             kieuDuLieu: type,
                             hienThiList: true,
                             hienThiDetail: true,
-                            tuDong: ['id', 'created_at'].includes(dbCol.column_name)
+                            tuDong: ['id', 'tao_luc'].includes(dbCol.column_name)
                         });
                     }
                 });

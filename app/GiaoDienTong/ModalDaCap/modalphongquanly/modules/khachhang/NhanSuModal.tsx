@@ -18,7 +18,7 @@ export default function NhanSuModal({ isOpen, onClose }: Props) {
 
     const fetchData = async () => {
         setLoading(true);
-        let query = supabase.from('nhan_su').select('*').order('created_at', { ascending: false });
+        let query = supabase.from('nhan_su').select('*').order('tao_luc', { ascending: false });
         
         if (search) {
             query = query.or(`ho_ten.ilike.%${search}%,vi_tri.ilike.%${search}%,so_dien_thoai.ilike.%${search}%`);

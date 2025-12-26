@@ -78,7 +78,7 @@ export async function toggleRLSAction(tableName: string, enable: boolean) {
 export async function getTableDataPaginatedAction(tableName: string, page: number, pageSize: number) {
     try {
         const offset = (page - 1) * pageSize;
-        const data = await sql`SELECT * FROM ${sql(tableName)} ORDER BY created_at DESC LIMIT ${pageSize} OFFSET ${offset}`;
+        const data = await sql`SELECT * FROM ${sql(tableName)} ORDER BY tao_luc DESC LIMIT ${pageSize} OFFSET ${offset}`;
         const [count] = await sql`SELECT count(*) as total FROM ${sql(tableName)}`;
         return { success: true, data: Array.from(data), total: Number(count.total) };
     } catch (error: any) { return { success: false, error: error.message }; }
@@ -104,7 +104,7 @@ export async function manageTableStructureAction(tableName: string, columnsDef: 
     await sql`
       CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
         id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-        created_at timestamptz DEFAULT now()
+        tao_luc timestamptz DEFAULT now()
       )
     `;
 
@@ -114,7 +114,7 @@ export async function manageTableStructureAction(tableName: string, columnsDef: 
     } catch (e) {}
 
     for (const col of columnsDef) {
-        if (['id', 'created_at'].includes(col.name)) continue;
+        if (['id', 'tao_luc'].includes(col.name)) continue;
 
         try {
             const [existing] = await sql`SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = ${tableName} AND column_name = ${col.name}`;

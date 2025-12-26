@@ -37,14 +37,14 @@ export default function Tab_NhatKyHoatDong({ nhanSuId, loginHistory }: { nhanSuI
                 .from('nhat_ky_hoat_dong')
                 .select('*')
                 .eq('nhan_su_id', nhanSuId)
-                .order('created_at', { ascending: false });
+                .order('tao_luc', { ascending: false });
 
             const formattedChanges = (changeLogs || []).map((log: any) => ({
                 id: log.id,
                 type: 'change',
                 title: log.hanh_dong,
                 details: log.chi_tiet,
-                time: log.created_at,
+                time: log.tao_luc,
                 icon: Edit3,
                 color: 'text-[#C69C6D]'
             }));

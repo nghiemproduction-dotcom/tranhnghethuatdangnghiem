@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
-import { Loader2, User, CreditCard, History, Split, Box, FileText, Settings, BarChart, Trophy } from 'lucide-react'; // 🟢 Thêm icon Trophy
+import { Loader2, User, CreditCard, History, Split, Box, FileText, Settings, BarChart, Trophy } from 'lucide-react'; 
 import { ModuleConfig, CotHienThi } from '../../../../../DashboardBuilder/KieuDuLieuModule';
 import { useRouter } from 'next/navigation';
 
@@ -18,8 +18,6 @@ import ThongTinChung from './thongtinchung';
 import TabContent from './TabContent';
 import { Level3Provider } from './Level3Context';
 import Tab_NhatKyHoatDong from './Tab_NhatKyHoatDong'; 
-
-// 🟢 IMPORT TAB MỚI
 import Tab_ThanhTich from './Tab_ThanhTich';
 
 interface Props {
@@ -41,7 +39,7 @@ const ICON_MAP: any = {
     'box': Box, 'file': FileText, 'settings': Settings, 'chart': BarChart
 };
 
-const HIDDEN_COLS = ['luong_theo_gio', 'lan_dang_nhap_ts', 'nguoi_tao_id', 'ten_nguoi_tao', 'ho_ten'];
+const HIDDEN_COLS = ['luong_theo_gio', 'lan_dang_nhap_ts', 'nguoi_tao', 'tao_luc', 'id'];
 
 export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config, initialData, userRole, userEmail, parentTitle }: Props) {
     const router = useRouter();
@@ -85,37 +83,23 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
 
         if (tableInfo) {
             const filteredTableInfo = tableInfo.filter((col: any) => !HIDDEN_COLS.includes(col.column_name));
-
             const mappedCols = filteredTableInfo.map((col: any) => {
                 const colKey = col.column_name;
                 const setting = dbConfig?.find((c: any) => c.cot_du_lieu === colKey) || {};
                 const detectedType = mapSqlTypeToUiType(col.data_type, colKey);
-                const isSystemCol = ['id', 'created_at', 'updated_at', 'nguoi_tao'].includes(colKey);
-
-                const isLoginHistory = colKey === 'lich_su_dang_nhap';
-                const isTienCong = colKey === 'tien_cong'; 
-                
-                let finalLabel = setting.tieu_de || getLabelFromColumn(colKey);
-                
-                if (colKey === 'ten_day_du') finalLabel = 'TÊN ĐẦY ĐỦ';
-                else if (colKey === 'ten_hien_thi') finalLabel = 'TÊN HIỂN THỊ';
-                else if (colKey === 'hop_dong') finalLabel = 'HỢP ĐỒNG';
-                else if (isLoginHistory) finalLabel = 'LỊCH SỬ ĐĂNG NHẬP';
-
-                const forceReadOnly = isLoginHistory || isTienCong || (setting.cho_phep_sua === false) || isSystemCol;
+                const isSystemCol = ['id', 'tao_luc', 'updated_at', 'nguoi_tao'].includes(colKey) || setting.la_cot_he_thong === true;
 
                 return {
                     key: colKey, 
-                    label: finalLabel, 
+                    label: setting.tieu_de || getLabelFromColumn(colKey), 
                     kieuDuLieu: setting.loai_hien_thi || detectedType,
-                    hienThiList: !isSystemCol && !isLoginHistory, 
-                    hienThiDetail: isLoginHistory ? false : (setting.an_hien_thi === true ? false : true), 
+                    hienThiList: setting.an_hien_thi === true ? false : true, 
+                    hienThiDetail: setting.an_hien_thi === true ? false : true, 
                     tuDong: isSystemCol,
-                    readOnly: forceReadOnly,
-                    batBuoc: (col.is_nullable === 'NO' || setting.bat_buoc_nhap === true) && !isSystemCol,
-                    formatType: detectedType === 'email' ? 'email' : (detectedType === 'phone' ? 'phone' : undefined),
+                    readOnly: isSystemCol || setting.cho_phep_sua === false,
+                    batBuoc: setting.bat_buoc_nhap === true || (col.is_nullable === 'NO' && !isSystemCol),
                     permRead: setting.quyen_xem || ['all'], 
-                    permEdit: forceReadOnly ? [] : (setting.quyen_sua || ['admin', 'quanly', 'owner'])
+                    permEdit: setting.quyen_sua || ['admin', 'quanly']
                 };
             });
 
@@ -126,7 +110,6 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
                     return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
                 });
             }
-
             setDynamicColumns(mappedCols); 
             setOrderedColumns(mappedCols);
         }
@@ -135,20 +118,10 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
     const refreshData = useCallback(async () => {
         if (isCreateMode) return; 
         setFetching(true);
-        // 🟢 CẬP NHẬT QUERY: Lấy thêm total_khach (số lượng khách hàng)
-        let selectQuery = '*';
-        if (config.bangDuLieu === 'nhan_su') selectQuery = '*, khach_hang(count)';
-
-        const { data } = await (supabase as any).from(config.bangDuLieu).select(selectQuery).eq('id', initialData.id).single();
-        
-        // Flatten dữ liệu count
-        if (data) {
-            if (data.khach_hang && Array.isArray(data.khach_hang)) {
-                data.total_khach = data.khach_hang[0]?.count || 0;
-            }
-            setFormData(data);
-        }
-        
+        // Nâng cấp: Lấy dữ liệu từ View thống kê
+        const tableToQuery = config.bangDuLieu === 'nhan_su' ? 'view_nhan_su_thong_ke' : config.bangDuLieu;
+        const { data } = await (supabase as any).from(tableToQuery).select('*').eq('id', initialData.id).single();
+        if (data) setFormData(data);
         if (config.virtualColumns) config.virtualColumns.forEach(v => fetchVirtualData(v, initialData.id));
         setFetching(false);
     }, [initialData, config, isCreateMode]);
@@ -160,11 +133,11 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
             if (!isCreateMode) refreshData(); 
             else setFormData({}); 
         } 
-    }, [isOpen, initialData]);
+    }, [isOpen, initialData, fetchSchema, isCreateMode, refreshData]);
 
     useEffect(() => {
         activeConfig.danhSachCot.forEach(col => { if (col.kieuDuLieu === 'select_dynamic') loadDynamicOptions(col); });
-    }, [dynamicColumns, orderedColumns]); 
+    }, [dynamicColumns, orderedColumns, activeConfig.danhSachCot]); 
 
     const loadDynamicOptions = async (col: CotHienThi) => {
         try {
@@ -198,17 +171,12 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
             img.src = URL.createObjectURL(file);
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
-                const MAX_SIZE = 500; 
+                let width = img.width; let height = img.height; const MAX_SIZE = 500; 
                 if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } } 
                 else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
-                
-                canvas.width = width;
-                canvas.height = height;
+                canvas.width = width; canvas.height = height;
                 const ctx = canvas.getContext('2d');
-                if(!ctx) return reject("Canvas Error");
-                ctx.drawImage(img, 0, 0, width, height);
+                if(!ctx) return reject("Canvas Error"); ctx.drawImage(img, 0, 0, width, height);
                 canvas.toBlob((blob) => { if (blob) resolve(blob); else reject("Compression Error"); }, 'image/jpeg', 0.8);
             };
             img.onerror = (err) => reject(err);
@@ -219,19 +187,14 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
         if (!e.target.files?.length) return;
         setUploadingImg(true);
         try {
-            const originalFile = e.target.files[0];
-            const compressedBlob = await compressImage(originalFile);
+            const originalFile = e.target.files[0]; const compressedBlob = await compressImage(originalFile);
             const newFile = new File([compressedBlob], `avatar_${Date.now()}.jpg`, { type: 'image/jpeg' });
             const filePath = `${Date.now()}_${newFile.name}`; 
-            
             const { error: uploadError } = await supabase.storage.from(BUCKET_NAME).upload(filePath, newFile, { cacheControl: '3600', upsert: false });
             if (uploadError) throw uploadError;
-
             const { data: { publicUrl } } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filePath);
-            
-            const imgCol = activeConfig.danhSachCot.find(c => c.kieuDuLieu === 'image') || activeConfig.danhSachCot.find(c => c.key === 'hinh_anh' || c.key === 'avatar');
+            const imgCol = activeConfig.danhSachCot.find(c => ['hinh_anh', 'avatar', 'hinh_dai_dien'].includes(c.key));
             if (imgCol) setFormData((p: any) => ({ ...p, [imgCol.key]: publicUrl }));
-            
         } catch (err: any) { alert(`Lỗi tải ảnh: ` + (err.message || err)); } finally { setUploadingImg(false); }
     };
 
@@ -240,33 +203,16 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
         try {
             const cleanPayload: any = {};
             for (const col of activeConfig.danhSachCot) {
-                if (!col.hienThiDetail) continue; 
-                if (col.readOnly) continue;
-                if (col.tuDong) continue;
+                if (!col.hienThiDetail || col.readOnly || col.tuDong) continue;
                 if (!canEditColumn(col) && !isCreateMode) continue;
-                if (col.key === 'ho_ten') continue; 
-
                 let val = formData[col.key];
                 if (col.batBuoc && (val === null || val === undefined || val === '')) throw new Error(`Trường "${col.label}" là bắt buộc nhập.`);
-                if (['number', 'currency', 'percent', 'int4', 'bigint', 'numeric'].includes(col.kieuDuLieu)) val = val ? Number(String(val).replace(/,/g, '')) : null;
-                
+                if (['number', 'currency', 'percent'].includes(col.kieuDuLieu)) val = val ? Number(String(val).replace(/,/g, '')) : null;
                 cleanPayload[col.key] = val;
             }
-
-            // 🟢 XÓA DỮ LIỆU RÁC TRƯỚC KHI LƯU
-            delete cleanPayload.total_khach;
-            delete cleanPayload.khach_hang;
-
-            if (Object.keys(cleanPayload).length === 0) console.warn("Không có dữ liệu thay đổi.");
-
-            let result;
-            if (isCreateMode) {
-                result = await (supabase.from(activeConfig.bangDuLieu) as any).insert(cleanPayload);
-            } else {
-                if (!initialData.id) throw new Error("Không tìm thấy ID bản ghi.");
-                result = await (supabase.from(activeConfig.bangDuLieu) as any).update(cleanPayload).eq('id', initialData.id);
-            }
-
+            const exclude = ['total_khach', 'total_viec', 'total_mau', 'nguoi_tao', 'tao_luc'];
+            exclude.forEach(k => delete cleanPayload[k]);
+            let result = isCreateMode ? await (supabase.from(activeConfig.bangDuLieu) as any).insert(cleanPayload) : await (supabase.from(activeConfig.bangDuLieu) as any).update(cleanPayload).eq('id', initialData.id);
             if (result.error) throw result.error;
             alert("Đã lưu thành công!");
             if (isCreateMode) { onSuccess(); onClose(); } else { await refreshData(); setIsEditing(false); onSuccess(); }
@@ -284,41 +230,23 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
 
     const handleDelete = async () => {
         if (!confirm('Xóa vĩnh viễn?')) return;
-        setLoading(true);
-        const { error } = await (supabase.from(activeConfig.bangDuLieu) as any).delete().eq('id', initialData.id);
-        setLoading(false);
-        if (!error) { onSuccess(); onClose(); } else alert(error.message);
+        setLoading(true); const { error } = await (supabase.from(activeConfig.bangDuLieu) as any).delete().eq('id', initialData.id);
+        setLoading(false); if (!error) { onSuccess(); onClose(); } else alert(error.message);
     };
 
-    // 🟢 HÀM XỬ LÝ ĐĂNG XUẤT
     const handleLogout = async () => {
         if (confirm("⚠️ BẠN CÓ CHẮC CHẮN MUỐN ĐĂNG XUẤT?")) {
-            await supabase.auth.signOut();
-            router.push('/'); 
-            window.location.reload(); 
+            await supabase.auth.signOut(); router.push('/'); window.location.reload(); 
         }
     };
 
     const tabList: TabItem[] = [
         { id: 'form', label: 'Thông Tin', icon: User },
-        ...((config as any).tabs || []).map((t: any) => ({
-            id: t.id,
-            label: t.label,
-            icon: ICON_MAP[t.icon] || FileText 
-        })),
+        ...((config as any).tabs || []).map((t: any) => ({ id: t.id, label: t.label, icon: ICON_MAP[t.icon] || FileText })),
         { id: 'nhat_ky_hoat_dong', label: 'Hoạt Động', icon: History },
-        ...(!isCreateMode && activeConfig.virtualColumns ? activeConfig.virtualColumns.map(v => ({ 
-            id: v.key, 
-            label: v.label, 
-            icon: Split, 
-            count: virtualData[v.key]?.length || 0 
-        })) : [])
+        ...(!isCreateMode && activeConfig.virtualColumns ? activeConfig.virtualColumns.map(v => ({ id: v.key, label: v.label, icon: Split, count: virtualData[v.key]?.length || 0 })) : [])
     ];
-
-    // 🟢 CHÈN TAB THÀNH TÍCH VÀO SAU TAB THÔNG TIN
-    if (!isCreateMode && config.bangDuLieu === 'nhan_su') {
-        tabList.splice(1, 0, { id: 'thanh_tich', label: 'Thành Tích', icon: Trophy });
-    }
+    if (!isCreateMode && config.bangDuLieu === 'nhan_su') tabList.splice(1, 0, { id: 'thanh_tich', label: 'Thành Tích', icon: Trophy });
 
     if (!isOpen) return null;
 
@@ -331,60 +259,38 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
     return (
         <Level3Provider value={contextValue}>
             <div className="fixed inset-0 bottom-[80px] z-[2300] bg-[#0a0807] flex flex-col shadow-2xl animate-in slide-in-from-right-20">
-                
                 <div className="shrink-0 z-[100] bg-[#0a0807] border-b border-[#8B5E3C]/30 shadow-lg flex items-center justify-between pr-4">
                     <div className="flex-1">
                         <ThanhDieuHuong danhSachCap={[
                             { id: 'back', ten: parentTitle || 'Quay Lại', onClick: onClose }, 
-                            { id: 'd', ten: ((config as any).tieuDeCot && formData[(config as any).tieuDeCot]) ? formData[(config as any).tieuDeCot].toUpperCase() : (formData?.ten_hien_thi || 'CHI TIẾT').toUpperCase() }
+                            { id: 'd', ten: ((config as any).tieuDeCot && formData[(config as any).tieuDeCot]) ? formData[(config as any).tieuDeCot].toUpperCase() : (formData?.ho_ten || 'CHI TIẾT').toUpperCase() }
                         ]} />
                     </div>
                 </div>
-
                 <NoidungModal>
                     <div className="flex flex-col h-full bg-[#0F0C0B] overflow-hidden">
-                        
-                        {activeTab === 'form' && <ThongTinChung />}
-
                         <div className="shrink-0 bg-[#0a0807] border-b border-[#8B5E3C]/20 z-20">
                             <ThanhTab danhSachTab={tabList} tabHienTai={activeTab} onChuyenTab={setActiveTab} />
                         </div>
+                        {activeTab === 'form' && <div className="border-b border-[#8B5E3C]/20"><ThongTinChung /></div>}
                         <div className="flex-1 overflow-y-auto custom-scroll p-6 md:p-10 relative">
                             {fetching && <div className="absolute inset-0 bg-[#0a0807]/80 z-50 flex items-center justify-center"><Loader2 className="animate-spin text-[#C69C6D]" size={40}/></div>}
                             {isArranging && <div className="mb-6 p-4 bg-[#C69C6D]/10 border border-[#C69C6D] border-dashed rounded-xl text-center pulse"><p className="text-[#C69C6D] font-bold text-sm uppercase">🔧 Chế độ sắp xếp giao diện</p></div>}
-                            
-                            {/* 🟢 RENDER NỘI DUNG TAB THÀNH TÍCH */}
                             {activeTab === 'thanh_tich' ? (
-                                <Tab_ThanhTich 
-                                    nhanSuId={initialData?.id} 
-                                    totalKhach={formData?.total_khach || 0} 
-                                />
+                                <Tab_ThanhTich nhanSuId={initialData?.id} totalKhach={formData?.total_khach || 0} totalViec={formData?.total_viec || 0} totalMau={formData?.total_mau || 0} />
                             ) : activeTab === 'nhat_ky_hoat_dong' ? (
                                 <Tab_NhatKyHoatDong nhanSuId={initialData?.id} loginHistory={formData?.lich_su_dang_nhap} />
-                            ) : (
-                                <TabContent activeTab={activeTab} virtualData={virtualData} /> 
-                            )}
+                            ) : <TabContent activeTab={activeTab} virtualData={virtualData} />}
                         </div>
                     </div>
                 </NoidungModal>
-                
                 <NutChucNangLevel3 
-                    isCreateMode={isCreateMode} 
-                    isEditing={isEditing} 
-                    isArranging={isArranging} 
-                    loading={loading} 
-                    canEditRecord={canEditRecord} 
-                    canDeleteRecord={['admin'].includes(userRole)} 
-                    isAdmin={userRole === 'admin'} 
-                    hasError={!!error} 
-                    onSave={handleSave} 
-                    onEdit={() => setIsEditing(true)} 
-                    onCancel={() => setIsEditing(false)} 
-                    onDelete={handleDelete} 
-                    onClose={onClose} 
-                    onFixDB={() => {}} 
-                    onToggleArrange={() => setIsArranging(!isArranging)} 
-                    onSaveLayout={handleSaveLayout}
+                    isCreateMode={isCreateMode} isEditing={isEditing} isArranging={isArranging} 
+                    loading={loading} canEditRecord={canEditRecord} canDeleteRecord={['admin'].includes(userRole)}
+                    isAdmin={userRole === 'admin'} hasError={!!error}
+                    onSave={handleSave} onEdit={() => setIsEditing(true)} onCancel={() => setIsEditing(false)} 
+                    onDelete={handleDelete} onClose={onClose} onFixDB={() => {}}
+                    onToggleArrange={() => setIsArranging(!isArranging)} onSaveLayout={handleSaveLayout}
                     onLogout={config.bangDuLieu === 'nhan_su' ? handleLogout : undefined}
                 />
             </div>

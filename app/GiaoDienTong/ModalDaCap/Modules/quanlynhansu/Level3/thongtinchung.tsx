@@ -70,7 +70,7 @@ export default function ThongTinChung() {
     const actionButtons = renderActions();
 
     // Lấy thông tin người tạo
-    const ngayTao = formData.created_at;
+    const ngayTao = formData.tao_luc;
     const nguoiTao = formData.ten_nguoi_tao || formData.nguoi_tao || 'Hệ thống';
 
     return (

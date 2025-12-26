@@ -76,7 +76,7 @@ export default function Level2_DanhSachModal({ isOpen, onClose, config, onOpenDe
                 const filterString = getSearchFilter(config.bangDuLieu, keyword, config.danhSachCot);
                 if (filterString) query = query.or(filterString);
             }
-            query = query.order('created_at', { ascending: false }).range(from, to);
+            query = query.order('tao_luc', { ascending: false }).range(from, to);
             const { data: result, count, error } = await query;
             if (error) throw error;
             setData(result || []);

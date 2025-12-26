@@ -24,7 +24,7 @@ export default function Level2_DanhSach({ config, onBack }: Props) {
         const { data: res, error } = await supabase
             .from('khach_hang') // 🟢 Lấy từ bảng khách hàng
             .select('*')
-            .order('created_at', { ascending: false });
+            .order('tao_luc', { ascending: false });
         
         if (!error) setData(res || []);
         setLoading(false);

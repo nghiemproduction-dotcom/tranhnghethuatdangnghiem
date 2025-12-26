@@ -48,7 +48,7 @@ export const COLUMN_DICT: Record<string, string> = {
     'ghi_chu': 'Ghi Chú',
     'mo_ta': 'Mô Tả Chi Tiết',
     'nguoi_tao': 'Người Tạo',
-    'created_at': 'Ngày Tạo',
+    'tao_luc': 'Ngày Tạo',
     'updated_at': 'Cập Nhật Cuối',
     'id': 'Mã Hệ Thống (ID)'
 };
@@ -93,7 +93,7 @@ export const mapSqlTypeToUiType = (sqlType: string, colName: string): string => 
     }
 
     // 4. NGÀY THÁNG
-    if (['date', 'timestamp', 'timestamptz'].some(k => type.includes(k)) || ['ngay', 'date', 'time', 'dob', 'created_at', 'han_chot'].some(k => name.includes(k))) return 'date';
+    if (['date', 'timestamp', 'timestamptz'].some(k => type.includes(k)) || ['ngay', 'date', 'time', 'dob', 'tao_luc', 'han_chot'].some(k => name.includes(k))) return 'date';
 
     // 5. LIÊN HỆ
     if (['email', 'mail'].some(k => name.includes(k))) return 'email';
