@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
-import { Loader2, User, CreditCard, History, Split, Box, FileText, Settings, BarChart, Users } from 'lucide-react'; // 🟢 Thêm icon Users
+import { Loader2, User, CreditCard, History, Split, Box, FileText, Settings, BarChart, Trophy } from 'lucide-react'; // 🟢 Thêm icon Trophy
 import { ModuleConfig, CotHienThi } from '../../../../../DashboardBuilder/KieuDuLieuModule';
 import { useRouter } from 'next/navigation';
 
@@ -19,8 +19,8 @@ import TabContent from './TabContent';
 import { Level3Provider } from './Level3Context';
 import Tab_NhatKyHoatDong from './Tab_NhatKyHoatDong'; 
 
-// 🟢 Import Tab Mới
-import Tab_KhachHangPhuTrach from './Tab_KhachHangPhuTrach';
+// 🟢 IMPORT TAB MỚI
+import Tab_ThanhTich from './Tab_ThanhTich';
 
 interface Props {
     isOpen: boolean;
@@ -135,8 +135,20 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
     const refreshData = useCallback(async () => {
         if (isCreateMode) return; 
         setFetching(true);
-        const { data } = await (supabase as any).from(config.bangDuLieu).select('*').eq('id', initialData.id).single();
-        if (data) setFormData(data);
+        // 🟢 CẬP NHẬT QUERY: Lấy thêm total_khach (số lượng khách hàng)
+        let selectQuery = '*';
+        if (config.bangDuLieu === 'nhan_su') selectQuery = '*, khach_hang(count)';
+
+        const { data } = await (supabase as any).from(config.bangDuLieu).select(selectQuery).eq('id', initialData.id).single();
+        
+        // Flatten dữ liệu count
+        if (data) {
+            if (data.khach_hang && Array.isArray(data.khach_hang)) {
+                data.total_khach = data.khach_hang[0]?.count || 0;
+            }
+            setFormData(data);
+        }
+        
         if (config.virtualColumns) config.virtualColumns.forEach(v => fetchVirtualData(v, initialData.id));
         setFetching(false);
     }, [initialData, config, isCreateMode]);
@@ -241,6 +253,10 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
                 cleanPayload[col.key] = val;
             }
 
+            // 🟢 XÓA DỮ LIỆU RÁC TRƯỚC KHI LƯU
+            delete cleanPayload.total_khach;
+            delete cleanPayload.khach_hang;
+
             if (Object.keys(cleanPayload).length === 0) console.warn("Không có dữ liệu thay đổi.");
 
             let result;
@@ -274,6 +290,15 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
         if (!error) { onSuccess(); onClose(); } else alert(error.message);
     };
 
+    // 🟢 HÀM XỬ LÝ ĐĂNG XUẤT
+    const handleLogout = async () => {
+        if (confirm("⚠️ BẠN CÓ CHẮC CHẮN MUỐN ĐĂNG XUẤT?")) {
+            await supabase.auth.signOut();
+            router.push('/'); 
+            window.location.reload(); 
+        }
+    };
+
     const tabList: TabItem[] = [
         { id: 'form', label: 'Thông Tin', icon: User },
         ...((config as any).tabs || []).map((t: any) => ({
@@ -290,14 +315,9 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
         })) : [])
     ];
 
-    // 🟢 THÊM TAB KHÁCH HÀNG (CHỈ HIỆN KHI KHÔNG PHẢI TẠO MỚI VÀ MODULE NHAN_SU)
+    // 🟢 CHÈN TAB THÀNH TÍCH VÀO SAU TAB THÔNG TIN
     if (!isCreateMode && config.bangDuLieu === 'nhan_su') {
-        // Chèn vào vị trí số 2 (sau tab Thông Tin)
-        tabList.splice(1, 0, {
-            id: 'khach_hang_phu_trach',
-            label: `KHÁCH HÀNG (${initialData?.total_khach || 0})`,
-            icon: Users
-        });
+        tabList.splice(1, 0, { id: 'thanh_tich', label: 'Thành Tích', icon: Trophy });
     }
 
     if (!isOpen) return null;
@@ -324,7 +344,6 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
                 <NoidungModal>
                     <div className="flex flex-col h-full bg-[#0F0C0B] overflow-hidden">
                         
-                        {/* Chỉ hiện Thông Tin Chung khi ở tab form */}
                         {activeTab === 'form' && <ThongTinChung />}
 
                         <div className="shrink-0 bg-[#0a0807] border-b border-[#8B5E3C]/20 z-20">
@@ -334,9 +353,12 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
                             {fetching && <div className="absolute inset-0 bg-[#0a0807]/80 z-50 flex items-center justify-center"><Loader2 className="animate-spin text-[#C69C6D]" size={40}/></div>}
                             {isArranging && <div className="mb-6 p-4 bg-[#C69C6D]/10 border border-[#C69C6D] border-dashed rounded-xl text-center pulse"><p className="text-[#C69C6D] font-bold text-sm uppercase">🔧 Chế độ sắp xếp giao diện</p></div>}
                             
-                            {/* 🟢 RENDER NỘI DUNG TAB */}
-                            {activeTab === 'khach_hang_phu_trach' ? (
-                                <Tab_KhachHangPhuTrach nhanSuId={initialData?.id} />
+                            {/* 🟢 RENDER NỘI DUNG TAB THÀNH TÍCH */}
+                            {activeTab === 'thanh_tich' ? (
+                                <Tab_ThanhTich 
+                                    nhanSuId={initialData?.id} 
+                                    totalKhach={formData?.total_khach || 0} 
+                                />
                             ) : activeTab === 'nhat_ky_hoat_dong' ? (
                                 <Tab_NhatKyHoatDong nhanSuId={initialData?.id} loginHistory={formData?.lich_su_dang_nhap} />
                             ) : (
@@ -363,7 +385,7 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
                     onFixDB={() => {}} 
                     onToggleArrange={() => setIsArranging(!isArranging)} 
                     onSaveLayout={handleSaveLayout}
-                    // Bỏ nút logout như code cũ
+                    onLogout={config.bangDuLieu === 'nhan_su' ? handleLogout : undefined}
                 />
             </div>
         </Level3Provider>
