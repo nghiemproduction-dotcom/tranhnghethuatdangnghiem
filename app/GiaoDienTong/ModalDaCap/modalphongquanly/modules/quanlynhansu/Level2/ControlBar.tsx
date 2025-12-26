@@ -4,7 +4,7 @@ import {
     Search, Table as IconTable, LayoutGrid, Kanban as IconKanban, 
     ChevronLeft, ChevronRight, Plus, RefreshCw, Filter, LayoutDashboard, X, ListFilter, ShieldCheck
 } from 'lucide-react';
-import { ModuleConfig } from '../../../../../DashboardBuilder/KieuDuLieuModule';
+import { ModuleConfig } from '@/app/GiaoDienTong/DashboardBuilder/KieuDuLieuModule';
 
 interface Props {
     config: ModuleConfig;
