@@ -9,7 +9,7 @@ import { ModuleConfig } from '@/app/GiaoDienTong/DashboardBuilder/KieuDuLieuModu
 import Level1_Widget_Generic from '@/app/GiaoDienTong/ModalDaCap/modalphongquanly/modules/generic/Level1_Widget';
 import Level2_Generic from '@/app/GiaoDienTong/ModalDaCap/modalphongquanly/modules/generic/Level2';
 import Level3_FormChiTiet from '@/app/GiaoDienTong/ModalDaCap/modalphongquanly/modules/quanlynhansu/Level3/level3';
-  
+ 
 import NhanSuWidget from '@/app/GiaoDienTong/ModalDaCap/modalphongquanly/modules/quanlynhansu/NhanSuWidget';
 import Level2_DanhSachModal from '@/app/GiaoDienTong/ModalDaCap/modalphongquanly/modules/quanlynhansu/Level2/Level2';
 
@@ -53,14 +53,13 @@ export default function ModuleItem({
   const nhanSuFullConfig: ModuleConfig = { ...data, tenModule: 'Quản Lý Nhân Sự', bangDuLieu: 'nhan_su', kieuHienThiList: 'table', listConfig: { groupByColumn: 'vi_tri' }, danhSachCot: data.danhSachCot || [] };
 
   const renderContent = () => {
-      
+ 
       if (data.customId === 'custom_nhan_su') return <NhanSuWidget onClick={() => { setCustomConfig(nhanSuFullConfig); handleToggleLevel2(true); }} />;
 
       if (data.moduleType === 'generic') {
           if (viewType === 'direct_l2') {
              return (
                  <div className="w-full h-full overflow-hidden bg-[#0F0C0B] flex flex-col">
-                     {/* 🟢 FIX: Thêm thanh tiêu đề cho Bảng Trực Tiếp */}
                      <div className="flex items-center gap-2 px-4 py-3 border-b border-[#8B5E3C]/20 bg-[#161210]">
                         <Database size={16} className="text-[#C69C6D]" />
                         <span className="text-[#E8D4B9] font-bold text-xs uppercase">{data.tenModule}</span>
@@ -98,10 +97,18 @@ export default function ModuleItem({
             @media (min-width: 1280px) { .module-item { grid-column: span ${colSpan} !important; } }
         `}</style>
         
-        {/* Header Toolbar */}
         <div className="h-[32px] px-2 flex items-center justify-between bg-gradient-to-r from-[#1a120f] via-[#2a1e1b] to-[#1a120f] shrink-0 absolute top-0 left-0 right-0 z-20 opacity-0 group-hover/module:opacity-100 transition-opacity duration-200 pointer-events-none group-hover/module:pointer-events-auto">
             <div className="flex items-center gap-1 pl-1 overflow-hidden w-full">
-                <div {...attributes} {...listeners} className="text-[#8B5E3C] hover:text-[#C69C6D] cursor-grab active:cursor-grabbing p-1 transition-colors"><GripVertical size={16} /></div>
+                
+                {/* 🟢 CHỈ HIỆN NÚT NẮM KÉO NẾU LÀ ADMIN */}
+                {isAdmin ? (
+                    <div {...attributes} {...listeners} className="text-[#8B5E3C] hover:text-[#C69C6D] cursor-grab active:cursor-grabbing p-1 transition-colors">
+                        <GripVertical size={16} />
+                    </div>
+                ) : (
+                    <div className="pl-1"></div> 
+                )}
+
                 <div className="flex-1 flex items-center gap-2 font-bold text-[10px] text-[#C69C6D] uppercase tracking-wider truncate cursor-default select-none"><Gauge size={14} className="shrink-0"/><span className="truncate">{data.tenModule}</span></div>
             </div>
             
@@ -119,7 +126,6 @@ export default function ModuleItem({
             )}
         </div>
 
-        {/* Nội dung chính: Cập nhật padding top cho direct_l2 vì đã có header riêng */}
         <div className={`flex-1 overflow-hidden relative transition-all duration-300 ${viewType === 'direct_l2' ? 'pt-0' : 'pt-0'}`}>
            {renderContent()}
         </div>
@@ -135,7 +141,7 @@ export default function ModuleItem({
                       <Level2_Generic isOpen={true} onClose={() => handleToggleLevel2(false)} config={data} onOpenDetail={onOpenDetail} />
                   )
               ) : (
-               
+          
                   <Level2_DanhSachModal isOpen={showLevel2} onClose={() => handleToggleLevel2(false)} config={customConfig || data} onOpenDetail={onOpenDetail} />
               )}
           </Level2Wrapper>

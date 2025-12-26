@@ -2,8 +2,11 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
-import { Loader2, User, CreditCard, History, Split, Box, FileText, Settings, BarChart } from 'lucide-react';
+// 🟢 THÊM: Import LogOut icon
+import { Loader2, User, CreditCard, History, Split, Box, FileText, Settings, BarChart, LogOut } from 'lucide-react';
 import { ModuleConfig, CotHienThi } from '../../../../../DashboardBuilder/KieuDuLieuModule';
+// 🟢 THÊM: Import useRouter
+import { useRouter } from 'next/navigation';
 
 import ThanhDieuHuong from '@/app/GiaoDienTong/ModalDaCap/GiaoDien/ThanhDieuHuong';
 import NoidungModal from '@/app/GiaoDienTong/ModalDaCap/GiaoDien/NoidungModal';
@@ -41,6 +44,9 @@ const ICON_MAP: any = {
 const HIDDEN_COLS = ['luong_theo_gio', 'lan_dang_nhap_ts', 'nguoi_tao_id', 'ten_nguoi_tao', 'ho_ten'];
 
 export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config, initialData, userRole, userEmail, parentTitle }: Props) {
+    // 🟢 THÊM: Khởi tạo Router
+    const router = useRouter();
+
     const [dynamicColumns, setDynamicColumns] = useState<CotHienThi[]>([]);
     const [orderedColumns, setOrderedColumns] = useState<CotHienThi[]>([]);
     
@@ -137,20 +143,14 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
         setFetching(false);
     }, [initialData, config, isCreateMode]);
 
-    // 🟢 SỬA LỖI Ở ĐÂY: Reset lại state Edit khi mở Modal
     useEffect(() => { 
         if (isOpen) { 
             fetchSchema();
-            
-            // 🟢 QUAN TRỌNG: Ép buộc trạng thái hiển thị đúng logic
-            // Nếu là tạo mới -> Edit Mode = true
-            // Nếu là xem chi tiết -> Edit Mode = false
             setIsEditing(isCreateMode); 
-
             if (!isCreateMode) refreshData(); 
             else setFormData({}); 
         } 
-    }, [isOpen, initialData]); // Thêm initialData vào dependencies
+    }, [isOpen, initialData]);
 
     useEffect(() => {
         activeConfig.danhSachCot.forEach(col => { if (col.kieuDuLieu === 'select_dynamic') loadDynamicOptions(col); });
@@ -276,6 +276,15 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
         if (!error) { onSuccess(); onClose(); } else alert(error.message);
     };
 
+    // 🟢 THÊM: HÀM XỬ LÝ ĐĂNG XUẤT
+    const handleLogout = async () => {
+        if (confirm("⚠️ BẠN CÓ CHẮC CHẮN MUỐN ĐĂNG XUẤT?")) {
+            await supabase.auth.signOut();
+            router.push('/'); 
+            window.location.reload(); 
+        }
+    };
+
     const tabList: TabItem[] = [
         { id: 'form', label: 'Thông Tin', icon: User },
         ...((config as any).tabs || []).map((t: any) => ({
@@ -304,11 +313,23 @@ export default function Level3_FormChiTiet({ isOpen, onClose, onSuccess, config,
         <Level3Provider value={contextValue}>
             <div className="fixed inset-0 bottom-[80px] z-[2300] bg-[#0a0807] flex flex-col shadow-2xl animate-in slide-in-from-right-20">
                 
-                <div className="shrink-0 z-[100] bg-[#0a0807] border-b border-[#8B5E3C]/30 shadow-lg">
-                    <ThanhDieuHuong danhSachCap={[
-                        { id: 'back', ten: parentTitle || 'Quay Lại', onClick: onClose }, 
-                        { id: 'd', ten: ((config as any).tieuDeCot && formData[(config as any).tieuDeCot]) ? formData[(config as any).tieuDeCot].toUpperCase() : (formData?.ten_hien_thi || 'CHI TIẾT').toUpperCase() }
-                    ]} />
+                {/* 🟢 CẬP NHẬT: Header dùng Flexbox để chứa nút đăng xuất */}
+                <div className="shrink-0 z-[100] bg-[#0a0807] border-b border-[#8B5E3C]/30 shadow-lg flex items-center justify-between pr-4">
+                    <div className="flex-1">
+                        <ThanhDieuHuong danhSachCap={[
+                            { id: 'back', ten: parentTitle || 'Quay Lại', onClick: onClose }, 
+                            { id: 'd', ten: ((config as any).tieuDeCot && formData[(config as any).tieuDeCot]) ? formData[(config as any).tieuDeCot].toUpperCase() : (formData?.ten_hien_thi || 'CHI TIẾT').toUpperCase() }
+                        ]} />
+                    </div>
+                    
+                    {/* 🟢 THÊM: Nút đăng xuất nổi bật */}
+                    <button 
+                        onClick={handleLogout}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-red-900/20 text-red-500 border border-red-500/30 rounded hover:bg-red-600 hover:text-white transition-all text-xs font-bold uppercase tracking-wider shadow-[0_0_10px_rgba(220,38,38,0.2)] hover:shadow-[0_0_15px_rgba(220,38,38,0.5)]"
+                    >
+                        <LogOut size={14} />
+                        <span className="hidden sm:inline">Đăng Xuất</span>
+                    </button>
                 </div>
 
                 <NoidungModal>

@@ -45,16 +45,27 @@ export default function DashboardBuilder({ pageId, title, allowedRoles, initialM
     useEffect(() => {
         const init = async () => {
             const { data: { session } } = await supabase.auth.getSession();
-            const role = 'admin'; setUserRole(role); setIsAdmin(true); setCheckingAuth(false);
+            
+            // 🟢 LẤY ROLE THỰC TẾ TỪ LOCALSTORAGE (Thay vì set cứng)
+            const role = localStorage.getItem('USER_ROLE') || 'khach';
+            setUserRole(role);
+            
+            // 🟢 CHỈ ROLE 'admin' MỚI CÓ QUYỀN SỬA GIAO DIỆN
+            setIsAdmin(role === 'admin'); 
+            
             if (allowedRoles && !allowedRoles.includes(role)) setHasAccess(false);
+            
             const { data: tables } = await supabase.rpc('get_manageable_tables');
             if (tables) setAvailableTables(tables.map((t: any) => t.table_name));
+            
             fetchGlobalLibrary();
+            
             if (!configModule) {
                 const { data: layout } = await supabase.from('dashboard_layouts').select('layout_json').eq('page_id', pageId).single();
                 if (layout?.layout_json) setModules(layout.layout_json);
                 else if (initialModules) setModules(initialModules);
             } else { setModules([configModule]); }
+            
             setLoading(false);
         };
         init();
@@ -164,15 +175,9 @@ export default function DashboardBuilder({ pageId, title, allowedRoles, initialM
     };
     
     const handleDelete = (id: string) => { if (confirm('Gỡ module?')) setModules(prev => prev.filter(m => m.id !== id)); };
-    
-    // 🟢 FIX LỖI TẠI ĐÂY: Cho phép max 4 cột (thay vì 2)
     const handleResizeWidth = (id: string, delta: number) => { 
-        setModules(prev => prev.map(m => m.id === id ? { 
-            ...m, 
-            doRong: Math.max(1, Math.min(4, (m.doRong || 1) + delta)) // Sửa số 2 thành số 4
-        } : m)); 
+        setModules(prev => prev.map(m => m.id === id ? { ...m, doRong: Math.max(1, Math.min(4, (m.doRong || 1) + delta)) } : m)); 
     };
-    
     const handleOpenDetail = (item: any, config: ModuleConfig) => { setDetailItem(item || {}); setActiveModuleConfig(config); setIsDetailOpen(true); };
 
     if (loading) return <div className="h-screen flex items-center justify-center bg-[#0a0807]"><Loader2 className="animate-spin text-[#C69C6D]" size={40}/></div>;
@@ -192,6 +197,7 @@ export default function DashboardBuilder({ pageId, title, allowedRoles, initialM
                 forceHidden={false} 
             />
 
+            {/* Chỉ Admin mới thấy nút Lưu Cấu Hình */}
             {!configModule && isAdmin && !isDetailOpen && !isAnyLevel2Open && (
                 <NutModal 
                     danhSachTacVu={[
