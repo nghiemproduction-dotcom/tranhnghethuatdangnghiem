@@ -1,20 +1,18 @@
 'use client';
-import React, { useState, useEffect } from 'react'; // 🟢 Đã thêm useEffect
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
 import { Loader2, User, FileText, Split } from 'lucide-react'; 
 import { ModuleConfig } from '@/app/GiaoDienTong/DashboardBuilder/KieuDuLieuModule';
 import { useRouter } from 'next/navigation';
 
-import ThanhDieuHuong from '@/app/GiaoDienTong/ModalDaCap/GiaoDien/ThanhDieuHuong';
+// 🟢 Đã xóa import ThanhDieuHuong
 import NoidungModal from '@/app/GiaoDienTong/ModalDaCap/GiaoDien/NoidungModal';
 import ThanhTab, { TabItem } from '@/app/GiaoDienTong/ModalDaCap/GiaoDien/ThanhTab'; 
 
-// Import các thành phần mới
 import { Level3Provider } from './Level3Context';
 import { useDuLieuLevel3 } from './useDuLieuLevel3';
 import { layCauHinhNgoaiLe } from './CauHinhNgoaiLe';
 
-// TÁI SỬ DỤNG CÁC IMPORT CŨ (Đường dẫn có thể cần chỉnh lại tùy vị trí folder)
 import NutChucNangLevel3 from './NutChucNang';
 import Tab_ThongTin from './Tab_ThongTin';
 import TabContent from './TabContent';
@@ -32,23 +30,16 @@ export default function TrangChuLevel3({ isOpen, onClose, onSuccess, config, ini
     const [isArranging, setIsArranging] = useState(false);
     const [activeTab, setActiveTab] = useState('form');
 
-    // 🟢 FIX QUAN TRỌNG: Reset trạng thái khi Modal mở ra
     useEffect(() => {
         if (isOpen) {
-            // Nếu là tạo mới (isCreateMode=true) -> isEditing = true
-            // Nếu là xem chi tiết (isCreateMode=false) -> isEditing = false
             setIsEditing(isCreateMode);
-            
-            // Reset tab về mặc định
             setActiveTab('form');
             setIsArranging(false);
         }
     }, [isOpen, isCreateMode]);
 
-    // Cấu hình ngoại lệ (Tabs, Logout...)
     const { customTabs, showLogout } = layCauHinhNgoaiLe(config.bangDuLieu, isCreateMode);
 
-    // Biến này tên là 'canEdit'
     const canEdit = isCreateMode || ['admin', 'quanly', 'boss'].includes(userRole) || isOwner;
     const canEditColumn = (col: any) => isCreateMode ? !col.tuDong : (!col.readOnly && (col.permEdit?.includes(userRole) || col.permEdit?.includes('all')));
 
@@ -64,7 +55,6 @@ export default function TrangChuLevel3({ isOpen, onClose, onSuccess, config, ini
                 if (['number','currency'].includes(col.kieuDuLieu)) val = val ? Number(String(val).replace(/,/g, '')) : null;
                 payload[col.key] = val;
             }
-            // Loại bỏ các cột ngoại lệ
             excludeColsOnSave.forEach(k => delete payload[k]);
 
             const { error } = isCreateMode ? await (supabase.from(config.bangDuLieu) as any).insert(payload) : await (supabase.from(config.bangDuLieu) as any).update(payload).eq('id', initialData.id);
@@ -110,11 +100,20 @@ export default function TrangChuLevel3({ isOpen, onClose, onSuccess, config, ini
 
     return (
         <Level3Provider value={contextValue}>
-            <div className="fixed inset-0 bottom-[80px] z-[2300] bg-[#0a0807] flex flex-col shadow-2xl animate-in slide-in-from-right-20">
-                <div className="shrink-0 z-[100] bg-[#0a0807] border-b border-[#8B5E3C]/30 shadow-lg p-2"><ThanhDieuHuong danhSachCap={[{id:'b',ten:parentTitle||'Quay lại',onClick:onClose},{id:'c',ten:title.toUpperCase()}]}/></div>
+            {/* 🟢 SỬA CONTAINER LEVEL 3:
+                - bg-black/90 backdrop-blur-xl: Kính mờ
+                - z-[2300]: Nổi trên Level 2 nhưng dưới Menu Tren (z-3000)
+            */}
+            <div className="fixed top-0 left-0 right-0 bottom-0 z-[2300] bg-black/90 backdrop-blur-xl flex flex-col shadow-2xl animate-in slide-in-from-right-20">
+                
+                {/* 🟢 XÓA THANH ĐIỀU HƯỚNG */}
+                {/* <div className="shrink-0..."><ThanhDieuHuong...></div> */}
+
                 <NoidungModal>
-                    <div className="flex flex-col h-full bg-[#0F0C0B]">
-                        <div className="shrink-0 bg-[#0a0807]"><ThanhTab danhSachTab={tabList} tabHienTai={activeTab} onChuyenTab={setActiveTab}/></div>
+                    <div className="flex flex-col h-full bg-transparent">
+                        <div className="shrink-0 bg-transparent border-b border-white/10 pb-2">
+                            <ThanhTab danhSachTab={tabList} tabHienTai={activeTab} onChuyenTab={setActiveTab}/>
+                        </div>
                         
                         {activeTab === 'form' && <AnhDaiDien imgUrl={imgCol ? formData[imgCol.key] : ''} onUpload={handleImageUpload} uploading={uploadingImg} canEdit={isEditing} label={title}/>}
                         
@@ -135,7 +134,6 @@ export default function TrangChuLevel3({ isOpen, onClose, onSuccess, config, ini
                     isEditing={isEditing} 
                     isArranging={isArranging} 
                     loading={loading} 
-                    // 🟢 FIX 1: Truyền biến 'canEdit' vào prop 'canEditRecord'
                     canEditRecord={canEdit} 
                     canDeleteRecord={['admin'].includes(userRole)} 
                     isAdmin={userRole==='admin'} 
@@ -145,7 +143,6 @@ export default function TrangChuLevel3({ isOpen, onClose, onSuccess, config, ini
                     onCancel={()=>setIsEditing(false)} 
                     onDelete={handleDelete} 
                     onClose={onClose} 
-                    // 🟢 FIX 2: Đổi 'onArrange' thành 'onToggleArrange'
                     onToggleArrange={()=>setIsArranging(!isArranging)} 
                     onSaveLayout={handleSaveLayout} 
                     onLogout={showLogout ? handleLogout : undefined} 

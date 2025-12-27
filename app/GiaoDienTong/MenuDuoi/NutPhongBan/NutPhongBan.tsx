@@ -4,13 +4,13 @@ import { useSearchParams } from 'next/navigation';
 import { Building2 } from 'lucide-react';
 
 import NutMenu from '@/app/GiaoDienTong/MenuDuoi/GiaoDien/NutMenu';
-import ThanhDieuHuong from '@/app/GiaoDienTong/ModalDaCap/GiaoDien/ThanhDieuHuong';
 import NoidungModal from '@/app/GiaoDienTong/ModalDaCap/GiaoDien/NoidungModal';
 import ThanhDieuKhien from '@/app/GiaoDienTong/ModalDaCap/GiaoDien/ThanhDieuKhien';
 
 import GiaoDienDanhSach from './GiaoDienDanhSach';
-import { DANH_SACH_PHONG_BAN, kiemTraQuyen } from '@/app/GiaoDienTong/MenuDuoi/DuLieu';
+import { DANH_SACH_PHONG_BAN } from '@/app/GiaoDienTong/MenuDuoi/DuLieu';
 
+// Import các Modal con
 import ModalPhongQuanLy from '@/app/GiaoDienTong/ModalDaCap/ModalPhongQuanLy';
 import ModalPhongAdmin from '@/app/GiaoDienTong/ModalDaCap/ModalPhongAdmin';
 import ModalPhongSales from '@/app/GiaoDienTong/ModalDaCap/ModalPhongSales';
@@ -94,31 +94,31 @@ export default function NutPhongBan({ nguoiDung, isOpen, onToggle, onClose }: Pr
             </div>
 
             {isOpen && (
-                <div className="fixed top-0 left-0 right-0 bottom-[clamp(65px,16vw,85px)] z-[2000] bg-[#0a0807] flex flex-col animate-in fade-in duration-200 border-b border-[#8B5E3C]/30 shadow-2xl">
+                // 🟢 SỬA LẠI: TRONG SUỐT HOÀN TOÀN (INVISIBLE CONTAINER)
+                <div className="fixed top-[85px] bottom-[100px] left-0 right-0 z-[2000] flex flex-col animate-in fade-in zoom-in-95 duration-300">
                     
-                    {/* 🟢 SỬA: Điền tên vào cấp cuối cùng -> Nó sẽ tự biến thành Tiêu đề */}
-                    <ThanhDieuHuong 
-                        danhSachCap={[
-                            { id: 'home', ten: 'Trang Chủ', onClick: onClose }, 
-                            { id: 'phongban', ten: 'DANH SÁCH PHÒNG BAN' } 
-                        ]} 
-                    />
+                    {/* KHÔNG CÒN HEADER, KHÔNG CÒN NÚT ĐÓNG */}
 
-                    <NoidungModal>
-                        <div className="pb-20">
-                            <GiaoDienDanhSach 
-                                data={duLieuTrangNay} 
-                                nguoiDung={nguoiDung} 
-                                onDongModal={onClose} 
-                                onMoModal={handleListClick} 
-                            />
-                        </div>
-                    </NoidungModal>
-                    
-                    {tongSoTrang > 1 && (
-                        <ThanhDieuKhien hienThiPhanTrang={true} trangHienTai={trang} tongSoTrang={tongSoTrang} 
-                            onTrangTruoc={() => trang > 1 && setTrang(t=>t-1)} onTrangSau={() => trang < tongSoTrang && setTrang(t=>t+1)} onLuiLichSu={onClose} onToiLichSu={() => setTrang(tongSoTrang)}
+                    {/* Nội dung danh sách */}
+                    <div className="flex-1 overflow-y-auto custom-scroll p-4 md:p-8 flex flex-col justify-center">
+                        <GiaoDienDanhSach 
+                            data={duLieuTrangNay} 
+                            nguoiDung={nguoiDung} 
+                            onDongModal={onClose} 
+                            onMoModal={handleListClick} 
                         />
+                    </div>
+                    
+                    {/* Thanh phân trang (nếu có nhiều trang) cũng phải trong suốt */}
+                    {tongSoTrang > 1 && (
+                        <div className="shrink-0 flex justify-center pb-4">
+                            {/* Bọc thêm 1 div nhỏ để gom gọn thanh điều khiển lại */}
+                            <div className="bg-black/40 backdrop-blur-md rounded-full px-4 border border-white/10">
+                                <ThanhDieuKhien hienThiPhanTrang={true} trangHienTai={trang} tongSoTrang={tongSoTrang} 
+                                    onTrangTruoc={() => trang > 1 && setTrang(t=>t-1)} onTrangSau={() => trang < tongSoTrang && setTrang(t=>t+1)} onLuiLichSu={onClose} onToiLichSu={() => setTrang(tongSoTrang)}
+                                />
+                            </div>
+                        </div>
                     )}
                 </div>
             )}

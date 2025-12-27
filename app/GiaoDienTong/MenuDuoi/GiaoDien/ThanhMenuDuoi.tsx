@@ -1,22 +1,17 @@
 'use client';
 import React from 'react';
 
-interface Props {
-    children: React.ReactNode;
-}
-
-export default function ThanhMenuDuoi({ children }: Props) {
-    // Không cần useRef hay handleScroll nữa vì nút điều hướng đã dời đi chỗ khác
+export default function ThanhMenuDuoi({ children }: { children: React.ReactNode }) {
     return (
-        <nav className="fixed bottom-0 left-0 right-0 h-[clamp(70px,15vw,90px)] z-[9999] bg-[#110d0c] shadow-[0_-5px_30px_rgba(0,0,0,0.9)] border-t border-[#3E2723] flex items-center px-1">
+        <div className="w-full h-full relative pointer-events-none"> {/* pointer-events-none để click xuyên qua vùng trống */}
             
-            {/* Chỉ còn vùng chứa Menu - CÂN GIỮA TUYỆT ĐỐI */}
-            <div className="flex-1 flex overflow-x-auto px-2 no-scrollbar h-full">
-                <div className="flex items-center gap-4 m-auto w-max min-w-full justify-center">
-                    {children}
-                </div>
+            {/* 🟢 SỬA GRADIENT: Chỉ cao 32 đơn vị (h-32) và nằm sát đáy */}
+            <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black via-black/90 to-transparent z-0" />
+            
+            {/* Nội dung menu */}
+            <div className="absolute bottom-0 left-0 right-0 z-10 flex justify-center items-end pb-2 gap-8 md:gap-20 pointer-events-auto">
+                {children}
             </div>
-
-        </nav>
+        </div>
     );
 }
