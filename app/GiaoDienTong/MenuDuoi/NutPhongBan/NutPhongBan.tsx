@@ -11,13 +11,13 @@ import ThanhDieuKhien from '@/app/GiaoDienTong/ModalDaCap/GiaoDien/ThanhDieuKhie
 import GiaoDienDanhSach from './GiaoDienDanhSach';
 import { DANH_SACH_PHONG_BAN, kiemTraQuyen } from '@/app/GiaoDienTong/MenuDuoi/DuLieu';
 
-import ModalPhongQuanLy from '@/app/GiaoDienTong/ModalDaCap/modalphongquanly/ModalPhongQuanLy';
-import ModalPhongAdmin from '@/app/GiaoDienTong/ModalDaCap/modalphongadmin/ModalPhongAdmin';
-import ModalPhongSales from '@/app/GiaoDienTong/ModalDaCap/modalphongsales/ModalPhongSales';
-import ModalPhongTho from '@/app/GiaoDienTong/ModalDaCap/modalphongtho/ModalPhongTho';
-import ModalPhongCTV from '@/app/GiaoDienTong/ModalDaCap/modalphongctv/ModalPhongCTV';
-import ModalPhongPartTime from '@/app/GiaoDienTong/ModalDaCap/modalphongadmin/modalphongparttime/ModalPhongPartTime'; 
-import ModalPhongThietKe from '@/app/GiaoDienTong/ModalDaCap/modalphongthietke/ModalPhongThietKe'; 
+import ModalPhongQuanLy from '@/app/GiaoDienTong/ModalDaCap/ModalPhongQuanLy';
+import ModalPhongAdmin from '@/app/GiaoDienTong/ModalDaCap/ModalPhongAdmin';
+import ModalPhongSales from '@/app/GiaoDienTong/ModalDaCap/ModalPhongSales';
+import ModalPhongTho from '@/app/GiaoDienTong/ModalDaCap/ModalPhongTho';
+import ModalPhongCTV from '@/app/GiaoDienTong/ModalDaCap/ModalPhongCTV';
+import ModalPhongPartTime from '@/app/GiaoDienTong/ModalDaCap/ModalPhongPartTime'; 
+import ModalPhongThietKe from '@/app/GiaoDienTong/ModalDaCap/ModalPhongThietKe'; 
 
 interface Props {
     nguoiDung: any;

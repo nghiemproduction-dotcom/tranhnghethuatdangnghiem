@@ -7,7 +7,7 @@ import { ModuleConfig } from './KieuDuLieuModule';
 import { useRouter } from 'next/navigation';
 import AccessDenied from './AccessDenied';
 import GridArea from './GridArea';
-import Level3_FormChiTiet from '@/app/GiaoDienTong/ModalDaCap/modalphongquanly/modules/quanlynhansu/Level3/level3'; 
+import Level3_FormChiTiet from '@/app/GiaoDienTong/ModalDaCap/Modulegeneric/level3generic/level3generic'; 
 import NutModal from '@/app/GiaoDienTong/ModalDaCap/GiaoDien/NutModal';
 
 interface Props { pageId: string; title: string; allowedRoles: string[]; initialModules?: ModuleConfig[]; hideAddButton?: boolean; configModule?: ModuleConfig; }

@@ -4,7 +4,7 @@ import { UserCircle } from 'lucide-react';
 
 import NutMenu from '@/app/GiaoDienTong/MenuDuoi/GiaoDien/NutMenu';
 // 🟢 IMPORT LEVEL 3 (Đường dẫn tương đối có thể khác tùy máy bạn, hãy chỉnh lại nếu cần)
-import Level3_FormChiTiet from '../../ModalDaCap/modalphongquanly/modules/quanlynhansu/Level3/level3';
+import Level3_FormChiTiet from '../../ModalDaCap/Modulegeneric/level3generic/level3generic';
 
 interface Props {
     nguoiDung: any; 

@@ -24,13 +24,25 @@ export default function CongDangNhap({ isOpen, onClose, isGateKeeper = false }: 
 
   const isModal = typeof isOpen === 'boolean';
   
-  const normalizeRole = (str: string) => {
-      if (!str) return 'khach';
+  // Hàm chuẩn hóa chuỗi (bỏ dấu, viết thường)
+  const normalizeString = (str: string) => {
+      if (!str) return '';
       return str.normalize("NFD")
                 .replace(/[\u0300-\u036f]/g, "") 
                 .toLowerCase()                   
-                .replace(/[^a-z0-9]/g, "")       
                 .trim();
+  };
+
+  const normalizeRole = (str: string) => {
+      if (!str) return 'khach';
+      return normalizeString(str).replace(/[^a-z0-9]/g, "");       
+  };
+
+  // 🟢 HÀM KIỂM TRA KHÁCH HÀNG VIP / TRỌNG TÂM
+  const isVipCustomer = (phanLoai: string) => {
+      const s = normalizeString(phanLoai);
+      // Chấp nhận nếu chứa từ "vip" hoặc "trong tam" (bất kể hoa thường, có dấu hay không)
+      return s.includes('vip') || s.includes('trong tam');
   };
 
   useEffect(() => {
@@ -61,12 +73,10 @@ export default function CongDangNhap({ isOpen, onClose, isGateKeeper = false }: 
       try {
         const elem = document.documentElement as any;
         if (elem.requestFullscreen) elem.requestFullscreen();
-        else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen(); // Safari
-        else if (elem.mozRequestFullScreen) elem.mozRequestFullScreen(); // Firefox
-        else if (elem.msRequestFullscreen) elem.msRequestFullscreen(); // IE/Edge
-      } catch (err) {
-        console.warn("Fullscreen error:", err);
-      }
+        else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+        else if (elem.mozRequestFullScreen) elem.mozRequestFullScreen();
+        else if (elem.msRequestFullscreen) elem.msRequestFullscreen();
+      } catch (err) { console.warn("Fullscreen error:", err); }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -76,9 +86,7 @@ export default function CongDangNhap({ isOpen, onClose, isGateKeeper = false }: 
         localStorage.setItem('GLOBAL_FULLSCREEN_PREF', wantFullScreen ? 'true' : 'false');
     }
 
-    if (wantFullScreen) {
-        triggerFullScreen();
-    }
+    if (wantFullScreen) triggerFullScreen();
 
     setFlags(p => ({...p, loading: true})); 
     setIsError(false);
@@ -87,55 +95,74 @@ export default function CongDangNhap({ isOpen, onClose, isGateKeeper = false }: 
     const phone = user.phone.trim();
     
     try {
-        // 1. Đăng nhập Supabase 
-        // (Lúc này createBrowserClient sẽ tự động set Cookies cho Middleware)
+        // 1. Đăng nhập Supabase Auth
         const { error: authError } = await supabase.auth.signInWithPassword({ email: email, password: phone });
         if (authError) throw new Error("Thông tin đăng nhập không chính xác.");
 
-        // 2. Lấy Role từ bảng NHAN_SU
-        // (Nhờ có Cookies, RLS sẽ cho phép đọc dòng của chính mình)
-        const { data: nhanVien, error: dbError } = await supabase
+        // 2. 🟢 CHIẾN LƯỢC TÌM KIẾM 2 LỚP (NHÂN SỰ -> KHÁCH HÀNG)
+        
+        let finalUser = null;
+        let finalRole = 'khach';
+        let finalPosition = '';
+
+        // A. Thử tìm trong bảng NHÂN SỰ trước
+        const { data: nhanVien } = await supabase
             .from('nhan_su')
             .select('*')
             .eq('email', email)
             .single();
 
-        if (dbError || !nhanVien) throw new Error("Không tìm thấy hồ sơ nhân sự.");
-
-        // 3. Lưu ghi nhớ
-        if (rememberMe) {
-            localStorage.setItem('SAVED_CREDS', JSON.stringify({ email, phone }));
+        if (nhanVien) {
+            finalUser = nhanVien;
+            finalPosition = nhanVien.vi_tri || 'Nhân Viên';
+            finalRole = normalizeRole(finalPosition);
         } else {
-            localStorage.removeItem('SAVED_CREDS');
+            // B. Nếu không phải nhân sự, tìm trong bảng KHÁCH HÀNG
+            const { data: khachHang } = await supabase
+                .from('khach_hang')
+                .select('*')
+                .eq('email', email)
+                .single();
+
+            if (khachHang) {
+                // Kiểm tra phân loại VIP / Trọng tâm
+                if (isVipCustomer(khachHang.phan_loai)) {
+                    finalUser = khachHang;
+                    finalPosition = khachHang.phan_loai || 'Khách Hàng VIP';
+                    finalRole = 'khach_vip'; // Role đặc biệt cho khách VIP
+                } else {
+                    throw new Error("Tài khoản Khách hàng này không đủ quyền truy cập (Yêu cầu VIP hoặc Trọng tâm).");
+                }
+            }
         }
 
-        // 4. Chuẩn hóa Role & Lưu LocalStorage (Cho UI dùng tạm)
-        const viTriGoc = nhanVien.vi_tri || ''; 
-        const roleChuan = normalizeRole(viTriGoc); 
+        if (!finalUser) throw new Error("Không tìm thấy hồ sơ Nhân sự hoặc Khách hàng VIP.");
 
+        // 3. Lưu ghi nhớ
+        if (rememberMe) localStorage.setItem('SAVED_CREDS', JSON.stringify({ email, phone }));
+        else localStorage.removeItem('SAVED_CREDS');
+
+        // 4. Lưu LocalStorage
         const userInfo = {
-            id: nhanVien.id,
-            ho_ten: nhanVien.ten_hien_thi || nhanVien.ho_ten || email,
+            id: finalUser.id,
+            ho_ten: finalUser.ten_hien_thi || finalUser.ho_ten || email,
             email: email,
-            vi_tri: viTriGoc, 
-            role: roleChuan,  
-            avatar_url: nhanVien.hinh_anh
+            vi_tri: finalPosition, 
+            role: finalRole,  
+            avatar_url: finalUser.hinh_anh
         };
         
         localStorage.removeItem('LA_ADMIN_CUNG');
         localStorage.setItem('USER_INFO', JSON.stringify(userInfo));
-        localStorage.setItem('USER_ROLE', roleChuan);
+        localStorage.setItem('USER_ROLE', finalRole);
 
-        // 5. ĐIỀU HƯỚNG AN TOÀN
+        // 5. ĐIỀU HƯỚNG
         const nextPath = '/trangchu';
-        
-        // 🟢 QUAN TRỌNG: Làm mới router để Middleware nhận diện cookie mới
         router.refresh(); 
-        
         setTimeout(() => {
             router.replace(nextPath);
             if(onClose && !isGateKeeper) onClose();
-        }, 500); // Tăng delay xíu để Cookie kịp ghi
+        }, 500);
 
     } catch (err: any) { 
         console.error("Lỗi:", err.message);
@@ -185,28 +212,18 @@ export default function CongDangNhap({ isOpen, onClose, isGateKeeper = false }: 
                     />
                     
                     <div className="flex flex-col gap-3 mt-1">
-                        <div 
-                            className="flex items-center gap-3 cursor-pointer group select-none"
-                            onClick={() => setRememberMe(!rememberMe)}
-                        >
+                        <div className="flex items-center gap-3 cursor-pointer group select-none" onClick={() => setRememberMe(!rememberMe)}>
                             <div className={`transition-colors ${rememberMe ? 'text-[#C69C6D]' : 'text-gray-600 group-hover:text-gray-400'}`}>
                                 {rememberMe ? <CheckSquare size={18} /> : <Square size={18} />}
                             </div>
-                            <span className={`text-[10px] font-bold uppercase tracking-widest transition-colors ${rememberMe ? 'text-white' : 'text-gray-500 group-hover:text-gray-400'}`}>
-                                Ghi nhớ đăng nhập
-                            </span>
+                            <span className={`text-[10px] font-bold uppercase tracking-widest transition-colors ${rememberMe ? 'text-white' : 'text-gray-500 group-hover:text-gray-400'}`}>Ghi nhớ đăng nhập</span>
                         </div>
 
-                        <div 
-                            className="flex items-center gap-3 cursor-pointer group select-none"
-                            onClick={() => setWantFullScreen(!wantFullScreen)}
-                        >
+                        <div className="flex items-center gap-3 cursor-pointer group select-none" onClick={() => setWantFullScreen(!wantFullScreen)}>
                             <div className={`transition-colors ${wantFullScreen ? 'text-yellow-500' : 'text-gray-600 group-hover:text-gray-400'}`}>
                                 {wantFullScreen ? <CheckSquare size={18} /> : <Square size={18} />}
                             </div>
-                            <span className={`text-[10px] font-bold uppercase tracking-widest transition-colors ${wantFullScreen ? 'text-white' : 'text-gray-500 group-hover:text-gray-400'}`}>
-                                Tự động bật toàn màn hình
-                            </span>
+                            <span className={`text-[10px] font-bold uppercase tracking-widest transition-colors ${wantFullScreen ? 'text-white' : 'text-gray-500 group-hover:text-gray-400'}`}>Tự động bật toàn màn hình</span>
                         </div>
                     </div>
 
