@@ -7,12 +7,14 @@ interface Props {
 
 export default function NoidungModal({ children }: Props) {
     return (
-        // 🟢 SỬA ĐỔI: Thay bg-[#0a0807] thành bg-transparent (Trong suốt)
-        // Thêm pt-20 để nội dung không bị Menu Trên che mất (vì Menu Trên giờ sẽ đè lên)
-        <div className="flex-1 w-full overflow-y-auto custom-scroll relative bg-transparent p-[clamp(10px,3vw,20px)] pt-24">
-            {/* Wrapper để đảm bảo nội dung không bị sát lề dưới trên mobile */}
-            <div className="w-full min-h-full pb-[80px]"> 
-                {children}
+        <div className="fixed top-[85px] bottom-[100px] left-0 right-0 z-[2000] flex flex-col bg-transparent animate-in fade-in zoom-in-95 duration-500 ease-out overflow-hidden shadow-none">
+            
+            {/* 🟢 ĐÃ XÓA: Phần div gradient h-12 tại đây */}
+            
+            <div className="flex-1 w-full overflow-y-auto custom-scroll p-4 md:p-6 relative z-0">
+                <div className="w-full min-h-full pb-8"> 
+                    {children}
+                </div>
             </div>
         </div>
     );

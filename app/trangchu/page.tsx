@@ -4,11 +4,13 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 // Import Module Giao diện
-import HieuUngNen from '@/app/GiaoDienTong/HieuUngNen'; // (Lưu ý: Check lại đường dẫn import HieuUngNen nếu cần)
+import HieuUngNen from '@/app/GiaoDienTong/HieuUngNen/HieuUngNen';
+// 🟢 IMPORT LỚP PHỦ LAN MÀU
+import LopPhuLanMau from '@/app/GiaoDienTong/HieuUngNen/LopPhuLanMau';
 import MenuTren from '@/app/GiaoDienTong/MenuTren/MenuTren';
 import MenuDuoi from '@/app/GiaoDienTong/MenuDuoi/MenuDuoi';
 
-// 🟢 1. IMPORT NHẠC NỀN
+// 🟢 IMPORT NHẠC NỀN
 import NhacNen from '@/app/Music/NhacNen';
 
 export default function TrangChuPage() {
@@ -39,23 +41,25 @@ export default function TrangChuPage() {
     if (!nguoiDung) return null;
 
     return (
-        <div className="fixed inset-0 w-full h-[100dvh] bg-black text-[#F5F5F5] font-sans overflow-hidden">
+        <div className="fixed inset-0 w-full h-[100dvh] bg-[#050505] text-[#F5F5F5] font-sans overflow-hidden">
             
-            {/* 🟢 2. KÍCH HOẠT NHẠC NỀN (Tự động phát khi tương tác) */}
+            {/* 1. ÂM THANH & LOGIC */}
             <NhacNen />
 
-            {/* 1. LỚP HÌNH NỀN & HIỆU ỨNG (Z-Index: 0) */}
+            {/* 2. LỚP HÌNH NỀN & HIỆU ỨNG (Z-Index thấp nhất) */}
             <HieuUngNen />
 
-            {/* 2. MENU TRÊN (Z-Index: 3000) 
-               🟢 QUAN TRỌNG: Đặt z-3000 để cao hơn Modal Level 3 (thường là z-2300) 
-            */}
-            <div className="fixed top-0 left-0 right-0 z-[3000]">
+            {/* 🟢 3. LỚP PHỦ LAN MÀU (Z-Index 8000) */}
+            {/* Phủ sát mép trên và dưới, tạo nền tối cho Menu trong suốt */}
+            <LopPhuLanMau />
+
+            {/* 🟢 4. MENU TRÊN (Z-Index: 9999 - CAO NHẤT) */}
+            <div className="fixed top-0 left-0 right-0 z-[9999]">
                 <MenuTren nguoiDung={nguoiDung} loiChao={loiChao} />
             </div>
 
-            {/* 4. MENU DƯỚI (Z-Index: 3000 - Cố định đáy) */}
-            <div className="fixed bottom-0 left-0 right-0 z-[3000]">
+            {/* 🟢 5. MENU DƯỚI (Z-Index: 9999 - CAO NHẤT) */}
+            <div className="fixed bottom-0 left-0 right-0 z-[9999]">
                 <MenuDuoi currentUser={nguoiDung} />
             </div>
 

@@ -41,8 +41,14 @@ export default function NutPhongBan({ nguoiDung, isOpen, onToggle, onClose }: Pr
         });
     };
 
+    // Khi đóng danh sách chính (isOpen = false), thì cũng đóng luôn các modal con (trừ khi đang thao tác đặc biệt)
+    // Tuy nhiên logic dưới đây chỉ chạy khi props isOpen thay đổi từ ngoài vào
     useEffect(() => {
-        if (!isOpen) closeAllModals();
+        if (!isOpen) {
+            // Kiểm tra xem có modal con nào đang mở không? Nếu có thì không đóng vội để tránh mất trạng thái
+            // Nhưng logic hiện tại của bạn là đóng tất cả khi menu đóng -> OK
+            // closeAllModals(); // (Tạm comment dòng này nếu muốn giữ trạng thái modal con khi menu đóng, nhưng thường là nên đóng)
+        }
     }, [isOpen]);
 
     const openSpecificModal = (key: string) => {
@@ -57,10 +63,13 @@ export default function NutPhongBan({ nguoiDung, isOpen, onToggle, onClose }: Pr
         const portal = searchParams.get('portal');
         if (portal && ['admin', 'quanly', 'sales', 'tho', 'parttime', 'ctv', 'thietke'].includes(portal)) {
             openSpecificModal(portal);
+            // Nếu mở từ URL, đảm bảo danh sách chính đóng lại
+            if (isOpen) onToggle();
         }
     }, [searchParams]);
 
     const handleListClick = (idPhong: string) => {
+        // 1. Mở modal con tương ứng
         if (idPhong === 'admin') openSpecificModal('admin');
         else if (idPhong === 'quanly') openSpecificModal('quanly');
         else if (idPhong === 'thietke') openSpecificModal('thietke'); 
@@ -68,6 +77,11 @@ export default function NutPhongBan({ nguoiDung, isOpen, onToggle, onClose }: Pr
         else if (['sales', 'kinhdoanh'].includes(idPhong)) openSpecificModal('sales');
         else if (['parttime', 'thoivu'].includes(idPhong)) openSpecificModal('parttime');
         else if (['congtacvien', 'ctv'].includes(idPhong)) openSpecificModal('ctv');
+
+        // 🟢 QUAN TRỌNG: Đóng danh sách "Phòng Ban" ngay lập tức để không bị đè
+        if (isOpen) {
+            onToggle(); 
+        }
     };
 
     const danhSachHienThi = DANH_SACH_PHONG_BAN;
@@ -83,10 +97,13 @@ export default function NutPhongBan({ nguoiDung, isOpen, onToggle, onClose }: Pr
                     active={isOpen || Object.values(openStates).some(v => v)} 
                     onClick={() => {
                         const isAnyChildOpen = Object.values(openStates).some(v => v);
+                        
                         if (isAnyChildOpen) {
+                            // Nếu đang mở Modal con -> Đóng Modal con, và ĐÓNG LUÔN danh sách (reset về trạng thái nghỉ)
                             closeAllModals();
-                            if (!isOpen) onToggle(); 
+                            if (isOpen) onToggle(); 
                         } else {
+                            // Nếu không mở Modal con -> Toggle danh sách
                             onToggle();
                         }
                     }} 
@@ -94,12 +111,7 @@ export default function NutPhongBan({ nguoiDung, isOpen, onToggle, onClose }: Pr
             </div>
 
             {isOpen && (
-                // 🟢 SỬA LẠI: TRONG SUỐT HOÀN TOÀN (INVISIBLE CONTAINER)
                 <div className="fixed top-[85px] bottom-[100px] left-0 right-0 z-[2000] flex flex-col animate-in fade-in zoom-in-95 duration-300">
-                    
-                    {/* KHÔNG CÒN HEADER, KHÔNG CÒN NÚT ĐÓNG */}
-
-                    {/* Nội dung danh sách */}
                     <div className="flex-1 overflow-y-auto custom-scroll p-4 md:p-8 flex flex-col justify-center">
                         <GiaoDienDanhSach 
                             data={duLieuTrangNay} 
@@ -109,10 +121,8 @@ export default function NutPhongBan({ nguoiDung, isOpen, onToggle, onClose }: Pr
                         />
                     </div>
                     
-                    {/* Thanh phân trang (nếu có nhiều trang) cũng phải trong suốt */}
                     {tongSoTrang > 1 && (
                         <div className="shrink-0 flex justify-center pb-4">
-                            {/* Bọc thêm 1 div nhỏ để gom gọn thanh điều khiển lại */}
                             <div className="bg-black/40 backdrop-blur-md rounded-full px-4 border border-white/10">
                                 <ThanhDieuKhien hienThiPhanTrang={true} trangHienTai={trang} tongSoTrang={tongSoTrang} 
                                     onTrangTruoc={() => trang > 1 && setTrang(t=>t-1)} onTrangSau={() => trang < tongSoTrang && setTrang(t=>t+1)} onLuiLichSu={onClose} onToiLichSu={() => setTrang(tongSoTrang)}

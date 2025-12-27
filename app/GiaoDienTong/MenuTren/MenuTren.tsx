@@ -6,19 +6,23 @@ export default function MenuTren({ nguoiDung, loiChao }: { nguoiDung: any, loiCh
     if (!nguoiDung) return null;
 
     return (
-        // Giảm padding top xuống còn pt-6 (trước là pt-12) để gọn hơn
-        <div className="fixed top-0 left-0 right-0 z-50 px-5 pt-6 pb-2 flex justify-between items-start">
+        // 🟢 CẬP NHẬT: NỀN TRONG SUỐT HOÀN TOÀN
+        // Xóa bg-[#0a0807]/90, backdrop-blur-md, shadow-lg, border-b
+        <div className="fixed top-0 left-0 right-0 z-[9999] h-[85px] px-5 flex justify-between items-center bg-transparent transition-all duration-300">
             
-            {/* Góc trái */}
-            <div className="flex flex-col animate-slide-down">
-                <span className="text-xs md:text-sm font-medium italic text-gray-300 drop-shadow-md">{loiChao},</span>
-                <span className="text-lg md:text-xl font-black text-white uppercase tracking-wider drop-shadow-lg shadow-black">
+            {/* Góc trái: Dòng chào mừng */}
+            <div className="flex items-center gap-2 max-w-[70%] animate-slide-down">
+                <span className="text-xs md:text-sm font-medium italic text-gray-300 drop-shadow-md whitespace-nowrap hidden sm:inline-block">
+                    {loiChao},
+                </span>
+                <span className="font-black text-white uppercase tracking-wider drop-shadow-lg shadow-black truncate" 
+                      style={{ fontSize: 'clamp(14px, 4vw, 20px)' }}>
                     {nguoiDung.ho_ten}
                 </span>
             </div>
 
             {/* Góc phải */}
-            <div className="flex gap-2 md:gap-3 animate-slide-down delay-100">
+            <div className="flex gap-2 md:gap-3 animate-slide-down delay-100 shrink-0">
                 <NutVuong icon={Bell} badge={3} />
                 <NutVuong icon={ShoppingCart} />
                 <NutVuong icon={QrCode} />
