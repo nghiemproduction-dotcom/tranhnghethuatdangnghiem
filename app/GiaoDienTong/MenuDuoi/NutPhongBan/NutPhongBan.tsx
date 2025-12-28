@@ -5,8 +5,9 @@ import { useSearchParams } from 'next/navigation';
 import { Building2 } from 'lucide-react';
 
 import NutMenu from '@/app/GiaoDienTong/MenuDuoi/GiaoDien/NutMenu';
-import ThanhDieuKhien from '@/app/GiaoDienTong/ModalDaCap/GiaoDien/ThanhDieuKhien';
 import GiaoDienDanhSach from './GiaoDienDanhSach';
+import ThanhPhanTrang from '@/app/GiaoDienTong/ModalDaCap/GiaoDien/ThanhPhanTrang'; 
+
 import { DANH_SACH_PHONG_BAN } from '@/app/GiaoDienTong/MenuDuoi/DuLieu';
 
 // Import các Modal con
@@ -28,13 +29,27 @@ interface Props {
 export default function NutPhongBan({ nguoiDung, isOpen, onToggle, onClose }: Props) {
     const [trang, setTrang] = useState(1);
     const [mounted, setMounted] = useState(false);
+    const [itemsPerPage, setItemsPerPage] = useState(10); 
+
     const [openStates, setOpenStates] = useState({
         admin: false, quanly: false, sales: false, tho: false, 
         parttime: false, ctv: false, thietke: false 
     });
     const searchParams = useSearchParams();
 
-    useEffect(() => { setMounted(true); }, []);
+    // Responsive items per page
+    useEffect(() => { 
+        setMounted(true); 
+        const handleResize = () => {
+            const width = window.innerWidth;
+            if (width < 768) setItemsPerPage(6);      
+            else if (width < 1024) setItemsPerPage(8); 
+            else setItemsPerPage(10);                 
+        };
+        handleResize(); 
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     const closeAllModals = () => {
         setOpenStates({ 
@@ -64,25 +79,24 @@ export default function NutPhongBan({ nguoiDung, isOpen, onToggle, onClose }: Pr
     };
 
     const danhSachHienThi = DANH_SACH_PHONG_BAN;
-    const SO_MUC_MOI_TRANG = 8; 
-    const tongSoTrang = Math.ceil(danhSachHienThi.length / SO_MUC_MOI_TRANG);
-    const duLieuTrangNay = danhSachHienThi.slice((trang - 1) * SO_MUC_MOI_TRANG, trang * SO_MUC_MOI_TRANG);
+    const tongSoTrang = Math.ceil(danhSachHienThi.length / itemsPerPage);
+    
+    useEffect(() => {
+        if (trang > tongSoTrang && tongSoTrang > 0) setTrang(tongSoTrang);
+    }, [tongSoTrang, trang]);
 
-    // 🟢 CẬP NHẬT LOGIC LIST CONTENT
+    const duLieuTrangNay = danhSachHienThi.slice((trang - 1) * itemsPerPage, trang * itemsPerPage);
+
+    // Overlay Danh sách phòng ban (Nền đen 80%)
     const listContent = isOpen ? (
-        // Wrapper ngoài cùng: pointer-events-none (để click xuyên qua các vùng trống)
-        <div className="fixed inset-0 z-[10000] flex flex-col animate-in fade-in zoom-in-95 duration-300 pointer-events-none">
-            
-            {/* Container cuộn: Vẫn giữ pointer-events-none.
-               Lưu ý: Nếu user để chuột vào vùng trống và lăn chuột, có thể sẽ không cuộn được danh sách 
-               vì sự kiện lăn chuột sẽ xuyên qua xuống dưới. Nhưng đây là đánh đổi để đạt được yêu cầu "click xuyên qua".
-            */}
-            <div className="w-full h-full overflow-y-auto custom-scroll pt-28 pb-36 px-4 md:px-8 pointer-events-none">
-                
-                <div className="w-full max-w-7xl mx-auto min-h-min pointer-events-none"> 
+        <div 
+            className="fixed inset-0 z-[10000] flex flex-col animate-in fade-in zoom-in-95 duration-300 bg-black/80 backdrop-blur-sm pointer-events-auto overflow-hidden"
+            onClick={onClose}
+        >
+            <div className="w-full h-full flex flex-col pt-[90px] pb-[110px] px-4 md:px-8 pointer-events-none">
+                <div className="flex-1 w-full max-w-7xl mx-auto flex flex-col justify-center min-h-0 pointer-events-none"> 
                     
-                    {/* CHỈ BẬT SỰ KIỆN CLICK CHO NỘI DUNG DANH SÁCH */}
-                    <div className="pointer-events-auto">
+                    <div className="flex-1 w-full pointer-events-auto flex items-center">
                         <GiaoDienDanhSach 
                             data={duLieuTrangNay} 
                             nguoiDung={nguoiDung} 
@@ -91,14 +105,14 @@ export default function NutPhongBan({ nguoiDung, isOpen, onToggle, onClose }: Pr
                         />
                     </div>
 
-                    {/* VÀ THANH PHÂN TRANG */}
                     {tongSoTrang > 1 && (
-                        <div className="mt-8 flex justify-center pointer-events-auto">
-                            <div className="bg-black/40 backdrop-blur-md rounded-full px-4 border border-white/10">
-                                <ThanhDieuKhien hienThiPhanTrang={true} trangHienTai={trang} tongSoTrang={tongSoTrang} 
-                                    onTrangTruoc={() => trang > 1 && setTrang(t=>t-1)} onTrangSau={() => trang < tongSoTrang && setTrang(t=>t+1)} onLuiLichSu={onClose} onToiLichSu={() => setTrang(tongSoTrang)}
-                                />
-                            </div>
+                        <div className="h-[60px] flex items-center justify-center shrink-0 pointer-events-auto">
+                            <ThanhPhanTrang 
+                                trangHienTai={trang} 
+                                tongSoTrang={tongSoTrang} 
+                                onLui={() => trang > 1 && setTrang(t => t - 1)} 
+                                onToi={() => trang < tongSoTrang && setTrang(t => t + 1)} 
+                            />
                         </div>
                     )}
                 </div>

@@ -47,9 +47,9 @@ export default function ModuleItem({ id, data, isAdmin, onDelete, onEdit, onResi
       if (onLevel2Toggle) onLevel2Toggle(show);
   };
 
-  // 🟢 LOGIC MỚI: PHÁT SỰ KIỆN ẨN PAGE
+  // 🟢 PHÁT SỰ KIỆN TOÀN CỤC ĐỂ ẨN PAGE
   useEffect(() => {
-    // Tìm phần tử dashboard cha
+    // Ẩn Dashboard Builder (lớp cha trực tiếp)
     const dashboard = document.getElementById('dashboard-main-content');
     if (showLevel2) {
         if (dashboard) { dashboard.style.opacity = '0'; dashboard.style.pointerEvents = 'none'; }
@@ -57,7 +57,7 @@ export default function ModuleItem({ id, data, isAdmin, onDelete, onEdit, onResi
         if (dashboard) { dashboard.style.opacity = '1'; dashboard.style.removeProperty('pointer-events'); }
     }
 
-    // 🟢 Phát sự kiện toàn cục để Page.tsx biết và ẩn nội dung nền
+    // Ẩn Page Content (lớp ông nội)
     const event = new CustomEvent('toggle-content-visibility', {
         detail: { id: `module-${id}`, open: showLevel2 }
     });

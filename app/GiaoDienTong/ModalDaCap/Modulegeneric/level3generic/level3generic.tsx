@@ -27,7 +27,7 @@ export default function TrangChuLevel3({ isOpen, onClose, onSuccess, config, ini
     const [isEditing, setIsEditing] = useState(isCreateMode);
     const [isArranging, setIsArranging] = useState(false);
     const [activeTab, setActiveTab] = useState('form');
-    const [shake, setShake] = useState(false);
+    const [shake, setShake] = useState(false); // Effect rung khi lỗi
 
     useEffect(() => {
         if (isOpen) {
@@ -51,8 +51,9 @@ export default function TrangChuLevel3({ isOpen, onClose, onSuccess, config, ini
                 if (col.readOnly || col.tuDong || (!isCreateMode && !canEditColumn(col))) continue;
                 let val = formData[col.key];
                 
+                // 🟢 SMART VALIDATION: Kiểm tra bắt buộc
                 if (col.batBuoc && (val === undefined || val === null || val === '')) {
-                    setShake(true); setTimeout(() => setShake(false), 500); 
+                    setShake(true); setTimeout(() => setShake(false), 500); // Rung giao diện
                     throw new Error(`${col.label} là bắt buộc nhập!`);
                 }
                 
@@ -68,11 +69,14 @@ export default function TrangChuLevel3({ isOpen, onClose, onSuccess, config, ini
         } catch (e: any) { alert(e.message); } finally { setLoading(false); }
     };
 
+    // 🟢 SMART SHORTCUT: Ctrl+S để lưu
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 's') {
                 e.preventDefault();
-                if (isOpen && (isEditing || isCreateMode)) handleSave();
+                if (isOpen && (isEditing || isCreateMode)) {
+                    handleSave();
+                }
             }
         };
         window.addEventListener('keydown', handleKeyDown);
@@ -120,13 +124,21 @@ export default function TrangChuLevel3({ isOpen, onClose, onSuccess, config, ini
 
     return (
         <Level3Provider value={contextValue}>
-            {/* 🟢 Z-INDEX 4000: Cao nhất (chỉ dưới Menu) */}
+            {/* 🟢 SMART RESPONSIVE CONTAINER:
+                - fixed inset-0: Full màn hình để dễ căn chỉnh.
+                - z-[4000]: Đảm bảo đè lên Level 2.
+                - Padding linh hoạt: Mobile (0), Desktop (có khoảng cách để né Menu).
+            */}
             <div className={`fixed inset-0 z-[4000] flex flex-col items-center justify-center pointer-events-none transition-all duration-300 ${shake ? 'animate-shake' : ''}`}>
                 
                 {/* Lớp nền mờ */}
                 <div className="absolute inset-0 bg-black/80 pointer-events-auto backdrop-blur-sm animate-in fade-in duration-300" onClick={onClose} />
 
-                {/* KHUNG GIAO DIỆN CHÍNH */}
+                {/* 🟢 KHUNG GIAO DIỆN CHÍNH (THE CARD) */}
+                {/* Responsive: 
+                    - Mobile: w-full h-full (Tràn màn hình) -> rounded-none
+                    - Desktop: max-w-6xl h-[85vh] -> rounded-xl, có viền
+                */}
                 <div className="
                     relative pointer-events-auto overflow-hidden flex flex-col md:flex-row bg-[#0f0c0b] 
                     w-full h-full md:w-[95%] md:max-w-6xl md:h-[85vh] 
@@ -134,57 +146,130 @@ export default function TrangChuLevel3({ isOpen, onClose, onSuccess, config, ini
                     animate-in zoom-in-95 duration-300
                 ">
                     
-                    {/* CỘT TRÁI */}
+                    {/* --- CỘT TRÁI: AVATAR & INFO (Ẩn bớt trên mobile nếu cần, hoặc stack dọc) --- */}
                     <div className="w-full md:w-[350px] shrink-0 bg-gradient-to-b from-[#1a1512] to-[#0a0807] border-b md:border-b-0 md:border-r border-[#8B5E3C]/30 relative flex flex-col transition-all">
                         <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay pointer-events-none" />
+                        
+                        {/* Header */}
                         <div className="p-4 md:p-6 text-center z-10">
                             <div className="flex items-center justify-center gap-2 text-[#C69C6D] mb-1 opacity-80">
                                 <Shield size={14} />
                                 <span className="text-[10px] font-bold uppercase tracking-[0.2em]">{parentTitle || 'DETAIL'}</span>
                             </div>
-                            <h2 className="text-xl md:text-2xl font-bold text-[#E8D4B9] uppercase tracking-wide leading-none drop-shadow-md line-clamp-2">{title}</h2>
+                            <h2 className="text-xl md:text-2xl font-bold text-[#E8D4B9] uppercase tracking-wide leading-none drop-shadow-md line-clamp-2">
+                                {title}
+                            </h2>
                             <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 bg-[#C69C6D]/10 border border-[#C69C6D]/30 rounded-full">
                                 <Star size={10} className="text-[#C69C6D] fill-[#C69C6D]" />
                                 <span className="text-[10px] font-bold text-[#C69C6D] uppercase truncate max-w-[200px]">{subTitle}</span>
                             </div>
                         </div>
+
+                        {/* Avatar Area (Responsive scale) */}
                         <div className="flex-1 flex flex-col items-center justify-center relative p-4 min-h-[200px] md:min-h-0">
                             <div className="absolute w-48 h-48 md:w-64 md:h-64 border border-[#8B5E3C]/10 rounded-full animate-spin-slow pointer-events-none" />
                             <div className="absolute w-40 h-40 md:w-56 md:h-56 border border-dashed border-[#8B5E3C]/20 rounded-full pointer-events-none" />
+                            
                             <div className="relative z-20 scale-100 md:scale-110 transition-transform">
-                                <AnhDaiDien imgUrl={imgCol ? formData[imgCol.key] : ''} onUpload={handleImageUpload} uploading={uploadingImg} canEdit={isEditing} label="" />
+                                <AnhDaiDien 
+                                    imgUrl={imgCol ? formData[imgCol.key] : ''} 
+                                    onUpload={handleImageUpload} 
+                                    uploading={uploadingImg} 
+                                    canEdit={isEditing} 
+                                    label="" 
+                                />
                             </div>
                         </div>
+
+                        {/* Footer Info */}
                         <div className="p-3 md:p-4 grid grid-cols-3 gap-2 border-t border-[#8B5E3C]/20 bg-black/20">
-                            <div className="flex flex-col items-center"><Zap size={14} className="text-yellow-500 mb-1" /><span className="text-xs font-bold text-white">{isCreateMode ? 'NEW' : 'EDIT'}</span></div>
-                            <div className="flex flex-col items-center border-x border-[#8B5E3C]/20"><span className="text-[10px] text-gray-400">ID</span><span className="text-xs font-bold text-white">#{initialData?.id || '---'}</span></div>
-                            <div className="flex flex-col items-center"><span className="text-[10px] text-gray-400">STATUS</span><div className={`w-2 h-2 rounded-full mt-1 shadow-[0_0_5px] ${isEditing ? 'bg-yellow-500 shadow-yellow-500' : 'bg-green-500 shadow-lime'}`} /></div>
+                            <div className="flex flex-col items-center">
+                                <Zap size={14} className="text-yellow-500 mb-1" />
+                                <span className="text-xs font-bold text-white">{isCreateMode ? 'NEW' : 'EDIT'}</span>
+                            </div>
+                            <div className="flex flex-col items-center border-x border-[#8B5E3C]/20">
+                                <span className="text-[10px] text-gray-400">ID</span>
+                                <span className="text-xs font-bold text-white">#{initialData?.id || '---'}</span>
+                            </div>
+                            <div className="flex flex-col items-center">
+                                <span className="text-[10px] text-gray-400">STATUS</span>
+                                <div className={`w-2 h-2 rounded-full mt-1 shadow-[0_0_5px] ${isEditing ? 'bg-yellow-500 shadow-yellow-500' : 'bg-green-500 shadow-lime'}`} />
+                            </div>
                         </div>
                     </div>
 
-                    {/* CỘT PHẢI */}
+                    {/* --- CỘT PHẢI: CHI TIẾT --- */}
                     <div className="flex-1 flex flex-col bg-black/40 backdrop-blur-md relative overflow-hidden min-h-0">
-                        <div className="shrink-0 border-b border-[#8B5E3C]/30 bg-black/40 overflow-x-auto scrollbar-hide"><ThanhTab danhSachTab={tabList} tabHienTai={activeTab} onChuyenTab={setActiveTab}/></div>
+                        
+                        {/* Thanh Tab */}
+                        <div className="shrink-0 border-b border-[#8B5E3C]/30 bg-black/40 overflow-x-auto scrollbar-hide">
+                            <ThanhTab danhSachTab={tabList} tabHienTai={activeTab} onChuyenTab={setActiveTab}/>
+                        </div>
+
+                        {/* Nội dung cuộn */}
                         <div className="flex-1 overflow-y-auto custom-scroll p-4 md:p-6 relative">
-                            {fetching && (<div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center backdrop-blur-sm"><div className="flex flex-col items-center gap-3"><Loader2 className="animate-spin text-[#C69C6D]" size={32}/><span className="text-xs font-bold text-[#C69C6D] tracking-widest animate-pulse">LOADING DATA...</span></div></div>)}
-                            {isArranging && (<div className="mb-6 p-3 bg-[#C69C6D]/10 border border-[#C69C6D] border-dashed rounded-xl text-center flex items-center justify-center gap-2"><div className="w-2 h-2 bg-[#C69C6D] animate-ping" /><p className="text-[#C69C6D] font-bold text-xs md:text-sm uppercase tracking-widest">ĐANG CHỈNH SỬA GIAO DIỆN</p></div>)}
+                            {fetching && (
+                                <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center backdrop-blur-sm">
+                                    <div className="flex flex-col items-center gap-3">
+                                        <Loader2 className="animate-spin text-[#C69C6D]" size={32}/>
+                                        <span className="text-xs font-bold text-[#C69C6D] tracking-widest animate-pulse">LOADING DATA...</span>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {isArranging && (
+                                <div className="mb-6 p-3 bg-[#C69C6D]/10 border border-[#C69C6D] border-dashed rounded-xl text-center flex items-center justify-center gap-2">
+                                    <div className="w-2 h-2 bg-[#C69C6D] animate-ping" />
+                                    <p className="text-[#C69C6D] font-bold text-xs md:text-sm uppercase tracking-widest">ĐANG CHỈNH SỬA GIAO DIỆN</p>
+                                </div>
+                            )}
+                            
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 pb-20 md:pb-0">
-                                {activeTab === 'form' ? <Tab_ThongTin /> : activeTab === 'thanh_tich' ? <Tab_ThanhTich nhanSuId={initialData?.id} totalKhach={formData?.total_khach || 0} totalViec={formData?.total_viec || 0} totalMau={formData?.total_mau || 0} /> : activeTab === 'nhat_ky_hoat_dong' ? <Tab_NhatKyHoatDong nhanSuId={initialData?.id} loginHistory={formData?.lich_su_dang_nhap} /> : <TabContent activeTab={activeTab} virtualData={{}} />}
+                                {activeTab === 'form' ? <Tab_ThongTin /> 
+                                : activeTab === 'thanh_tich' ? <Tab_ThanhTich nhanSuId={initialData?.id} totalKhach={formData?.total_khach || 0} totalViec={formData?.total_viec || 0} totalMau={formData?.total_mau || 0} />
+                                : activeTab === 'nhat_ky_hoat_dong' ? <Tab_NhatKyHoatDong nhanSuId={initialData?.id} loginHistory={formData?.lich_su_dang_nhap} />
+                                : <TabContent activeTab={activeTab} virtualData={{}} />}
                             </div>
                         </div>
+
+                        {/* Thanh tác vụ dưới cùng */}
                         <div className="shrink-0 p-3 md:p-4 border-t border-[#8B5E3C]/30 bg-black/90 md:bg-black/60 flex justify-end gap-3 backdrop-blur-md z-30">
                              <div className="w-full flex justify-end items-center gap-2">
-                                <NutChucNangLevel3 isCreateMode={isCreateMode} isEditing={isEditing} isArranging={isArranging} loading={loading} canEditRecord={canEdit} canDeleteRecord={['admin'].includes(userRole)} isAdmin={userRole==='admin'} hasError={false} onSave={handleSave} onEdit={()=>setIsEditing(true)} onCancel={()=>setIsEditing(false)} onDelete={handleDelete} onClose={onClose} onToggleArrange={()=>setIsArranging(!isArranging)} onSaveLayout={handleSaveLayout} onLogout={showLogout ? handleLogout : undefined} onFixDB={() => {}} />
+                                <NutChucNangLevel3 
+                                    isCreateMode={isCreateMode} 
+                                    isEditing={isEditing} 
+                                    isArranging={isArranging} 
+                                    loading={loading} 
+                                    canEditRecord={canEdit} 
+                                    canDeleteRecord={['admin'].includes(userRole)} 
+                                    isAdmin={userRole==='admin'} 
+                                    hasError={false}
+                                    onSave={handleSave} 
+                                    onEdit={()=>setIsEditing(true)} 
+                                    onCancel={()=>setIsEditing(false)} 
+                                    onDelete={handleDelete} 
+                                    onClose={onClose} 
+                                    onToggleArrange={()=>setIsArranging(!isArranging)} 
+                                    onSaveLayout={handleSaveLayout} 
+                                    onLogout={showLogout ? handleLogout : undefined} 
+                                    onFixDB={() => {}}
+                                />
                              </div>
                         </div>
                     </div>
                 </div>
             </div>
             
+            {/* CSS Animation cho Effect Rung */}
             <style jsx global>{`
-                @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); } 20%, 40%, 60%, 80% { transform: translateX(5px); } }
+                @keyframes shake {
+                    0%, 100% { transform: translateX(0); }
+                    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+                    20%, 40%, 60%, 80% { transform: translateX(5px); }
+                }
                 .animate-shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
-                .scrollbar-hide::-webkit-scrollbar { display: none; } .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+                .scrollbar-hide::-webkit-scrollbar { display: none; }
+                .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
         </Level3Provider>
     );

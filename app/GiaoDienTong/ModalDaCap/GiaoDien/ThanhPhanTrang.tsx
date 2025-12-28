@@ -1,6 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import NutToiLui from '../../MenuDuoi/GiaoDien/NutToiLui'; 
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface Props {
     trangHienTai: number;
@@ -10,7 +10,7 @@ interface Props {
 }
 
 export default function ThanhPhanTrang({ trangHienTai, tongSoTrang, onToi, onLui }: Props) {
-    // State xử lý vuốt
+    // State xử lý vuốt (Swipe)
     const [touchStart, setTouchStart] = useState<number | null>(null);
     const [touchEnd, setTouchEnd] = useState<number | null>(null);
     const minSwipeDistance = 50; 
@@ -34,36 +34,43 @@ export default function ThanhPhanTrang({ trangHienTai, tongSoTrang, onToi, onLui
 
     return (
         <div 
-            className="fixed bottom-[clamp(80px,18vw,100px)] left-0 right-0 z-[2001] flex justify-center pointer-events-none"
-            // Gắn sự kiện vuốt vào container
+            className="fixed bottom-[clamp(85px,18vw,105px)] left-0 right-0 z-[2001] flex justify-center pointer-events-none select-none"
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
             onTouchEnd={onTouchEnd}
         >
-            <div className="pointer-events-auto flex items-center bg-[#110d0c]/95 backdrop-blur-xl border border-[#8B5E3C]/40 rounded-full shadow-[0_5px_30px_rgba(0,0,0,0.9)] px-3 py-1.5 gap-4 h-[50px] transition-transform active:scale-95">
+            <div className="pointer-events-auto flex items-center gap-6 px-4 py-2 bg-black/60 backdrop-blur-md rounded-full shadow-[0_4px_15px_rgba(0,0,0,0.5)] border border-white/5 transition-transform active:scale-95">
                 
-                <div className="h-full scale-90 origin-center opacity-80 hover:opacity-100">
-                    <NutToiLui direction="left" onClick={onLui} />
+                {/* Nút Lui */}
+                <button 
+                    onClick={onLui}
+                    disabled={trangHienTai <= 1}
+                    className={`p-2 rounded-full transition-all ${trangHienTai <= 1 ? 'opacity-20 cursor-not-allowed' : 'hover:bg-white/10 text-[#C69C6D] active:scale-90'}`}
+                >
+                    <ChevronLeft size={20} strokeWidth={2.5} />
+                </button>
+
+                {/* Số trang */}
+                <div className="flex items-baseline gap-1.5 font-mono">
+                    <span className="text-xl font-bold text-[#F5E6D3] drop-shadow-md">{trangHienTai}</span>
+                    <span className="text-sm text-gray-500 font-medium">/</span>
+                    <span className="text-sm text-gray-500 font-medium">{tongSoTrang}</span>
                 </div>
 
-                <div className="flex flex-col items-center justify-center min-w-[70px] select-none">
-                    <span className="text-[9px] text-[#8B5E3C] uppercase font-bold tracking-[0.2em]">Trang</span>
-                    <div className="flex items-baseline gap-1">
-                        <span className="text-xl font-bold text-[#F5E6D3]">{trangHienTai}</span>
-                        <span className="text-xs text-[#5D4037] font-bold">/</span>
-                        <span className="text-xs text-[#5D4037] font-bold">{tongSoTrang}</span>
-                    </div>
-                </div>
-
-                <div className="h-full scale-90 origin-center opacity-80 hover:opacity-100">
-                    <NutToiLui direction="right" onClick={onToi} />
-                </div>
+                {/* Nút Tới */}
+                <button 
+                    onClick={onToi}
+                    disabled={trangHienTai >= tongSoTrang}
+                    className={`p-2 rounded-full transition-all ${trangHienTai >= tongSoTrang ? 'opacity-20 cursor-not-allowed' : 'hover:bg-white/10 text-[#C69C6D] active:scale-90'}`}
+                >
+                    <ChevronRight size={20} strokeWidth={2.5} />
+                </button>
 
             </div>
             
-            {/* Chỉ dẫn vuốt (Chỉ hiện trên mobile) */}
-            <div className="absolute -bottom-6 text-[8px] text-white/20 uppercase tracking-widest md:hidden animate-pulse">
-                Vuốt để chuyển trang
+            {/* Chỉ dẫn vuốt (Ẩn trên Desktop) */}
+            <div className="absolute -bottom-5 text-[9px] font-bold text-white/10 uppercase tracking-[0.3em] md:hidden animate-pulse">
+                &larr; Vuốt &rarr;
             </div>
         </div>
     );

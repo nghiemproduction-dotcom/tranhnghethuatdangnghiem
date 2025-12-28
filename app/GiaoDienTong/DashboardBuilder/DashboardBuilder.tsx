@@ -64,15 +64,6 @@ export default function DashboardBuilder({ pageId, title, allowedRoles, initialM
         init();
     }, [pageId, configModule]);
 
-    // 🟢 LOGIC MỚI: Khi mở Modal Add/Edit/Detail -> Ẩn Page Content
-    useEffect(() => {
-        const isOpen = isAddModalOpen || isDetailOpen;
-        const event = new CustomEvent('toggle-content-visibility', {
-            detail: { id: `dashboard-modal-${pageId}`, open: isOpen }
-        });
-        window.dispatchEvent(event);
-    }, [isAddModalOpen, isDetailOpen, pageId]);
-
     const fetchGlobalLibrary = async () => {
         try {
             const { data: mods, error } = await supabase.from('global_modules').select('*');
@@ -196,9 +187,10 @@ export default function DashboardBuilder({ pageId, title, allowedRoles, initialM
     if (!hasAccess) return <AccessDenied userRole={userRole} targetTitle={title} allowedRoles={allowedRoles} onRedirect={() => router.push('/')} />;
 
     return (
+        // 🟢 NỀN ĐEN 80% VÀ KHÔNG CUỘN THÂN TRANG
         <div 
             id="dashboard-main-content"
-            className="fixed inset-0 z-[3000] w-full h-[100dvh] bg-transparent text-[#E8D4B9] font-sans overflow-hidden transition-opacity duration-500 ease-in-out"
+            className="fixed inset-0 z-[3000] w-full h-[100dvh] bg-black/80 backdrop-blur-sm text-[#E8D4B9] font-sans overflow-hidden transition-opacity duration-500 ease-in-out"
         >
             <div className="w-full h-full overflow-y-auto custom-scroll">
                 <div className="pt-[100px] pb-[120px]">
@@ -212,6 +204,7 @@ export default function DashboardBuilder({ pageId, title, allowedRoles, initialM
 
             {isAddModalOpen && (
                 <div className="fixed inset-0 z-[6000] bg-black/90 flex items-center justify-center p-0 md:p-4 backdrop-blur-sm pointer-events-auto">
+                    {/* ... (Giữ nguyên nội dung modal thêm mới) ... */}
                     <div className="bg-[#161210] border border-[#8B5E3C]/30 rounded-none md:rounded-2xl w-full max-w-5xl h-full md:h-[85vh] shadow-2xl flex flex-col overflow-hidden">
                         <div className="shrink-0 p-4 border-b border-[#8B5E3C]/20 flex justify-between items-center bg-[#1a120f]">
                             <h3 className="text-xl font-bold text-[#F5E6D3] flex items-center gap-3">{editingId ? <Edit3 /> : <Layout />} {editingId ? 'Chỉnh Sửa Module' : 'Thêm Module'}</h3>

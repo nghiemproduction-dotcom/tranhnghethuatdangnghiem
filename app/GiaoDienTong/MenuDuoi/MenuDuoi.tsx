@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { LayoutTemplate, Grid } from 'lucide-react'; 
+import { LayoutTemplate } from 'lucide-react'; 
 
 import ThanhMenuDuoi from './GiaoDien/ThanhMenuDuoi';
 import NutMenu from './GiaoDien/NutMenu';
@@ -11,7 +11,6 @@ import NutCaNhan from './NutCaNhan/NutCaNhan';
 
 interface Props {
   currentUser?: any;
-  // 🟢 THÊM PROP NÀY ĐỂ LIÊN LẠC VỚI TRANG CHỦ
   onToggleContent?: (isOpen: boolean) => void;
 }
 
@@ -20,6 +19,7 @@ export default function MenuDuoi({ currentUser: propUser, onToggleContent }: Pro
   const [realUser, setRealUser] = useState<any>(null);
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
+  // Đồng bộ User từ props hoặc LocalStorage
   useEffect(() => {
     if (propUser) { 
         setRealUser(propUser); 
@@ -31,48 +31,40 @@ export default function MenuDuoi({ currentUser: propUser, onToggleContent }: Pro
     }
   }, [propUser]);
 
-  // 🟢 HÀM TOGGLE ĐÃ CẬP NHẬT LOGIC BÁO HIỆU
+  // Báo cho Page biết trạng thái mở/đóng Modal (dùng useEffect để tránh lỗi React Render Loop)
+  useEffect(() => {
+      if (onToggleContent) {
+          onToggleContent(activeModal !== null);
+      }
+  }, [activeModal, onToggleContent]);
+
   const handleToggle = (modalName: string) => {
-      setActiveModal(prev => {
-          const newState = prev === modalName ? null : modalName;
-          
-          // Báo cho Page biết: Có đang mở cái gì không?
-          // Nếu newState != null => Đang mở => Page cần ẩn chữ
-          if (onToggleContent) {
-              onToggleContent(newState !== null);
-          }
-          
-          return newState;
-      });
+      setActiveModal(prev => prev === modalName ? null : modalName);
   };
 
   const handleCloseAll = () => {
       setActiveModal(null);
-      // Báo đóng -> Page hiện chữ lại
-      if (onToggleContent) onToggleContent(false);
   };
 
   return (
-    <>
-      <ThanhMenuDuoi>
-          
-          {/* NÚT PHÒNG BAN */}
-          <NutPhongBan 
-              nguoiDung={realUser} 
-              isOpen={activeModal === 'phongban'} 
-              onToggle={() => handleToggle('phongban')} 
-              onClose={handleCloseAll} 
-          />
+    <ThanhMenuDuoi>
+        
+        {/* NÚT PHÒNG BAN */}
+        <NutPhongBan 
+            nguoiDung={realUser} 
+            isOpen={activeModal === 'phongban'} 
+            onToggle={() => handleToggle('phongban')} 
+            onClose={handleCloseAll} 
+        />
+  
+        {/* NÚT CÁ NHÂN (Đã fix lỗi load dữ liệu) */}
+        <NutCaNhan 
+            nguoiDung={realUser} 
+            isOpen={activeModal === 'canhan'} 
+            onToggle={() => handleToggle('canhan')} 
+            onClose={handleCloseAll}
+        />
 
-          {/* NÚT CÁ NHÂN */}
-          <NutCaNhan 
-              nguoiDung={realUser} 
-              isOpen={activeModal === 'canhan'}
-              onToggle={() => handleToggle('canhan')}
-              onClose={handleCloseAll}
-          />
-
-      </ThanhMenuDuoi>
-    </>
+    </ThanhMenuDuoi>
   );
 }

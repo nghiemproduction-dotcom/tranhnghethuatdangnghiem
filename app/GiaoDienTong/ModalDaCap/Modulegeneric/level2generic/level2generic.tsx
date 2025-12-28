@@ -38,7 +38,7 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
     const canAdd = ['admin', 'quanly', 'boss'].includes(userRole);
     const canDelete = ['admin', 'boss'].includes(userRole);
 
-    // 🟢 LOGIC MỚI: KHI LEVEL 3 MỞ -> GỬI TÍN HIỆU ẨN PAGE
+    // PHÁT SỰ KIỆN KHI LEVEL 3 MỞ -> ẨN PAGE
     useEffect(() => {
         const event = new CustomEvent('toggle-content-visibility', {
             detail: { id: `level2-${config.id}-level3`, open: isLevel3Open }
@@ -178,8 +178,9 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
     if (isEmbedded) return <>{MainContent}{Level3Modal}</>;
 
     return (
+        // 🟢 CẬP NHẬT: NỀN ĐEN 80% (bg-black/80)
         <>
-            <div className="fixed inset-0 z-[3500] bg-transparent flex flex-col shadow-none animate-in fade-in zoom-in-95 duration-300 overflow-hidden pointer-events-none">
+            <div className="fixed inset-0 z-[3500] bg-black/80 backdrop-blur-sm flex flex-col shadow-none animate-in fade-in zoom-in-95 duration-300 overflow-hidden pointer-events-none">
                 <div className="w-full h-full pointer-events-auto flex flex-col">
                     <div className="flex-1 relative w-full h-[100dvh] overflow-hidden">
                         {MainContent}

@@ -13,23 +13,22 @@ interface Props {
 
 export default function GiaoDienDanhSach({ data, nguoiDung, onDongModal, onMoModal }: Props) {
     
-    // SFX
-    const playHoverSound = () => {
-        const audio = new Audio('/sounds/hover.mp3'); 
-        audio.volume = 0.2; 
-        audio.play().catch(() => {}); 
-    };
-
-    const playClickSound = () => {
-        const audio = new Audio('/sounds/click.mp3');
-        audio.volume = 0.5;
-        audio.play().catch(() => {});
+    // SFX an toàn (Safe Sound Effect)
+    const playSound = (type: 'hover' | 'click') => {
+        try {
+            const audio = new Audio(`/sounds/${type}.mp3`);
+            audio.volume = type === 'hover' ? 0.2 : 0.5;
+            // Catch error để không crash nếu trình duyệt chặn autoplay hoặc file không tồn tại
+            audio.play().catch((e) => console.warn("Audio play blocked/failed:", e)); 
+        } catch (err) {
+            // Im lặng bỏ qua lỗi
+        }
     };
 
     if (!data || data.length === 0) return null;
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-7xl mx-auto px-4">
+        <div className="w-full h-full grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-6 place-content-center">
             {data.map((phong) => {
                 const Icon = phong.icon;
                 const coQuyen = kiemTraQuyen(nguoiDung, phong.quyenTruyCap);
@@ -37,74 +36,59 @@ export default function GiaoDienDanhSach({ data, nguoiDung, onDongModal, onMoMod
                 return (
                     <div 
                         key={phong.id} 
-                        onMouseEnter={playHoverSound}
+                        onMouseEnter={() => playSound('hover')}
                         
                         className={`
-                            relative group w-full min-h-[140px] p-6
-                            flex flex-col items-center justify-center text-center gap-3
-                            /* 🟢 STYLE KÍNH NGHỆ THUẬT (ARTISTIC GLASS) */
-                            bg-[#0a0807]/80 backdrop-blur-xl border border-[#C69C6D]/30
+                            relative group w-full h-full min-h-[120px] md:min-h-[160px] p-4 md:p-6
+                            flex flex-col items-center justify-center text-center gap-2 md:gap-3
+                            bg-black/60 backdrop-blur-md border border-[#C69C6D]/20
                             rounded-xl shadow-lg transition-all duration-300
                             ${coQuyen 
-                                ? 'cursor-pointer hover:bg-[#1a120f] hover:border-[#C69C6D] hover:shadow-[0_0_30px_rgba(198,156,109,0.2)] hover:-translate-y-1' 
-                                : 'opacity-50 grayscale cursor-not-allowed border-[#333]'
+                                ? 'cursor-pointer hover:bg-[#C69C6D]/10 hover:border-[#C69C6D] hover:shadow-[0_0_20px_rgba(198,156,109,0.3)] hover:-translate-y-1' 
+                                : 'opacity-40 grayscale cursor-not-allowed border-white/5'
                             }
                         `}
                     >
-                        {/* Link điều hướng */}
                         {coQuyen && (
                             <>
                                 {onMoModal ? (
-                                    <div onClick={(e) => { e.stopPropagation(); playClickSound(); onMoModal(phong.id); }} className="absolute inset-0 z-20 w-full h-full bg-transparent" />
+                                    <div onClick={(e) => { e.stopPropagation(); playSound('click'); onMoModal(phong.id); }} className="absolute inset-0 z-20 w-full h-full bg-transparent" />
                                 ) : (
-                                    <Link href={phong.duongDan} onClick={(e) => { playClickSound(); onDongModal(); }} className="absolute inset-0 z-10" />
+                                    <Link href={phong.duongDan} onClick={(e) => { playSound('click'); onDongModal(); }} className="absolute inset-0 z-10" />
                                 )}
                             </>
                         )}
 
-                        {/* 1. ICON (Nằm trên cùng) */}
                         <div className={`
-                            w-12 h-12 flex items-center justify-center rounded-full
-                            bg-gradient-to-br from-[#2a1e1b] to-[#0a0807] border border-[#C69C6D]/20 shadow-inner
+                            w-10 h-10 md:w-14 md:h-14 flex items-center justify-center rounded-full
+                            bg-gradient-to-b from-[#2a1e1b] to-black border border-[#C69C6D]/30 shadow-inner
                             ${coQuyen ? 'group-hover:scale-110 group-hover:border-[#C69C6D]' : ''}
                             transition-all duration-500
                         `}>
                             <Icon 
-                                size={24} 
-                                className={`${coQuyen ? 'text-[#C69C6D]' : 'text-gray-600'} transition-colors`} 
+                                size={20} 
+                                className={`md:w-7 md:h-7 ${coQuyen ? 'text-[#C69C6D]' : 'text-gray-500'} transition-colors`} 
                                 strokeWidth={1.5}
                             />
                         </div>
 
-                        {/* 2. NỘI DUNG CHỮ (Ở giữa, tự xuống dòng) */}
-                        <div className="flex flex-col gap-1 w-full">
-                            {/* Tên phòng: Cho phép xuống dòng (whitespace-normal) */}
+                        <div className="flex flex-col gap-0.5 w-full">
                             <h3 className={`
-                                font-sans font-bold text-base md:text-lg uppercase tracking-wide leading-tight whitespace-normal
-                                ${coQuyen ? 'text-[#E8D4B9] group-hover:text-white' : 'text-gray-600'}
-                                transition-colors duration-300
+                                font-sans font-bold text-xs md:text-sm uppercase tracking-wider leading-tight whitespace-normal
+                                ${coQuyen ? 'text-[#E8D4B9] group-hover:text-white' : 'text-gray-500'}
+                                transition-colors duration-300 line-clamp-2
                             `}>
                                 {phong.ten}
                             </h3>
                             
-                            {/* Đường kẻ nhỏ */}
                             {coQuyen && (
-                                <div className="w-8 h-[1px] bg-[#C69C6D]/50 mx-auto group-hover:w-16 transition-all duration-500" />
+                                <div className="w-6 h-[1px] bg-[#C69C6D]/30 mx-auto group-hover:w-12 group-hover:bg-[#C69C6D] transition-all duration-500 my-1" />
                             )}
-
-                            {/* Mô tả */}
-                            <p className={`text-[11px] font-medium ${coQuyen ? 'text-[#8B5E3C] group-hover:text-[#C69C6D]' : 'text-gray-700'}`}>
-                                {coQuyen ? (phong.moTa || 'Truy cập ngay') : 'Khu vực hạn chế'}
-                            </p>
                         </div>
 
-                        {/* 3. TRẠNG THÁI (Góc dưới phải) */}
-                        <div className={`absolute bottom-3 right-3 opacity-50 ${coQuyen ? 'group-hover:opacity-100 text-[#C69C6D]' : 'text-gray-700'}`}>
-                            {coQuyen ? <ChevronRight size={14} /> : <Lock size={14} />}
+                        <div className={`absolute top-2 right-2 opacity-50 ${coQuyen ? 'group-hover:opacity-100 text-[#C69C6D]' : 'text-gray-600'}`}>
+                            {coQuyen ? <ChevronRight size={12} /> : <Lock size={12} />}
                         </div>
-
-                        {/* Hiệu ứng Glow nhẹ góc trên trái */}
-                        <div className="absolute top-0 left-0 w-20 h-20 bg-gradient-to-br from-[#C69C6D]/10 to-transparent rounded-tl-xl pointer-events-none" />
                     </div>
                 );
             })}
