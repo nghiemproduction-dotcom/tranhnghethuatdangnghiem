@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom'; // 🟢 1. IMPORT CREATE PORTAL
+import { createPortal } from 'react-dom';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Settings, Trash2, GripVertical, Cpu, Gauge, Maximize2, Minimize2 } from 'lucide-react';
@@ -24,7 +24,6 @@ interface Props {
 
 export default function ModuleItem({ id, data, isAdmin, onDelete, onEdit, onResizeWidth, onOpenDetail, onLevel2Toggle }: Props) {
   const [showLevel2, setShowLevel2] = useState(false);
-  // Dùng state này để đảm bảo chỉ render Portal khi client đã mount (tránh lỗi hydration)
   const [mounted, setMounted] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   
@@ -36,7 +35,7 @@ export default function ModuleItem({ id, data, isAdmin, onDelete, onEdit, onResi
     transform: CSS.Transform.toString(transform),
     transition,
     height: `${rowHeight}px`, 
-    zIndex: isDragging ? 50 : 'auto', // Z-index này chỉ so sánh nội bộ trong Grid, không chọc thủng lên Menu được
+    zIndex: isDragging ? 50 : 'auto', 
     opacity: isDragging ? 0.5 : 1,
     gridColumn: `span ${colSpan}`,
   } as React.CSSProperties;
@@ -48,32 +47,23 @@ export default function ModuleItem({ id, data, isAdmin, onDelete, onEdit, onResi
       if (onLevel2Toggle) onLevel2Toggle(show);
   };
 
-  // 🟢 2. LOGIC TỰ ĐỘNG LÀM MỜ DASHBOARD CHA KHI LEVEL 2 MỞ
+  // 🟢 LOGIC MỚI: PHÁT SỰ KIỆN ẨN PAGE
   useEffect(() => {
-    // Tìm phần tử dashboard cha theo ID đã đặt ở DashboardBuilder
+    // Tìm phần tử dashboard cha
     const dashboard = document.getElementById('dashboard-main-content');
-    
     if (showLevel2) {
-        if (dashboard) {
-            dashboard.style.opacity = '0'; // Làm mờ hoàn toàn lưới
-            dashboard.style.pointerEvents = 'none'; // Không cho bấm
-        }
+        if (dashboard) { dashboard.style.opacity = '0'; dashboard.style.pointerEvents = 'none'; }
     } else {
-        if (dashboard) {
-            dashboard.style.opacity = '1'; // Hiện lại lưới
-            // Reset pointerEvents về mặc định (hoặc none theo class gốc)
-            dashboard.style.removeProperty('pointer-events');
-        }
+        if (dashboard) { dashboard.style.opacity = '1'; dashboard.style.removeProperty('pointer-events'); }
     }
-    
-    // Cleanup khi component unmount
-    return () => {
-        if (dashboard) {
-            dashboard.style.opacity = '1';
-            dashboard.style.removeProperty('pointer-events');
-        }
-    };
-  }, [showLevel2]);
+
+    // 🟢 Phát sự kiện toàn cục để Page.tsx biết và ẩn nội dung nền
+    const event = new CustomEvent('toggle-content-visibility', {
+        detail: { id: `module-${id}`, open: showLevel2 }
+    });
+    window.dispatchEvent(event);
+
+  }, [showLevel2, id]);
 
   const renderContent = () => {
       if (data.customId === 'custom_nhan_su') return;
@@ -85,8 +75,6 @@ export default function ModuleItem({ id, data, isAdmin, onDelete, onEdit, onResi
       return <div className="w-full h-full flex flex-col items-center justify-center text-[#5D4037] bg-transparent"><Cpu size={32} className="mb-2 opacity-50"/><p className="text-xs font-bold uppercase text-center">{data.tenModule}</p></div>;
   };
 
-  // 🟢 3. CHUẨN BỊ NỘI DUNG LEVEL 2 ĐỂ RENDER RA PORTAL
-  // Phải dùng Portal để đưa nó ra khỏi DashboardBuilder. Nếu không, khi Dashboard opacity=0 thì cái này cũng mất luôn.
   const level2Content = showLevel2 ? (
       <>
           {data.moduleType === 'generic' ? (
@@ -139,7 +127,6 @@ export default function ModuleItem({ id, data, isAdmin, onDelete, onEdit, onResi
         </div>
       </div>
 
-      {/* 🟢 4. RENDER LEVEL 2 QUA PORTAL */}
       {mounted && showLevel2 && createPortal(level2Content, document.body)}
     </>
   );

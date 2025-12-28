@@ -64,7 +64,15 @@ export default function DashboardBuilder({ pageId, title, allowedRoles, initialM
         init();
     }, [pageId, configModule]);
 
-    // 🟢 SỬA LỖI: Load thư viện an toàn không gây lỗi 400
+    // 🟢 LOGIC MỚI: Khi mở Modal Add/Edit/Detail -> Ẩn Page Content
+    useEffect(() => {
+        const isOpen = isAddModalOpen || isDetailOpen;
+        const event = new CustomEvent('toggle-content-visibility', {
+            detail: { id: `dashboard-modal-${pageId}`, open: isOpen }
+        });
+        window.dispatchEvent(event);
+    }, [isAddModalOpen, isDetailOpen, pageId]);
+
     const fetchGlobalLibrary = async () => {
         try {
             const { data: mods, error } = await supabase.from('global_modules').select('*');
@@ -188,29 +196,29 @@ export default function DashboardBuilder({ pageId, title, allowedRoles, initialM
     if (!hasAccess) return <AccessDenied userRole={userRole} targetTitle={title} allowedRoles={allowedRoles} onRedirect={() => router.push('/')} />;
 
     return (
-        // 🟢 CẬP NHẬT QUAN TRỌNG:
-        // 1. Thêm id="dashboard-main-content" để ModuleItem tìm thấy và làm mờ.
-        // 2. Thêm transition-opacity để hiệu ứng ẩn hiện mượt mà.
         <div 
             id="dashboard-main-content"
-            className="min-h-screen bg-transparent text-[#E8D4B9] font-sans pt-[130px] pb-32 relative pointer-events-none transition-opacity duration-500 ease-in-out"
+            className="fixed inset-0 z-[3000] w-full h-[100dvh] bg-transparent text-[#E8D4B9] font-sans overflow-hidden transition-opacity duration-500 ease-in-out"
         >
-            
-            <GridArea modules={modules} isAdmin={isAdmin} onChange={(newModules) => setModules(newModules)} onEditModule={handleStartEdit} onDeleteModule={handleDelete} onResizeWidth={handleResizeWidth} onOpenDetail={handleOpenDetail} onLevel2Toggle={(isOpen) => setIsAnyLevel2Open(isOpen)} onAddModuleToRow={(rowId) => handleOpenAddModal(rowId)} forceHidden={false} />
+            <div className="w-full h-full overflow-y-auto custom-scroll">
+                <div className="pt-[100px] pb-[120px]">
+                    <GridArea modules={modules} isAdmin={isAdmin} onChange={(newModules) => setModules(newModules)} onEditModule={handleStartEdit} onDeleteModule={handleDelete} onResizeWidth={handleResizeWidth} onOpenDetail={handleOpenDetail} onLevel2Toggle={(isOpen) => setIsAnyLevel2Open(isOpen)} onAddModuleToRow={(rowId) => handleOpenAddModal(rowId)} forceHidden={false} />
+                </div>
+            </div>
 
             {!configModule && isAdmin && !isDetailOpen && !isAnyLevel2Open && (
                 <NutModal danhSachTacVu={[{ id: 'save', icon: isSaving ? CheckCircle : Save, nhan: isSaving ? 'Đã Lưu!' : 'Lưu Cấu Hình', onClick: handleSaveLayout, mauSac: isSaving ? 'bg-green-600 border-green-500 text-white' : undefined }]} />
             )}
 
             {isAddModalOpen && (
-                <div className="fixed inset-0 z-[3000] bg-black/90 flex items-center justify-center p-0 md:p-4 backdrop-blur-sm pointer-events-auto">
+                <div className="fixed inset-0 z-[6000] bg-black/90 flex items-center justify-center p-0 md:p-4 backdrop-blur-sm pointer-events-auto">
                     <div className="bg-[#161210] border border-[#8B5E3C]/30 rounded-none md:rounded-2xl w-full max-w-5xl h-full md:h-[85vh] shadow-2xl flex flex-col overflow-hidden">
                         <div className="shrink-0 p-4 border-b border-[#8B5E3C]/20 flex justify-between items-center bg-[#1a120f]">
                             <h3 className="text-xl font-bold text-[#F5E6D3] flex items-center gap-3">{editingId ? <Edit3 /> : <Layout />} {editingId ? 'Chỉnh Sửa Module' : 'Thêm Module'}</h3>
                             <button onClick={() => setIsAddModalOpen(false)} className="text-[#5D4037] hover:text-[#E8D4B9] bg-[#0a0807] p-2 rounded-full"><X size={24}/></button>
                         </div>
                         <div className="flex-1 flex overflow-hidden relative">
-                            {/* ... (Nội dung modal) ... */}
+                            {/* Layout Add/Edit Module */}
                             <div className={`w-full md:w-1/3 border-r border-[#8B5E3C]/20 flex flex-col bg-[#0a0807]/50 transition-all absolute md:relative inset-0 z-10 md:z-auto ${mobileStep === 'form' ? '-translate-x-full md:translate-x-0' : 'translate-x-0'}`}>
                                 <div className="flex border-b border-[#8B5E3C]/20">
                                     <button onClick={() => setAddMode('library')} disabled={!!editingId} className={`flex-1 py-4 font-bold uppercase text-xs ${addMode === 'library' ? 'bg-[#C69C6D]/10 text-[#C69C6D] border-b-2 border-[#C69C6D]' : 'text-[#5D4037]'}`}><Globe size={14} className="inline mr-2"/>Thư Viện</button>

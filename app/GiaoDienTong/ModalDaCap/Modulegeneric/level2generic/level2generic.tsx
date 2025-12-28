@@ -34,21 +34,25 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
     const [isLevel3Open, setIsLevel3Open] = useState(false);
     const [selectedItem, setSelectedItem] = useState<any>(null);
 
-    // Effect: Check Role
     useEffect(() => { if (typeof window !== 'undefined') setUserRole(localStorage.getItem('USER_ROLE') || 'khach'); }, []);
     const canAdd = ['admin', 'quanly', 'boss'].includes(userRole);
     const canDelete = ['admin', 'boss'].includes(userRole);
 
-    // 🟢 SMART SHORTCUTS (Phím tắt thông minh)
+    // 🟢 LOGIC MỚI: KHI LEVEL 3 MỞ -> GỬI TÍN HIỆU ẨN PAGE
+    useEffect(() => {
+        const event = new CustomEvent('toggle-content-visibility', {
+            detail: { id: `level2-${config.id}-level3`, open: isLevel3Open }
+        });
+        window.dispatchEvent(event);
+    }, [isLevel3Open, config.id]);
+
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Ctrl + K hoặc / : Focus tìm kiếm (Logic xử lý trong ThanhTacVu sẽ bắt event này nếu input có ref, ở đây ta set state để trigger)
             if ((e.ctrlKey && e.key === 'k') || (e.key === '/' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName))) {
                 e.preventDefault();
                 const searchInput = document.getElementById('search-input-level2');
                 if (searchInput) searchInput.focus();
             }
-            // Ctrl + R : Refresh Data
             if (e.ctrlKey && e.key === 'r') {
                 e.preventDefault();
                 fetchData(page);
@@ -58,7 +62,6 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [page, fetchData]);
 
-    // Effect: Load Tabs Group By
     useEffect(() => {
         const loadTabs = async () => {
             if (groupByCol && existingColumns.includes(groupByCol)) {
@@ -85,16 +88,9 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
     const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
 
     const MainContent = (
-        // 🟢 LAYOUT: Relative container 
         <div className={`relative w-full h-full bg-transparent ${isEmbedded ? '' : 'animate-in fade-in duration-300'}`}>
-            
-            {/* 1. VÙNG HIỂN THỊ DANH SÁCH (Trọng tâm) */}
             <div className="absolute inset-0 z-10 overflow-y-auto custom-scroll">
-                {/* Responsive Padding:
-                    - Top: Nếu Embedded (85px) để né HeaderNhung. Nếu Full (0px).
-                    - Bottom: 140px để né ThanhTacVu và ThanhPhanTrang.
-                */}
-                <div className={`min-h-full ${isEmbedded ? 'pt-[90px]' : 'pt-4'} pb-[160px] px-2 md:px-6`}>
+                <div className={`min-h-full ${isEmbedded ? 'pt-[100px]' : 'pt-[110px]'} pb-[130px] px-2 md:px-6`}>
                     <KhungHienThi 
                         loading={loading} 
                         data={data} 
@@ -105,12 +101,11 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
                         canEdit={true}
                         selectedIds={selectedIds} 
                         onSelect={(id) => setSelectedIds(p => p.includes(id) ? p.filter(x=>x!==id) : [...p, id])}
-                        onDragEnd={() => {}} // Placeholder cho DnD
+                        onDragEnd={() => {}}
                     />
                 </div>
             </div>
 
-            {/* 2. HEADER NHÚNG (Chỉ hiện khi nhúng trong Grid) */}
             {isEmbedded && (
                 <div className="absolute top-0 left-0 right-0 z-20 pointer-events-none pt-[85px]">
                     <div className="pointer-events-auto px-4"> 
@@ -123,26 +118,18 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
                 </div>
             )}
 
-            {/* 3. THANH TÁC VỤ & PHÂN TRANG (Floating Bottom) */}
             {!isEmbedded && !isLevel3Open && (
-                // Dùng z-20 để nổi trên danh sách nhưng dưới Level 3
                 <div className="absolute bottom-6 left-0 right-0 z-20 flex flex-col items-center pointer-events-none gap-3 px-4">
-                    
-                    {/* Phân trang nổi (Glassmorphism) */}
                     {totalPages > 1 && viewMode !== 'kanban' && (
                         <div className="pointer-events-auto animate-in slide-in-from-bottom-4 duration-500">
-                            <div className="bg-[#0f0c0b]/80 backdrop-blur-md rounded-full px-1 border border-[#8B5E3C]/30 shadow-lg">
-                                <ThanhPhanTrang 
-                                    trangHienTai={page} 
-                                    tongSoTrang={totalPages} 
-                                    onLui={() => page > 1 && fetchData(page - 1)} 
-                                    onToi={() => page < totalPages && fetchData(page + 1)} 
-                                />
-                            </div>
+                            <ThanhPhanTrang 
+                                trangHienTai={page} 
+                                tongSoTrang={totalPages} 
+                                onLui={() => page > 1 && fetchData(page - 1)} 
+                                onToi={() => page < totalPages && fetchData(page + 1)} 
+                            />
                         </div>
                     )}
-
-                    {/* Thanh công cụ chính (Smart Bar) */}
                     <div className="w-full max-w-4xl pointer-events-auto">
                         <ThanhTacVu 
                             config={config} 
@@ -166,7 +153,6 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
                 </div>
             )}
 
-            {/* Thanh chọn đa năng (Xuất hiện khi tick chọn row) */}
             <ThanhChon 
                 count={selectedIds.length} 
                 canDelete={canDelete} 
@@ -192,12 +178,12 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
     if (isEmbedded) return <>{MainContent}{Level3Modal}</>;
 
     return (
-        // 🟢 Z-INDEX 3000: Nằm trên Dashboard (ẩn) nhưng dưới Level 3 (4000)
         <>
-            <div className="fixed inset-0 z-[3000] bg-transparent flex flex-col shadow-none animate-in fade-in zoom-in-95 duration-300 overflow-hidden pointer-events-none">
-                {/* Wrapper full màn hình */}
-                <div className="w-full h-full pointer-events-auto">
-                    {MainContent}
+            <div className="fixed inset-0 z-[3500] bg-transparent flex flex-col shadow-none animate-in fade-in zoom-in-95 duration-300 overflow-hidden pointer-events-none">
+                <div className="w-full h-full pointer-events-auto flex flex-col">
+                    <div className="flex-1 relative w-full h-[100dvh] overflow-hidden">
+                        {MainContent}
+                    </div>
                 </div>
             </div>
             {Level3Modal}
