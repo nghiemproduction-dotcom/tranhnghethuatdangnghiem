@@ -26,11 +26,11 @@ export const useDuLieu = (config: ModuleConfig, isOpen: boolean, extraFilter?: a
         const handleResize = () => {
             const width = window.innerWidth;
             if (width < 768) {
-                setItemsPerPage(6);  // Mobile
+                setItemsPerPage(8);  // Mobile
             } else if (width < 1024) {
-                setItemsPerPage(8);  // Tablet
+                setItemsPerPage(10);  // Tablet
             } else {
-                setItemsPerPage(10); // Desktop (Yêu cầu của bạn là 10, mặc định cũ là 20)
+                setItemsPerPage(12); // Desktop (Yêu cầu của bạn là 10, mặc định cũ là 20)
             }
         };
 

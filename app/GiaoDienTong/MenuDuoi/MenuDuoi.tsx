@@ -7,6 +7,7 @@ import { LayoutTemplate } from 'lucide-react';
 import ThanhMenuDuoi from './GiaoDien/ThanhMenuDuoi';
 import NutMenu from './GiaoDien/NutMenu';
 import NutPhongBan from './NutPhongBan/NutPhongBan';
+import NutCaNhan from '@/app/GiaoDienTong/MenuDuoi/NutCaNhan/NutCaNhan'; // <--- Đã import nút mới
  
 
 interface Props {
@@ -31,15 +32,13 @@ export default function MenuDuoi({ currentUser: propUser, onToggleContent }: Pro
     }
   }, [propUser]);
 
-  // Báo cho Page biết trạng thái mở/đóng Modal (dùng useEffect để tránh lỗi React Render Loop)
-  // Vì handleMenuToggle ở Page đã được useCallback, useEffect này sẽ không bị gọi lại liên tục nữa.
+  // Báo cho Page biết trạng thái mở/đóng Modal
   useEffect(() => {
       if (onToggleContent) {
           onToggleContent(activeModal !== null);
       }
   }, [activeModal, onToggleContent]);
 
-  // Tối ưu hóa: Dùng useCallback để prop truyền xuống con (NutPhongBan) không bị đổi địa chỉ
   const handleToggle = useCallback((modalName: string) => {
       setActiveModal(prev => prev === modalName ? null : modalName);
   }, []);
@@ -57,6 +56,14 @@ export default function MenuDuoi({ currentUser: propUser, onToggleContent }: Pro
             isOpen={activeModal === 'phongban'} 
             onToggle={() => handleToggle('phongban')} 
             onClose={handleCloseAll} 
+        />
+
+        {/* NÚT CÁ NHÂN (MỚI) */}
+        <NutCaNhan 
+            nguoiDung={realUser}
+            isOpen={activeModal === 'canhan'}
+            onToggle={() => handleToggle('canhan')}
+            onClose={handleCloseAll}
         />
    
     </ThanhMenuDuoi>
