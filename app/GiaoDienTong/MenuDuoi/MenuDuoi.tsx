@@ -10,14 +10,14 @@ import NutPhongBan from './NutPhongBan/NutPhongBan';
 import NutCaNhan from './NutCaNhan/NutCaNhan'; 
 
 interface Props {
-  currentUser?: any; 
+  currentUser?: any;
+  // 🟢 THÊM PROP NÀY ĐỂ LIÊN LẠC VỚI TRANG CHỦ
+  onToggleContent?: (isOpen: boolean) => void;
 }
 
-export default function MenuDuoi({ currentUser: propUser }: Props) {
+export default function MenuDuoi({ currentUser: propUser, onToggleContent }: Props) {
   const pathname = usePathname();
   const [realUser, setRealUser] = useState<any>(null);
-
-  // 🟢 STATE QUẢN LÝ TẬP TRUNG: Đang mở modal nào? ('phongban' | 'canhan' | null)
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
   useEffect(() => {
@@ -31,31 +31,40 @@ export default function MenuDuoi({ currentUser: propUser }: Props) {
     }
   }, [propUser]);
 
-  // Hàm xử lý Toggle (Bật/Tắt)
+  // 🟢 HÀM TOGGLE ĐÃ CẬP NHẬT LOGIC BÁO HIỆU
   const handleToggle = (modalName: string) => {
-      // Nếu đang mở chính nó -> Đóng lại (null)
-      // Nếu đang mở cái khác -> Chuyển sang cái này
-      setActiveModal(prev => prev === modalName ? null : modalName);
+      setActiveModal(prev => {
+          const newState = prev === modalName ? null : modalName;
+          
+          // Báo cho Page biết: Có đang mở cái gì không?
+          // Nếu newState != null => Đang mở => Page cần ẩn chữ
+          if (onToggleContent) {
+              onToggleContent(newState !== null);
+          }
+          
+          return newState;
+      });
   };
 
-  // Hàm đóng tất cả
-  const handleCloseAll = () => setActiveModal(null);
+  const handleCloseAll = () => {
+      setActiveModal(null);
+      // Báo đóng -> Page hiện chữ lại
+      if (onToggleContent) onToggleContent(false);
+  };
 
   return (
     <>
       <ThanhMenuDuoi>
           
-          {/* 1. NÚT PHÒNG BAN */}
+          {/* NÚT PHÒNG BAN */}
           <NutPhongBan 
               nguoiDung={realUser} 
-              isOpen={activeModal === 'phongban'} // Cha bảo mở thì mới được mở
-              onToggle={() => handleToggle('phongban')} // Con xin phép mở/đóng
-              onClose={handleCloseAll} // Lệnh đóng từ bên trong modal
+              isOpen={activeModal === 'phongban'} 
+              onToggle={() => handleToggle('phongban')} 
+              onClose={handleCloseAll} 
           />
 
-    
-
-          {/* 4. NÚT CÁ NHÂN */}
+          {/* NÚT CÁ NHÂN */}
           <NutCaNhan 
               nguoiDung={realUser} 
               isOpen={activeModal === 'canhan'}

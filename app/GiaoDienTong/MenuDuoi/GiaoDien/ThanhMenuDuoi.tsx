@@ -9,7 +9,7 @@ export default function ThanhMenuDuoi({ children }: { children: React.ReactNode 
             {/* Để LopPhuLanMau (z-8000) đảm nhiệm việc tạo nền tối cho toàn bộ đáy màn hình */}
             
             {/* Nội dung menu (Các nút bấm) */}
-            <div className="absolute bottom-0 left-0 right-0 z-10 flex justify-center items-end pb-2 gap-8 md:gap-20 pointer-events-auto">
+            <div className="absolute bottom-0 left-0 right-0 z-[10000] flex justify-center items-end pb-2 gap-8 md:gap-20 pointer-events-auto">
                 {children}
             </div>
         </div>

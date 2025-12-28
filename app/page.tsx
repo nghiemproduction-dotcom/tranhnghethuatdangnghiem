@@ -2,130 +2,154 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation'; // Thêm import
+import { useRouter } from 'next/navigation';
 import { Star, MapPin, ArrowRight } from 'lucide-react'; 
 import CongDangNhap from '@/app/CongDangNhap/CongDangNhap';
 import GoogleDich from '@/app/ThuVien/GoogleDich'; 
-
 import NhacNen from '@/app/Music/NhacNen';
-import LopPhuLanMau from '@/app/GiaoDienTong/HieuUngNen/LopPhuLanMau';
-import MenuTren from '@/app/GiaoDienTong/MenuTren/MenuTren';
-import MenuDuoi from '@/app/GiaoDienTong/MenuDuoi/MenuDuoi';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const BASE_IMG_URL = `${SUPABASE_URL}/storage/v1/object/public/hinh-nen`;
 
 export default function TrangChaoMung() {
-  const router = useRouter(); // Khai báo router
+  const router = useRouter(); 
   const [hienPopupLogin, setHienPopupLogin] = useState(false);
-  const [nguoiDung, setNguoiDung] = useState<any>(null);
-  const [loiChao, setLoiChao] = useState('Chào bạn');
 
+  // URL hình nền
+  // Thêm fallback để tránh lỗi nếu biến môi trường chưa load kịp
   const baseUrl = SUPABASE_URL ? BASE_IMG_URL : '';
   const bgMobile = `${baseUrl}/login-mobile.jpg?v=1`;
   const bgDesktop = `${baseUrl}/login-desktop.jpg?v=1`;
 
-  // Lấy thông tin user cho Menu
+  // 1. Kiểm tra lúc mới vào trang (F5)
   useEffect(() => {
-    const storedUser = localStorage.getItem('USER_INFO');
-    if (storedUser) {
-        try { setNguoiDung(JSON.parse(storedUser)); } catch (e) { console.error(e); }
+    kiemTraVaChuyenHuong();
+  }, [router]);
+
+  // Hàm kiểm tra logic đăng nhập
+  const kiemTraVaChuyenHuong = () => {
+    // Kiểm tra window để đảm bảo code chạy ở client
+    if (typeof window !== 'undefined') {
+        const storedUser = localStorage.getItem('USER_INFO');
+        if (storedUser) {
+            router.push('/trangchu');
+        }
     }
-    const h = new Date().getHours();
-    if (h >= 5 && h < 11) setLoiChao('Chào buổi sáng');
-    else if (h >= 11 && h < 14) setLoiChao('Chào buổi trưa');
-    else if (h >= 14 && h < 18) setLoiChao('Chào buổi chiều');
-    else setLoiChao('Chào buổi tối');
-  }, []);
+  };
+
+  // 2. 🟢 QUAN TRỌNG: Hàm xử lý khi đóng popup đăng nhập
+  const handleClosePopup = () => {
+      setHienPopupLogin(false);
+      // Kiểm tra lại ngay lập tức sau khi đóng popup
+      // Nếu đăng nhập thành công, localStorage đã có dữ liệu -> Chuyển hướng luôn
+      kiemTraVaChuyenHuong();
+  };
 
   return (
     <div className="relative h-[100dvh] w-full bg-[#050505] text-[#F5F5F5] overflow-hidden font-sans flex flex-col">
       
       <NhacNen />
 
-      {/* 🟢 LỚP PHỦ LAN MÀU (Z-Index: 9000) */}
-      <LopPhuLanMau />
-
-      {/* 🟢 MENU TRÊN (Z-Index: 9999 - CAO TUYỆT ĐỐI) */}
-      <div className="fixed top-0 left-0 right-0 z-[9999]">
-          <MenuTren nguoiDung={nguoiDung} loiChao={loiChao} />
-      </div>
-
-      {/* 🟢 MENU DƯỚI (Z-Index: 9999) */}
-      <div className="fixed bottom-0 left-0 right-0 z-[9999]">
-          <MenuDuoi currentUser={nguoiDung} />
-      </div>
-
+      {/* HÌNH NỀN: Đã tối ưu Responsive */}
+      {/* Logic cũ bị thiếu src ở thẻ img giữa (Tablet). 
+          Đã sửa: Mobile dùng bgMobile, từ Tablet trở lên (md:block) dùng bgDesktop */}
       <div className="absolute inset-0 w-full h-full z-0 pointer-events-none select-none">
           {SUPABASE_URL && (
             <>
-              <img src={bgMobile} alt="Background Mobile" className="absolute inset-0 w-full h-full object-cover md:hidden" loading="eager" />
-              <img className="absolute inset-0 w-full h-full object-cover hidden md:block lg:hidden" loading="eager" />
-              <img src={bgDesktop} alt="Background Desktop" className="absolute inset-0 w-full h-full object-cover hidden lg:block" loading="eager" />
+              {/* Mobile View (< 768px) */}
+              <img 
+                src={bgMobile} 
+                alt="Background Mobile" 
+                className="absolute inset-0 w-full h-full object-cover md:hidden" 
+                loading="eager" 
+              />
+              
+              {/* Desktop/Tablet View (>= 768px) */}
+              <img 
+                src={bgDesktop} 
+                alt="Background Desktop" 
+                className="absolute inset-0 w-full h-full object-cover hidden md:block" 
+                loading="eager" 
+              />
             </>
           )}
+          {/* Lớp phủ gradient để làm nổi bật chữ */}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
       </div>
 
       <GoogleDich />
 
-      <div className="absolute bottom-0 left-0 w-full h-[55%] flex flex-col justify-end items-center pb-24 md:pb-32 px-4 z-10 animate-fade-in-up">
-            <div className="text-center space-y-3 md:space-y-4 mb-6 md:mb-8">
-                <div className="flex items-center justify-center gap-2 text-[10px] md:text-xs font-bold tracking-[0.3em] text-white uppercase mb-1 drop-shadow-md">
-                    <MapPin size={12} className="text-yellow-500" />
-                    <span>CẦN THƠ / VIỆT NAM</span>
-                </div>
-                <div className="relative">
-                    <h1 className="text-4xl md:text-7xl font-thin tracking-widest leading-none text-white super-text-shadow">
-                        ĐĂNG NGHIÊM
-                    </h1>
-                    <p className="text-lg md:text-2xl font-serif italic text-yellow-500 mt-1 tracking-wide font-medium drop-shadow-md">
-                        Art Gallery
-                    </p>
-                </div>
-                <div className="flex flex-col items-center gap-2 mt-1">
-                    <p className="text-xs md:text-sm text-white/90 font-light tracking-wider drop-shadow-sm">
-                        Chủ trì bởi Nghệ nhân <strong className="text-white border-b border-yellow-500/50 pb-0.5">Trần Đăng Nghiêm</strong>
-                    </p>
-                    <div className="flex items-center gap-1.5 text-[9px] md:text-xs text-yellow-400 font-bold bg-white/10 px-3 py-1 rounded-full backdrop-blur-md shadow-lg border border-white/10">
-                        <Star size={10} fill="currentColor" />
-                        <span>Kỷ lục Tranh gạo ST25 lớn nhất Việt Nam</span>
+      {/* NỘI DUNG CHỮ & NÚT */}
+      {/* Sử dụng flex-col và justify-end để nội dung luôn nằm dưới đáy hợp lý trên mọi màn hình */}
+      <div className="absolute bottom-0 left-0 w-full h-full max-h-[100dvh] flex flex-col justify-end items-center pb-16 md:pb-24 lg:pb-32 px-4 z-10 animate-fade-in-up pointer-events-none">
+            
+            {/* Wrapper nội dung chính - pointer-events-auto để click được */}
+            <div className="pointer-events-auto w-full max-w-4xl mx-auto flex flex-col items-center">
+                
+                {/* HEADLINE SECTION */}
+                <div className="text-center space-y-3 md:space-y-4 mb-8 md:mb-12">
+                    <div className="flex items-center justify-center gap-2 text-[10px] md:text-xs font-bold tracking-[0.3em] text-white uppercase mb-2 drop-shadow-md">
+                        <MapPin size={12} className="text-yellow-500" />
+                        <span>CẦN THƠ / VIỆT NAM</span>
+                    </div>
+                    <div className="relative">
+                        <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-thin tracking-widest leading-none text-white super-text-shadow">
+                            ĐĂNG NGHIÊM
+                        </h1>
+                        <p className="text-lg sm:text-xl md:text-3xl font-serif italic text-yellow-500 mt-2 tracking-wide font-medium drop-shadow-md">
+                            Art Gallery
+                        </p>
+                    </div>
+                    <div className="flex flex-col items-center gap-3 mt-4">
+                        <p className="text-xs sm:text-sm md:text-base text-white/90 font-light tracking-wider drop-shadow-sm px-4">
+                            Chủ trì bởi Nghệ nhân <strong className="text-white border-b border-yellow-500/50 pb-0.5 whitespace-nowrap">Trần Đăng Nghiêm</strong>
+                        </p>
+                        <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] md:text-xs text-yellow-400 font-bold bg-white/10 px-4 py-1.5 rounded-full backdrop-blur-md shadow-lg border border-white/10 mx-2 text-center">
+                            <Star size={10} fill="currentColor" className="shrink-0" />
+                            <span className="truncate max-w-[280px] sm:max-w-none">Kỷ lục Tranh gạo ST25 lớn nhất Việt Nam</span>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {!nguoiDung && (
-                <div className="flex flex-row items-center justify-center gap-4 md:gap-16 w-full mb-2">
-                    <Link href="/phongtrungbay" className="group flex flex-col items-center gap-2 opacity-90 hover:opacity-100 transition-opacity">
-                        <div className="w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center bg-white/5 text-white group-hover:bg-yellow-500 group-hover:text-black transition-all duration-500 ease-out shadow-lg border border-white/20 hover:border-yellow-400">
-                            <ArrowRight size={20} className="group-hover:-rotate-45 transition-transform duration-500" />
+                {/* BUTTONS SECTION */}
+                <div className="flex flex-row items-center justify-center gap-6 sm:gap-10 md:gap-16 w-full mb-6">
+                    {/* Nút Tham Quan */}
+                    <Link href="/phongtrungbay" className="group flex flex-col items-center gap-3 opacity-90 hover:opacity-100 transition-opacity cursor-pointer">
+                        <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center bg-white/5 text-white group-hover:bg-yellow-500 group-hover:text-black transition-all duration-500 ease-out shadow-lg border border-white/20 hover:border-yellow-400">
+                            <ArrowRight size={20} className="md:w-6 md:h-6 group-hover:-rotate-45 transition-transform duration-500" />
                         </div>
                         <div className="flex flex-col items-center">
                             <span className="text-xs md:text-sm font-bold tracking-[0.2em] text-white group-hover:text-yellow-400 transition-colors drop-shadow-lg">THAM QUAN</span>
-                            <span className="hidden sm:block text-[9px] text-gray-400 font-light mt-0.5 drop-shadow-md">Khách & Đối tác</span>
+                            <span className="hidden sm:block text-[9px] md:text-[10px] text-gray-400 font-light mt-1 drop-shadow-md">Khách & Đối tác</span>
                         </div>
                     </Link>
-                    <div className="w-[1px] h-8 md:h-10 bg-white/20" />
-                    <button onClick={() => setHienPopupLogin(true)} className="group flex flex-col items-center gap-2 opacity-90 hover:opacity-100 transition-opacity">
-                        <div className="w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center bg-transparent text-gray-400 group-hover:bg-white group-hover:text-black transition-all duration-500 ease-out shadow-lg border border-white/20 hover:border-white">
-                            <ArrowRight size={20} className="group-hover:-rotate-45 transition-transform duration-500" />
+
+                    {/* Divider */}
+                    <div className="w-[1px] h-10 md:h-14 bg-white/20" />
+
+                    {/* Nút Nội Bộ */}
+                    <button onClick={() => setHienPopupLogin(true)} className="group flex flex-col items-center gap-3 opacity-90 hover:opacity-100 transition-opacity cursor-pointer">
+                        <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center bg-transparent text-gray-400 group-hover:bg-white group-hover:text-black transition-all duration-500 ease-out shadow-lg border border-white/20 hover:border-white">
+                            <ArrowRight size={20} className="md:w-6 md:h-6 group-hover:-rotate-45 transition-transform duration-500" />
                         </div>
                         <div className="flex flex-col items-center">
                             <span className="text-xs md:text-sm font-bold tracking-[0.2em] text-gray-400 group-hover:text-white transition-colors drop-shadow-lg">NỘI BỘ</span>
-                            <span className="hidden sm:block text-[9px] text-gray-500 font-light mt-0.5 drop-shadow-md">Nhân sự & Quản lý</span>
+                            <span className="hidden sm:block text-[9px] md:text-[10px] text-gray-500 font-light mt-1 drop-shadow-md">Nhân sự & Quản lý</span>
                         </div>
                     </button>
                 </div>
-            )}
             
-            <div className="text-center mt-2 opacity-40">
-                 <p className="text-[8px] tracking-[0.2em] uppercase font-bold text-gray-500 drop-shadow-sm">
-                    © {new Date().getFullYear()} DANG NGHIEM ART
-                 </p>
+                {/* FOOTER COPYRIGHT */}
+                <div className="text-center mt-4 opacity-40">
+                     <p className="text-[8px] md:text-[10px] tracking-[0.2em] uppercase font-bold text-gray-500 drop-shadow-sm">
+                        © {new Date().getFullYear()} DANG NGHIEM ART
+                     </p>
+                </div>
             </div>
       </div>
 
-      <CongDangNhap isOpen={hienPopupLogin} onClose={() => setHienPopupLogin(false)} />
+      {/* 🟢 GỌI HANDLE CLOSE POPUP ĐỂ CHECK LOGIN */}
+      <CongDangNhap isOpen={hienPopupLogin} onClose={handleClosePopup} />
       
       <style jsx global>{`
         @keyframes fade-in-up { 

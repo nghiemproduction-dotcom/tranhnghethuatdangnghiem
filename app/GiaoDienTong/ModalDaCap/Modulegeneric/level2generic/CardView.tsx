@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-import { ImageIcon, Edit, Phone, Trophy } from 'lucide-react'; // 🟢 Thêm icon Trophy
+import { ImageIcon, Edit, Phone, Trophy } from 'lucide-react';
 
 interface Props {
     data: any[];
@@ -15,7 +15,10 @@ interface Props {
 
 export default function CardView({ data, columns, imgCol, titleCol, canEdit, onRowClick, selectedIds = [], onSelect }: Props) {
     return (
-        <div className="h-full overflow-auto custom-scroll p-4">
+        // 🟢 CẬP NHẬT: Padding lớn để nội dung không bị Header/Menu che mất
+        // pt-[140px] = 85px (Menu Trên) + 55px (Header Tìm Kiếm)
+        // pb-[180px] = 100px (Menu Dưới) + 80px (Thanh Tác Vụ)
+        <div className="h-full overflow-y-auto custom-scroll p-4 pt-[140px] pb-[180px]">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                 {data.map((row, idx) => {
                     const imgUrl = imgCol ? row[imgCol.key] : null;
@@ -24,7 +27,6 @@ export default function CardView({ data, columns, imgCol, titleCol, canEdit, onR
                     const phone = row['so_dien_thoai'] || row['phone'] || row['sdt'];
                     const isSelected = selectedIds.includes(row.id);
                     
-                    // 🟢 LẤY SỐ LƯỢNG KHÁCH (Đã được flatten ở Level2)
                     const totalCustomers = row.total_khach;
 
                     return (
@@ -32,7 +34,7 @@ export default function CardView({ data, columns, imgCol, titleCol, canEdit, onR
                             key={idx} 
                             onClick={() => onRowClick(row)} 
                             className={`
-                                bg-[#1a120f] rounded-xl cursor-pointer group flex flex-col overflow-hidden relative shadow-md h-fit transition-all duration-300
+                                bg-[#1a120f]/80 backdrop-blur-sm rounded-xl cursor-pointer group flex flex-col overflow-hidden relative shadow-md h-fit transition-all duration-300
                                 ${isSelected ? 'border-2 border-[#C69C6D] shadow-[0_0_15px_rgba(198,156,109,0.4)]' : 'border border-[#8B5E3C]/20 hover:border-[#C69C6D] hover:shadow-[0_0_15px_rgba(198,156,109,0.2)]'}
                             `}
                         >
@@ -69,7 +71,7 @@ export default function CardView({ data, columns, imgCol, titleCol, canEdit, onR
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-[10px] text-[#1a120f] bg-[#C69C6D] px-2 py-0.5 rounded font-bold uppercase tracking-wider truncate max-w-full">{String(position)}</span>
                                     
-                                    {/* 🟢 HIỂN THỊ CÚP VÀNG DOANH SỐ (Nếu có khách) */}
+                                    {/* Hiển thị cúp vàng nếu có khách */}
                                     {totalCustomers !== undefined && totalCustomers > 0 && (
                                         <div className="flex items-center gap-1 bg-[#F5E6D3]/10 border border-[#C69C6D]/30 px-1.5 py-0.5 rounded">
                                             <Trophy size={10} className="text-[#C69C6D]" />

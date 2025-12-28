@@ -9,10 +9,9 @@ export default function ModalPhongQuanLy({ isOpen, onClose }: Props) {
   if (!isOpen) return null;
 
   return (
-    // 🟢 SỬA CHUẨN: BỎ HOÀN TOÀN CÁC THẺ DIV BAO QUANH
-    // Chỉ dùng NoidungModal để quản lý hiển thị -> Đảm bảo trong suốt
+    // Sử dụng NoidungModal (đã được fix z-index 2500 và full màn hình ở trên)
     <NoidungModal>
-         <div className="w-full h-full pb-4"> 
+         <div className="w-full h-full"> 
             <DashboardBuilder 
                 pageId="quanly" 
                 title="Quản Lý Tổng Hợp" 

@@ -3,7 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { CotHienThi } from '@/app/GiaoDienTong/DashboardBuilder/KieuDuLieuModule';
 import { useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 
-// Lưu ý: Các file này nằm ngoài folder generic, import từ path cũ
+// Import component con
 import CardView from '@/app/GiaoDienTong/ModalDaCap/Modulegeneric/level2generic/CardView';
 import KanbanView from '@/app/GiaoDienTong/ModalDaCap/Modulegeneric/level2generic/KanbanView';
 
@@ -23,7 +23,7 @@ interface Props {
 export default function KhungHienThi({ loading, data, viewMode, columns, groupByCol, onRowClick, selectedIds, onSelect, onDragEnd, canEdit }: Props) {
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
     
-    // Tìm cột ảnh và cột tiêu đề
+    // Xử lý cột hiển thị
     let displayColumns = columns;
     if (displayColumns.length === 0 && data.length > 0) {
         displayColumns = Object.keys(data[0])
@@ -34,15 +34,18 @@ export default function KhungHienThi({ loading, data, viewMode, columns, groupBy
     const titleCol = displayColumns[0] || { key: 'id' };
 
     return (
-        <div className="flex-1 relative overflow-hidden bg-[#0F0C0B]">
+        // 🟢 CẤU TRÚC HIỂN THỊ:
+        // - bg-transparent: Trong suốt để thấy nền
+        // - overflow-visible: Quan trọng! Để thanh cuộn của cha (level2generic) hoạt động
+        <div className="flex-1 relative bg-transparent min-h-full">
             {loading && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-20 backdrop-blur-[2px]">
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-20 backdrop-blur-[2px] rounded-xl">
                     <Loader2 className="animate-spin text-[#C69C6D]" size={30}/>
                 </div>
             )}
 
             {data.length === 0 && !loading ? (
-                <div className="flex flex-col items-center justify-center h-full text-[#8B5E3C] text-xs italic opacity-50">
+                <div className="flex flex-col items-center justify-center h-40 text-[#8B5E3C] text-xs italic opacity-50">
                     <p>Chưa có dữ liệu.</p>
                 </div>
             ) : (

@@ -7,7 +7,8 @@ interface Props {
 
 export default function ThanhTieuDe({ tieuDe }: Props) {
     return (
-        <div className="w-full shrink-0 flex items-center justify-center py-2 z-40">
+        // 🟢 Thêm pointer-events-auto (nếu muốn select text)
+        <div className="w-full shrink-0 flex items-center justify-center py-2 z-40 pointer-events-auto">
             <h2 className="
                 text-center uppercase font-black tracking-[0.15em] leading-tight
                 text-[clamp(20px,6vw,30px)]

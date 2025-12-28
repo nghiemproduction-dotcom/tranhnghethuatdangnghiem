@@ -35,14 +35,14 @@ export default function NutMenu({ label, icon: Icon, active, onClick, href }: Pr
     
     if (href) {
         return (
-            <Link href={href} className="shrink-0 relative z-[3000]">
+            <Link href={href} className="shrink-0 relative z-[11000]">
                 {content}
             </Link>
         );
     }
 
     return (
-        <button onClick={onClick} className="shrink-0 relative z-[3000]">
+        <button onClick={onClick} className="shrink-0 relative z-[11000]">
             {content}
         </button>
     );
