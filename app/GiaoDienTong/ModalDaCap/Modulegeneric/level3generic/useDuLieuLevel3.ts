@@ -23,9 +23,13 @@ export const useDuLieuLevel3 = (config: ModuleConfig, isOpen: boolean, initialDa
     // Lấy cấu hình ngoại lệ
     const { tableToQuery, excludeColsOnSave } = layCauHinhNgoaiLe(config.bangDuLieu, isCreateMode);
 
-    // 1. Fetch Schema
+    // 1. Fetch Schema (Cấu trúc bảng)
+    // 🟢 FIX: Dùng JSON.stringify(config.danhSachCot) làm dependency để tránh so sánh tham chiếu object gây loop
     const fetchSchema = useCallback(async () => {
-        if (config.danhSachCot?.length) { setOrderedColumns(config.danhSachCot); return; }
+        if (config.danhSachCot?.length) { 
+            setOrderedColumns(config.danhSachCot); 
+            return; 
+        }
 
         const { data: tableInfo } = await supabase.rpc('get_table_schema', { t_name: config.bangDuLieu });
         const { data: dbConfig } = await supabase.from('cau_hinh_cot').select('*').eq('bang_du_lieu', config.bangDuLieu).order('thu_tu', { ascending: true });
@@ -59,19 +63,23 @@ export const useDuLieuLevel3 = (config: ModuleConfig, isOpen: boolean, initialDa
                     return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
                 });
             }
-            setDynamicColumns(mappedCols); setOrderedColumns(mappedCols);
+            setDynamicColumns(mappedCols); 
+            setOrderedColumns(mappedCols);
         }
-    }, [config.bangDuLieu, config.danhSachCot]);
+    }, [config.bangDuLieu, JSON.stringify(config.danhSachCot)]); 
 
-    // 2. Load Data
+    // 2. Load Data (Tải dữ liệu chi tiết)
+    // 🟢 FIX: Chỉ phụ thuộc vào ID (initialData.id) thay vì toàn bộ object initialData
     const refreshData = useCallback(async () => {
         if (isCreateMode) { setFormData({}); return; }
+        
         setFetching(true);
         // Query động dựa trên cấu hình ngoại lệ
         const { data } = await (supabase as any).from(tableToQuery).select('*').eq('id', initialData.id).single();
+        
         if (data) setFormData(data);
         setFetching(false);
-    }, [initialData, tableToQuery, isCreateMode]);
+    }, [initialData?.id, tableToQuery, isCreateMode]);
 
     // 3. Upload Image
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -83,24 +91,34 @@ export const useDuLieuLevel3 = (config: ModuleConfig, isOpen: boolean, initialDa
             const { error } = await supabase.storage.from(BUCKET_NAME).upload(filePath, file);
             if (error) throw error;
             const { data: { publicUrl } } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filePath);
+            
             const imgCol = orderedColumns.find(c => ['hinh_anh', 'avatar'].includes(c.key)) || dynamicColumns.find(c => ['hinh_anh', 'avatar'].includes(c.key));
             if (imgCol) setFormData((p: any) => ({ ...p, [imgCol.key]: publicUrl }));
         } catch (err: any) { alert(`Lỗi tải ảnh: ${err.message}`); } finally { setUploadingImg(false); }
     };
 
-    // 4. Load Options
+    // 4. Load Options (Dữ liệu select box)
     useEffect(() => {
         const loadOpts = async (col: CotHienThi) => {
             const { data } = await (supabase as any).from(config.bangDuLieu).select(col.key).not(col.key, 'is', null);
             let opts = data ? Array.from(new Set(data.map((r: any) => r[col.key]))).filter(Boolean) as string[] : [];
             if (col.key.includes('ngan_hang')) opts = Array.from(new Set([...VN_BANKS, ...opts]));
+            
             setDynamicOptions(p => ({ ...p, [col.key]: opts.sort() }));
         };
         const cols = orderedColumns.length ? orderedColumns : dynamicColumns;
         cols.forEach(col => { if (col.kieuDuLieu === 'select_dynamic') loadOpts(col); });
-    }, [orderedColumns, dynamicColumns, config.bangDuLieu]);
+        
+    // 🟢 FIX: Stringify mảng columns để tránh loop do thay đổi tham chiếu
+    }, [JSON.stringify(orderedColumns), JSON.stringify(dynamicColumns), config.bangDuLieu]);
 
-    useEffect(() => { if (isOpen) { fetchSchema(); refreshData(); } }, [isOpen, fetchSchema, refreshData]);
+    // 5. Init Effect
+    useEffect(() => { 
+        if (isOpen) { 
+            fetchSchema(); 
+            refreshData(); 
+        } 
+    }, [isOpen, fetchSchema, refreshData]);
 
     return {
         formData, setFormData, loading, setLoading, fetching, uploadingImg,

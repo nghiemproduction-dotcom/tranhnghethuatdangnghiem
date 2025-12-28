@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { PlayCircle, Star, ArrowRight } from 'lucide-react';
 
@@ -68,18 +68,20 @@ export default function TrangChuDashboard() {
     }, []);
 
     // Xử lý riêng cho Menu Dưới
-    const handleMenuToggle = (isMenuOpen: boolean) => {
+    // 🔴 SỬA LỖI QUAN TRỌNG: Dùng useCallback để hàm này không bị tạo mới mỗi lần render
+    // Ngăn chặn vòng lặp vô tận giữa Page và MenuDuoi
+    const handleMenuToggle = useCallback((isMenuOpen: boolean) => {
         setActiveOverlays(prev => {
             const next = new Set(prev);
             if (isMenuOpen) next.add('menu-duoi');
             else next.delete('menu-duoi');
             return next;
         });
-    };
+    }, []);
 
-    const handleUpdateBackground = () => {
+    const handleUpdateBackground = useCallback(() => {
         setBgVersion(Date.now());
-    };
+    }, []);
 
     // Nội dung chỉ hiện khi KHÔNG CÓ overlay nào đang mở
     const hienThiNoiDung = activeOverlays.size === 0;
