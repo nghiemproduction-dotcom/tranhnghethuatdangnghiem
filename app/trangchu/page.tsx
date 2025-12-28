@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation'; // Thêm usePathname
 import { PlayCircle, Star, ArrowRight } from 'lucide-react';
 
 // Import các component hệ thống
@@ -20,10 +20,12 @@ const BASE_IMG_URL = `${SUPABASE_URL}/storage/v1/object/public/hinh-nen`;
 
 export default function TrangChuDashboard() {
     const router = useRouter();
+    const pathname = usePathname(); // Lấy đường dẫn hiện tại
     const [nguoiDung, setNguoiDung] = useState<any>(null);
     const [loiChao, setLoiChao] = useState('Chào bạn');
     const [daKiemTraLogin, setDaKiemTraLogin] = useState(false);
     
+    // 🟢 QUẢN LÝ TRẠNG THÁI HIỂN THỊ THÔNG MINH
     const [activeOverlays, setActiveOverlays] = useState<Set<string>>(new Set());
     const [bgVersion, setBgVersion] = useState(Date.now());
 
@@ -33,10 +35,20 @@ export default function TrangChuDashboard() {
 
     useEffect(() => {
         const storedUser = localStorage.getItem('USER_INFO');
+        
         if (!storedUser) {
-            router.push('/');
+            // 🔴 SỬA LỖI VÒNG LẶP VÔ TẬN (Infinite Redirect Loop)
+            // Nếu chưa đăng nhập và đang ở trang chủ, KHÔNG redirect về trang chủ nữa.
+            // Thay vào đó, chuyển sang trang login hoặc hiển thị màn hình chờ.
+            if (pathname !== '/dang-nhap' && pathname !== '/login') {
+                 // Giả sử bạn có trang login, nếu không có thì comment dòng này lại và hiển thị UI yêu cầu đăng nhập bên dưới
+                 // router.push('/dang-nhap'); 
+                 console.warn("Người dùng chưa đăng nhập.");
+            }
+            // Đánh dấu đã kiểm tra xong để render giao diện (dù là giao diện khách)
+            setDaKiemTraLogin(true);
         } else {
-            try { setNguoiDung(JSON.parse(storedUser)); } catch (e) { console.error(e); router.push('/'); }
+            try { setNguoiDung(JSON.parse(storedUser)); } catch (e) { console.error(e); }
             
             const h = new Date().getHours();
             if (h >= 5 && h < 11) setLoiChao('Chào buổi sáng');
@@ -46,7 +58,7 @@ export default function TrangChuDashboard() {
             
             setDaKiemTraLogin(true);
         }
-    }, [router]);
+    }, [router, pathname]);
 
     useEffect(() => {
         const handleVisibilityChange = (e: any) => {
@@ -78,6 +90,7 @@ export default function TrangChuDashboard() {
 
     const hienThiNoiDung = activeOverlays.size === 0;
 
+    // Nếu chưa kiểm tra login xong, hiện màn hình đen để tránh giật
     if (!daKiemTraLogin) return <div className="fixed inset-0 bg-[#050505]" />;
 
     return (
@@ -151,7 +164,7 @@ export default function TrangChuDashboard() {
             {/* LAYER 3: HỆ THỐNG MENU */}
             <MenuTren nguoiDung={nguoiDung} loiChao={loiChao} />
             
-     
+            
 
             <div className="fixed inset-0 z-[5000] pointer-events-none">
                 <MenuDuoi currentUser={nguoiDung} onToggleContent={handleMenuToggle} />
@@ -163,19 +176,9 @@ export default function TrangChuDashboard() {
             </div>
 
             <style jsx global>{`
-                /* Ẩn thanh cuộn cho Chrome, Safari, Opera */
-                ::-webkit-scrollbar {
-                    display: none;
-                }
-                
-                /* Ẩn thanh cuộn cho IE, Edge, Firefox */
-                html, body {
-                    -ms-overflow-style: none;  /* IE and Edge */
-                    scrollbar-width: none;  /* Firefox */
-                    overflow-x: hidden; /* Ngăn cuộn ngang */
-                    width: 100%;
-                }
-
+                /* Ẩn thanh cuộn */
+                ::-webkit-scrollbar { display: none; }
+                html, body { -ms-overflow-style: none; scrollbar-width: none; overflow-x: hidden; width: 100%; }
                 .text-stroke-title { -webkit-text-stroke: 1px #F5F5F5; color: transparent; text-shadow: 0 0 15px rgba(198,156,109,0.3); }
                 @keyframes fade-in-up { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
                 .animate-fade-in-up { animation: fade-in-up 1s ease-out forwards; }

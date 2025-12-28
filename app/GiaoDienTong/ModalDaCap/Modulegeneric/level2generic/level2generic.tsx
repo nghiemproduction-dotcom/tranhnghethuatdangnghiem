@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
 import { ModuleConfig } from '@/app/GiaoDienTong/DashboardBuilder/KieuDuLieuModule';
 import ThanhPhanTrang from '@/app/GiaoDienTong/ModalDaCap/GiaoDien/ThanhPhanTrang';
@@ -22,8 +22,36 @@ interface Props {
 }
 
 export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbedded = false, extraFilter }: Props) {
-    const { data, setData, loading, setLoading, search, setSearch, page, setPage, total, groupByCol, setGroupByCol, existingColumns, columns, fetchData, ITEMS_PER_PAGE } = useDuLieu(config, isOpen, extraFilter, isEmbedded);
-    const syncConfig = layCauHinhDongBo(config);
+    // 🟢 CHỐNG RE-RENDER TỪ PHÍA CHA (Parent Re-render Protection)
+    const configRef = useRef(config);
+    // Chỉ cập nhật ref nếu ID hoặc bảng thay đổi thực sự
+    if (config.id !== configRef.current.id || config.bangDuLieu !== configRef.current.bangDuLieu) {
+        configRef.current = config;
+    }
+    const stableConfig = configRef.current;
+
+    const extraFilterRef = useRef(extraFilter);
+    if (JSON.stringify(extraFilter) !== JSON.stringify(extraFilterRef.current)) {
+        extraFilterRef.current = extraFilter;
+    }
+    const stableExtraFilter = extraFilterRef.current;
+
+    // Hook lấy dữ liệu (đã được fix trong useDuLieu.ts)
+    const { data, setData, loading, setLoading, search, setSearch, page, setPage, total, groupByCol, setGroupByCol, existingColumns, columns, fetchData, ITEMS_PER_PAGE } = useDuLieu(stableConfig, isOpen, stableExtraFilter, isEmbedded);
+    
+    // 🟢 LỌC ID TRÙNG (Fix lỗi warnOnInvalidKey)
+    const uniqueData = useMemo(() => {
+        if (!data) return [];
+        const seen = new Set();
+        return data.filter((item: any) => {
+            const id = item.id || `temp-${Math.random()}`; // Fallback ID
+            if (seen.has(id)) return false;
+            seen.add(id);
+            return true;
+        });
+    }, [data]);
+
+    const syncConfig = layCauHinhDongBo(stableConfig);
     
     const [viewMode, setViewMode] = useState<'card' | 'kanban'>('card');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -38,13 +66,12 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
     const canAdd = ['admin', 'quanly', 'boss'].includes(userRole);
     const canDelete = ['admin', 'boss'].includes(userRole);
 
-    // PHÁT SỰ KIỆN KHI LEVEL 3 MỞ -> ẨN PAGE
     useEffect(() => {
         const event = new CustomEvent('toggle-content-visibility', {
-            detail: { id: `level2-${config.id}-level3`, open: isLevel3Open }
+            detail: { id: `level2-${stableConfig.id}-level3`, open: isLevel3Open }
         });
         window.dispatchEvent(event);
-    }, [isLevel3Open, config.id]);
+    }, [isLevel3Open, stableConfig.id]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -65,19 +92,19 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
     useEffect(() => {
         const loadTabs = async () => {
             if (groupByCol && existingColumns.includes(groupByCol)) {
-                const { data } = await supabase.from(config.bangDuLieu).select(groupByCol).not(groupByCol, 'is', null);
+                const { data } = await supabase.from(stableConfig.bangDuLieu).select(groupByCol).not(groupByCol, 'is', null);
                 if (data) setTabOptions(Array.from(new Set(data.map((i: any) => i[groupByCol]))).sort() as string[]);
             }
         };
         loadTabs();
-    }, [groupByCol, existingColumns, config.bangDuLieu]);
+    }, [groupByCol, existingColumns, stableConfig.bangDuLieu]);
 
     const handleSync = async () => { if (!confirm(`Bạn muốn ${syncConfig.tooltip}?`)) return; setSyncing(true); try { const { error } = await supabase.rpc(syncConfig.rpcFunc); if (error) throw error; alert('Đồng bộ thành công!'); } catch (e: any) { alert(e.message); } finally { setSyncing(false); } };
     
     const handleDelete = async () => { 
         if (!confirm(`Xóa vĩnh viễn ${selectedIds.length} mục đã chọn?`)) return; 
         setLoading(true); 
-        await supabase.from(config.bangDuLieu).delete().in('id', selectedIds); 
+        await supabase.from(stableConfig.bangDuLieu).delete().in('id', selectedIds); 
         setLoading(false); 
         setSelectedIds([]); 
         fetchData(page, activeTab, search); 
@@ -93,7 +120,7 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
                 <div className={`min-h-full ${isEmbedded ? 'pt-[100px]' : 'pt-[110px]'} pb-[130px] px-2 md:px-6`}>
                     <KhungHienThi 
                         loading={loading} 
-                        data={data} 
+                        data={uniqueData} 
                         viewMode={viewMode} 
                         columns={columns} 
                         groupByCol={groupByCol}
@@ -132,7 +159,7 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
                     )}
                     <div className="w-full max-w-4xl pointer-events-auto">
                         <ThanhTacVu 
-                            config={config} 
+                            config={stableConfig} 
                             canAdd={canAdd} 
                             canConfig={userRole === 'admin'}
                             viewMode={viewMode} 
@@ -167,18 +194,17 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
             isOpen={isLevel3Open} 
             onClose={() => setIsLevel3Open(false)} 
             onSuccess={() => fetchData(page, activeTab, search)} 
-            config={config} 
+            config={stableConfig} 
             initialData={selectedItem} 
             userRole={userRole} 
             userEmail={typeof window !== 'undefined' ? localStorage.getItem('USER_EMAIL') || '' : ''} 
-            parentTitle={config.tenModule} 
+            parentTitle={stableConfig.tenModule} 
         />
     );
 
     if (isEmbedded) return <>{MainContent}{Level3Modal}</>;
 
     return (
-        // 🟢 CẬP NHẬT: NỀN ĐEN 80% (bg-black/80)
         <>
             <div className="fixed inset-0 z-[3500] bg-black/80 backdrop-blur-sm flex flex-col shadow-none animate-in fade-in zoom-in-95 duration-300 overflow-hidden pointer-events-none">
                 <div className="w-full h-full pointer-events-auto flex flex-col">
