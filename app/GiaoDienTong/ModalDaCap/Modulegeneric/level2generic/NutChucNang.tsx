@@ -113,7 +113,7 @@ export default function NutChucNang({
     const validTasks = danhSachTacVu.filter((item): item is TacVuButton => item !== null);
 
     return (
-        <div className="fixed bottom-24 right-4 flex flex-col items-end gap-3 z-[2500] pointer-events-none" ref={filterRef}>
+        <div className="fixed bottom-32 right-4 flex flex-col items-end gap-3 z-[2500] pointer-events-none" ref={filterRef}>
             {/* Menu Lọc */}
             {showFilterMenu && groupableColumns && onSetGroupBy && (
                 <div className="pointer-events-auto mb-2 bg-[#161210] border border-[#8B5E3C]/50 rounded-xl shadow-2xl overflow-hidden w-64 animate-in slide-in-from-right-10 fade-in duration-200">

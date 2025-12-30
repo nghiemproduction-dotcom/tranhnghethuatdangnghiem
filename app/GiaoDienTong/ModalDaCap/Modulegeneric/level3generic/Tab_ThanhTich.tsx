@@ -2,9 +2,9 @@
 import React, { useState } from 'react';
 import { Trophy, Package, Sparkles, Crown, Medal, X } from 'lucide-react'; 
 import { ModuleConfig } from '@/app/GiaoDienTong/DashboardBuilder/KieuDuLieuModule';
-import Level2_Generic from '@/app/GiaoDienTong/ModalDaCap/Modulegeneric/level2generic/level2generic'; 
+import GenericModule from '@/app/GiaoDienTong/ModalDaCap/Modulegeneric/GenericModule'; 
 
-const Level2_Any = Level2_Generic as any;
+const Level2_Any = GenericModule as any;
 
 interface Props {
     nhanSuId: string;
@@ -107,7 +107,7 @@ export default function Tab_ThanhTich({ nhanSuId, totalKhach, totalViec, totalMa
                         </button>
                     </div>
                     <div className="flex-1 overflow-hidden relative">
-                        <Level2_Any 
+                        <GenericModule mode="level2"
                             isOpen={true}
                             onClose={() => setOpeningModule(null)} 
                             config={openingModule.config}

@@ -7,7 +7,8 @@ import { LayoutTemplate } from 'lucide-react';
 import ThanhMenuDuoi from './GiaoDien/ThanhMenuDuoi';
 import NutMenu from './GiaoDien/NutMenu';
 import NutPhongBan from './NutPhongBan/NutPhongBan';
-import NutCaNhan from '@/app/GiaoDienTong/MenuDuoi/NutCaNhan/NutCaNhan'; // <--- Đã import nút mới
+import NutCaNhan from './NutCaNhan/NutCaNhan'; 
+ 
  
 
 interface Props {
@@ -20,7 +21,6 @@ export default function MenuDuoi({ currentUser: propUser, onToggleContent }: Pro
   const [realUser, setRealUser] = useState<any>(null);
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
-  // Đồng bộ User từ props hoặc LocalStorage
   useEffect(() => {
     if (propUser) { 
         setRealUser(propUser); 
@@ -32,7 +32,6 @@ export default function MenuDuoi({ currentUser: propUser, onToggleContent }: Pro
     }
   }, [propUser]);
 
-  // Báo cho Page biết trạng thái mở/đóng Modal
   useEffect(() => {
       if (onToggleContent) {
           onToggleContent(activeModal !== null);
@@ -58,7 +57,9 @@ export default function MenuDuoi({ currentUser: propUser, onToggleContent }: Pro
             onClose={handleCloseAll} 
         />
 
-        {/* NÚT CÁ NHÂN (MỚI) */}
+         
+
+        {/* NÚT CÁ NHÂN */}
         <NutCaNhan 
             nguoiDung={realUser}
             isOpen={activeModal === 'canhan'}

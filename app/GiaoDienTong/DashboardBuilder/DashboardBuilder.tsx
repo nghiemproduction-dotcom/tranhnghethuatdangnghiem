@@ -1,118 +1,204 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Loader2, Plus, X, Database, Layout, Save, Globe, CheckCircle, BarChart3, List, Hash, MousePointerClick, AppWindow, Settings2, Trash2, MapPin, PieChart, Circle, Edit3, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
 import { ModuleConfig } from './KieuDuLieuModule'; 
 import { useRouter } from 'next/navigation';
 import AccessDenied from './AccessDenied';
 import GridArea from './GridArea';
-import Level3_FormChiTiet from '@/app/GiaoDienTong/ModalDaCap/Modulegeneric/level3generic/level3generic'; 
+import GenericModule from '@/app/GiaoDienTong/ModalDaCap/Modulegeneric/GenericModule'; 
 import NutModal from '@/app/GiaoDienTong/ModalDaCap/GiaoDien/NutModal';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 interface Props { pageId: string; title: string; allowedRoles: string[]; initialModules?: ModuleConfig[]; hideAddButton?: boolean; configModule?: ModuleConfig; }
 
 export default function DashboardBuilder({ pageId, title, allowedRoles, initialModules, hideAddButton = false, configModule }: Props) {
     const router = useRouter();
+    const queryClient = useQueryClient();
+    
     const [modules, setModules] = useState<ModuleConfig[]>([]);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [addMode, setAddMode] = useState<'library' | 'new'>('library');
     const [mobileStep, setMobileStep] = useState<'list' | 'form'>('list');
 
-    const [availableTables, setAvailableTables] = useState<string[]>([]);
-    const [globalModules, setGlobalModules] = useState<any[]>([]); 
-    const [usageMap, setUsageMap] = useState<Record<string, string[]>>({}); 
     const [editingId, setEditingId] = useState<string | null>(null);
-
     const [newModuleData, setNewModuleData] = useState({ 
         name: '', table: '', viewType: 'chart', chartType: 'Pie', groupBy: '', titleField: '', subField: '', buttonLabel: '', buttonColor: '#C69C6D'
     });
-    const [tableColumns, setTableColumns] = useState<string[]>([]);
 
     const [activeRowId, setActiveRowId] = useState<string | null>(null); 
     const [isAdmin, setIsAdmin] = useState(false); 
     const [hasAccess, setHasAccess] = useState(true); 
     const [userRole, setUserRole] = useState('khach');
-    const [loading, setLoading] = useState(true);
-    const [isSaving, setIsSaving] = useState(false); 
     const [detailItem, setDetailItem] = useState<any>(null);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
     const [activeModuleConfig, setActiveModuleConfig] = useState<ModuleConfig | null>(null);
     const [isAnyLevel2Open, setIsAnyLevel2Open] = useState(false);
 
+    // 🟢 1. LẤY USER ROLE VÀ CHECK ACCESS (chạy ngay)
     useEffect(() => {
-        const init = async () => {
-            const role = localStorage.getItem('USER_ROLE') || 'khach';
-            setUserRole(role);
-            setIsAdmin(role === 'admin'); 
-            
-            if (allowedRoles && !allowedRoles.includes(role)) setHasAccess(false);
-            
-            const { data: tables } = await supabase.rpc('get_manageable_tables');
-            if (tables) setAvailableTables(tables.map((t: any) => t.table_name));
-            
-            await fetchGlobalLibrary();
-            
-            if (!configModule) {
-                const { data: layout } = await supabase.from('dashboard_layouts').select('layout_json').eq('page_id', pageId).single();
-                if (layout?.layout_json) setModules(layout.layout_json);
-                else if (initialModules) setModules(initialModules);
-            } else { setModules([configModule]); }
-            
-            setLoading(false);
-        };
-        init();
-    }, [pageId, configModule]);
+        const role = localStorage.getItem('USER_ROLE') || 'khach';
+        setUserRole(role);
+        const adminRoles = ['admin', 'boss', 'quanly'];
+        setIsAdmin(adminRoles.includes(role)); 
+        if (allowedRoles && !allowedRoles.includes(role) && !adminRoles.includes(role)) {
+            setHasAccess(false);
+        }
+    }, [allowedRoles]);
 
-    const fetchGlobalLibrary = async () => {
-        try {
-            const { data: mods, error } = await supabase.from('global_modules').select('*');
-            if (!error && mods) {
-                const sortedMods = mods.sort((a: any, b: any) => 
-                    new Date(b.tao_luc || 0).getTime() - new Date(a.tao_luc || 0).getTime()
-                );
-                setGlobalModules(sortedMods);
-            }
+    // 🟢 2. FETCH AVAILABLE TABLES (Cache 10 phút - ít thay đổi)
+    const { data: availableTables = [] } = useQuery({
+        queryKey: ['manageable_tables'],
+        queryFn: async () => {
+            const { data } = await supabase.rpc('get_manageable_tables');
+            return data?.map((t: any) => t.table_name) || [];
+        },
+        staleTime: 1000 * 60 * 10, // Cache 10 phút
+        retry: 1,
+    });
 
-            const { data: usages } = await supabase.rpc('get_module_usage_locations');
-            if (usages) {
-                const map: Record<string, string[]> = {};
-                usages.forEach((u: any) => { map[u.module_name] = u.used_in_pages; });
-                setUsageMap(map);
+    // 🟢 3. FETCH GLOBAL MODULES (Cache 5 phút)
+    const { data: globalModules = [] } = useQuery({
+        queryKey: ['global_modules'],
+        queryFn: async () => {
+            const { data, error } = await supabase.from('global_modules').select('*');
+            if (error) throw error;
+            return data?.sort((a: any, b: any) => 
+                new Date(b.tao_luc || 0).getTime() - new Date(a.tao_luc || 0).getTime()
+            ) || [];
+        },
+        staleTime: 1000 * 60 * 5, // Cache 5 phút
+        retry: 1,
+    });
+
+    // 🟢 4. FETCH USAGE MAP (Cache 5 phút)
+    const { data: usageMap = {} } = useQuery({
+        queryKey: ['module_usage'],
+        queryFn: async () => {
+            const { data } = await supabase.rpc('get_module_usage_locations');
+            const map: Record<string, string[]> = {};
+            data?.forEach((u: any) => { 
+                map[u.module_name] = u.used_in_pages; 
+            });
+            return map;
+        },
+        staleTime: 1000 * 60 * 5, // Cache 5 phút
+        retry: 1,
+    });
+
+    // 🟢 5. FETCH DASHBOARD LAYOUT (Cache 2 phút, theo pageId)
+    const { data: layoutData, isLoading: isLoadingLayout } = useQuery({
+        queryKey: ['dashboard_layout', pageId],
+        queryFn: async () => {
+            if (configModule) return null; // Không fetch nếu có configModule
+            const { data } = await supabase
+                .from('dashboard_layouts')
+                .select('layout_json')
+                .eq('page_id', pageId)
+                .single();
+            return data?.layout_json || null;
+        },
+        enabled: !configModule, // Chỉ fetch khi không có configModule
+        staleTime: 1000 * 60 * 2, // Cache 2 phút
+        retry: 1,
+    });
+
+    // 🟢 6. SET MODULES TỪ LAYOUT HOẶC INITIAL
+    useEffect(() => {
+        if (configModule) {
+            setModules([configModule]);
+        } else if (layoutData) {
+            setModules(layoutData);
+        } else if (initialModules) {
+            setModules(initialModules);
+        }
+    }, [configModule, layoutData, initialModules]);
+
+    // 🟢 7. FETCH TABLE COLUMNS (Khi chọn bảng trong form)
+    const { data: tableColumns = [] } = useQuery({
+        queryKey: ['table_columns', newModuleData.table],
+        queryFn: async () => {
+            if (!newModuleData.table) return [];
+            const { data } = await supabase.from(newModuleData.table).select('*').limit(1);
+            if (data && data.length > 0) {
+                return Object.keys(data[0]).filter(k => !['id', 'tao_luc', 'updated_at', 'nguoi_tao'].includes(k));
             }
-        } catch (err) { console.error("Lỗi thư viện:", err); }
-    };
+            return [];
+        },
+        enabled: !!newModuleData.table,
+        staleTime: 1000 * 60 * 5, // Cache 5 phút
+    });
+
+    // 🟢 8. AUTO SET DEFAULT VALUES KHI CÓ COLUMNS
+    useEffect(() => {
+        if (tableColumns.length > 0 && !editingId) {
+            setNewModuleData(prev => ({
+                ...prev,
+                groupBy: tableColumns.includes('vi_tri') ? 'vi_tri' : (tableColumns.includes('trang_thai') ? 'trang_thai' : tableColumns[0]),
+                titleField: tableColumns.includes('ho_ten') ? 'ho_ten' : tableColumns[0],
+                subField: tableColumns[1] || tableColumns[0],
+                buttonLabel: 'Truy Cập'
+            }));
+        }
+    }, [tableColumns, editingId]);
+
+    // 🟢 9. MUTATION: DELETE FROM LIBRARY
+    const deleteFromLibraryMutation = useMutation({
+        mutationFn: async (id: string) => {
+            const { error } = await supabase.from('global_modules').delete().eq('id', id);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            // Invalidate cache để refetch
+            queryClient.invalidateQueries({ queryKey: ['global_modules'] });
+            queryClient.invalidateQueries({ queryKey: ['module_usage'] });
+        },
+    });
 
     const handleDeleteFromLibrary = async (id: string, name: string, e: React.MouseEvent) => {
         e.stopPropagation();
         if (confirm(`Xóa vĩnh viễn module "${name}" khỏi kho?`)) {
-            const { error } = await supabase.from('global_modules').delete().eq('id', id);
-            if (!error) setGlobalModules(prev => prev.filter(m => m.id !== id));
+            deleteFromLibraryMutation.mutate(id);
         }
     };
 
-    useEffect(() => {
-        const fetchCols = async () => {
-            if (!newModuleData.table) { setTableColumns([]); return; }
-            try {
-                const { data } = await supabase.from(newModuleData.table).select('*').limit(1);
-                if (data && data.length > 0) {
-                    const keys = Object.keys(data[0]).filter(k => !['id', 'tao_luc', 'updated_at', 'nguoi_tao_id'].includes(k));
-                    setTableColumns(keys);
-                    if (!editingId) {
-                        setNewModuleData(prev => ({
-                            ...prev,
-                            groupBy: keys.includes('vi_tri') ? 'vi_tri' : (keys.includes('trang_thai') ? 'trang_thai' : keys[0]),
-                            titleField: keys.includes('ho_ten') ? 'ho_ten' : keys[0],
-                            subField: keys[1] || keys[0],
-                            buttonLabel: 'Truy Cập'
-                        }));
-                    }
-                }
-            } catch (e) { setTableColumns([]); }
-        };
-        fetchCols();
-    }, [newModuleData.table]);
+    // 🟢 10. MUTATION: SAVE LAYOUT
+    const saveLayoutMutation = useMutation({
+        mutationFn: async (layoutJson: ModuleConfig[]) => {
+            const { error } = await supabase.from('dashboard_layouts').upsert(
+                { page_id: pageId, layout_json: layoutJson, updated_at: new Date().toISOString() }, 
+                { onConflict: 'page_id' }
+            );
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            // Invalidate cache để refetch
+            queryClient.invalidateQueries({ queryKey: ['dashboard_layout', pageId] });
+        },
+    });
+
+    const handleSaveLayout = async () => {
+        if (configModule) return;
+        saveLayoutMutation.mutate(modules);
+    };
+
+    // 🟢 11. MUTATION: ADD TO GLOBAL MODULES
+    const addToGlobalModulesMutation = useMutation({
+        mutationFn: async ({ name, table_name }: { name: string; table_name: string }) => {
+            const { error } = await supabase.from('global_modules').insert({ 
+                name, 
+                table_name, 
+                type: 'generic' 
+            });
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            // Invalidate cache
+            queryClient.invalidateQueries({ queryKey: ['global_modules'] });
+            queryClient.invalidateQueries({ queryKey: ['module_usage'] });
+        },
+    });
 
     const handleOpenAddModal = (rowId?: string) => { 
         setActiveRowId(rowId || 'row_default'); 
@@ -125,7 +211,9 @@ export default function DashboardBuilder({ pageId, title, allowedRoles, initialM
     const handleStartEdit = (id: string) => {
         const targetModule = modules.find(m => m.id === id);
         if (!targetModule) return;
-        setEditingId(id); setAddMode('new'); setMobileStep('form'); 
+        setEditingId(id); 
+        setAddMode('new'); 
+        setMobileStep('form'); 
         setIsAddModalOpen(true);
         setNewModuleData({
             name: targetModule.tenModule,
@@ -140,19 +228,23 @@ export default function DashboardBuilder({ pageId, title, allowedRoles, initialM
         });
     };
 
-    const handleSaveLayout = async () => {
-        if (configModule) return;
-        setIsSaving(true);
-        const { error } = await supabase.from('dashboard_layouts').upsert({ page_id: pageId, layout_json: modules, updated_at: new Date().toISOString() }, { onConflict: 'page_id' });
-        setTimeout(() => setIsSaving(false), 800);
-    };
-
     const handleAddOrUpdateModule = async () => {
         if (!newModuleData.name || !newModuleData.table) return alert("Thiếu tên hoặc bảng!");
-        const widgetData = { chartType: newModuleData.chartType as any, groupBy: newModuleData.groupBy, titleField: newModuleData.titleField, subField: newModuleData.subField, buttonLabel: newModuleData.buttonLabel, buttonColor: newModuleData.buttonColor };
+        const widgetData = { 
+            chartType: newModuleData.chartType as any, 
+            groupBy: newModuleData.groupBy, 
+            titleField: newModuleData.titleField, 
+            subField: newModuleData.subField, 
+            buttonLabel: newModuleData.buttonLabel, 
+            buttonColor: newModuleData.buttonColor 
+        };
         
         if (editingId) {
-            setModules(prev => prev.map(m => m.id === editingId ? { ...m, tenModule: newModuleData.name, bangDuLieu: newModuleData.table, viewType: newModuleData.viewType as any, widgetData: widgetData, updatedAt: new Date().toISOString() } : m));
+            setModules(prev => prev.map(m => 
+                m.id === editingId 
+                    ? { ...m, tenModule: newModuleData.name, bangDuLieu: newModuleData.table, viewType: newModuleData.viewType as any, widgetData: widgetData, updatedAt: new Date().toISOString() } 
+                    : m
+            ));
         } else {
             const newModule: ModuleConfig = {
                 id: `mod_${Date.now()}`,
@@ -166,45 +258,90 @@ export default function DashboardBuilder({ pageId, title, allowedRoles, initialM
                 widgetData: widgetData, 
                 page_id: pageId,
                 danhSachCot: [], 
-                version: '1.0', updatedAt: new Date().toISOString()
+                version: '1.0', 
+                updatedAt: new Date().toISOString()
             };
+            
             if (addMode === 'new') {
-                await supabase.from('global_modules').insert({ name: newModuleData.name, table_name: newModuleData.table, type: 'generic' });
-                fetchGlobalLibrary();
+                await addToGlobalModulesMutation.mutateAsync({ 
+                    name: newModuleData.name, 
+                    table_name: newModuleData.table 
+                });
             }
+            
             setModules(prev => [...prev, newModule]);
         }
-        setIsAddModalOpen(false); setEditingId(null); 
+        setIsAddModalOpen(false); 
+        setEditingId(null); 
     };
     
-    const handleDelete = (id: string) => { if (confirm('Gỡ module?')) setModules(prev => prev.filter(m => m.id !== id)); };
-    const handleResizeWidth = (id: string, delta: number) => { 
-        setModules(prev => prev.map(m => m.id === id ? { ...m, doRong: Math.max(1, Math.min(4, (m.doRong || 1) + delta)) } : m)); 
+    const handleDelete = (id: string) => { 
+        if (confirm('Gỡ module?')) setModules(prev => prev.filter(m => m.id !== id)); 
     };
-    const handleOpenDetail = (item: any, config: ModuleConfig) => { setDetailItem(item || {}); setActiveModuleConfig(config); setIsDetailOpen(true); };
+    
+    const handleResizeWidth = (id: string, delta: number) => { 
+        setModules(prev => prev.map(m => 
+            m.id === id 
+                ? { ...m, doRong: Math.max(1, Math.min(4, (m.doRong || 1) + delta)) } 
+                : m
+        )); 
+    };
+    
+    const handleOpenDetail = (item: any, config: ModuleConfig) => { 
+        setDetailItem(item || {}); 
+        setActiveModuleConfig(config); 
+        setIsDetailOpen(true); 
+    };
+
+    // 🟢 LOADING STATE: Chỉ loading khi fetch layout (nếu cần)
+    const loading = !configModule && isLoadingLayout;
 
     if (loading) return <div className="h-screen flex items-center justify-center bg-transparent pointer-events-none"><Loader2 className="animate-spin text-[#C69C6D]" size={40}/></div>;
     if (!hasAccess) return <AccessDenied userRole={userRole} targetTitle={title} allowedRoles={allowedRoles} onRedirect={() => router.push('/')} />;
 
+    // 🟢 TẠO DANH SÁCH TÁC VỤ CHO NUTMODAL
+    const danhSachTacVu: any[] = [];
+    if (!hideAddButton) {
+        danhSachTacVu.push({ id: 'add', icon: Plus, nhan: 'Thêm Module', onClick: () => handleOpenAddModal() });
+    }
+    const isSaving = saveLayoutMutation.isPending;
+    danhSachTacVu.push({ 
+        id: 'save', 
+        icon: isSaving ? CheckCircle : Save, 
+        nhan: isSaving ? 'Đang Lưu...' : 'Lưu Cấu Hình', 
+        onClick: handleSaveLayout, 
+        mauSac: isSaving ? 'bg-green-600 border-green-500 text-white' : undefined 
+    });
+
     return (
-        // 🟢 NỀN ĐEN 80% VÀ KHÔNG CUỘN THÂN TRANG
         <div 
             id="dashboard-main-content"
             className="fixed inset-0 z-[3000] w-full h-[100dvh] bg-black/80 backdrop-blur-sm text-[#E8D4B9] font-sans overflow-hidden transition-opacity duration-500 ease-in-out"
         >
             <div className="w-full h-full overflow-y-auto custom-scroll">
                 <div className="pt-[100px] pb-[120px]">
-                    <GridArea modules={modules} isAdmin={isAdmin} onChange={(newModules) => setModules(newModules)} onEditModule={handleStartEdit} onDeleteModule={handleDelete} onResizeWidth={handleResizeWidth} onOpenDetail={handleOpenDetail} onLevel2Toggle={(isOpen) => setIsAnyLevel2Open(isOpen)} onAddModuleToRow={(rowId) => handleOpenAddModal(rowId)} forceHidden={false} />
+                    <GridArea 
+                        modules={modules} 
+                        isAdmin={isAdmin} 
+                        onChange={(newModules) => setModules(newModules)} 
+                        onEditModule={handleStartEdit} 
+                        onDeleteModule={handleDelete} 
+                        onResizeWidth={handleResizeWidth} 
+                        onOpenDetail={handleOpenDetail} 
+                        onLevel2Toggle={(isOpen) => setIsAnyLevel2Open(isOpen)} 
+                        onAddModuleToRow={(rowId) => handleOpenAddModal(rowId)} 
+                        forceHidden={false} 
+                    />
                 </div>
             </div>
 
+            {/* 🟢 HIỂN THỊ NÚT TÁC VỤ (THÊM/LƯU) */}
             {!configModule && isAdmin && !isDetailOpen && !isAnyLevel2Open && (
-                <NutModal danhSachTacVu={[{ id: 'save', icon: isSaving ? CheckCircle : Save, nhan: isSaving ? 'Đã Lưu!' : 'Lưu Cấu Hình', onClick: handleSaveLayout, mauSac: isSaving ? 'bg-green-600 border-green-500 text-white' : undefined }]} />
+                <NutModal danhSachTacVu={danhSachTacVu} />
             )}
 
             {isAddModalOpen && (
                 <div className="fixed inset-0 z-[6000] bg-black/90 flex items-center justify-center p-0 md:p-4 backdrop-blur-sm pointer-events-auto">
-                    {/* ... (Giữ nguyên nội dung modal thêm mới) ... */}
                     <div className="bg-[#161210] border border-[#8B5E3C]/30 rounded-none md:rounded-2xl w-full max-w-5xl h-full md:h-[85vh] shadow-2xl flex flex-col overflow-hidden">
                         <div className="shrink-0 p-4 border-b border-[#8B5E3C]/20 flex justify-between items-center bg-[#1a120f]">
                             <h3 className="text-xl font-bold text-[#F5E6D3] flex items-center gap-3">{editingId ? <Edit3 /> : <Layout />} {editingId ? 'Chỉnh Sửa Module' : 'Thêm Module'}</h3>
@@ -236,7 +373,7 @@ export default function DashboardBuilder({ pageId, title, allowedRoles, initialM
                                 <div className="space-y-8 max-w-2xl mx-auto">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div><label className="block text-xs font-bold text-[#8B5E3C] uppercase mb-2">Tên Module</label><input type="text" className="w-full bg-[#0a0807] border border-[#8B5E3C]/30 rounded-lg px-4 py-3 outline-none" value={newModuleData.name} onChange={(e) => setNewModuleData({...newModuleData, name: e.target.value})} /></div>
-                                        <div><label className="block text-xs font-bold text-[#8B5E3C] uppercase mb-2">Bảng Dữ Liệu</label><select className="w-full bg-[#0a0807] border border-[#8B5E3C]/30 rounded-lg px-4 py-3 outline-none" value={newModuleData.table} onChange={(e) => setNewModuleData({...newModuleData, table: e.target.value})}><option value="">-- Chọn --</option>{availableTables.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                                        <div><label className="block text-xs font-bold text-[#8B5E3C] uppercase mb-2">Bảng Dữ Liệu</label><select className="w-full bg-[#0a0807] border border-[#8B5E3C]/30 rounded-lg px-4 py-3 outline-none" value={newModuleData.table} onChange={(e) => setNewModuleData({...newModuleData, table: e.target.value})}><option value="">-- Chọn --</option>{availableTables.map((t: string) => <option key={t} value={t}>{t}</option>)}</select></div>
                                     </div>
                                     <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
                                         {[
@@ -246,7 +383,7 @@ export default function DashboardBuilder({ pageId, title, allowedRoles, initialM
                                             {id: 'button', label: 'Nút Bấm', icon: MousePointerClick},
                                             {id: 'direct_l2', label: 'Bảng', icon: AppWindow},
                                         ].map(type => (
-                                            <div key={type.id} onClick={() => setNewModuleData({...newModuleData, viewType: type.id})} className={`cursor-pointer p-3 rounded-xl border flex flex-col items-center gap-2 ${newModuleData.viewType === type.id ? 'bg-[#C69C6D]/20 border-[#C69C6D] text-[#C69C6D]' : 'bg-[#0a0807] border-[#8B5E3C]/20 text-[#5D4037]'}`}><type.icon size={20} /><span className="font-bold text-[9px] uppercase">{type.label}</span></div>
+                                            <div key={type.id} onClick={() => setNewModuleData({...newModuleData, viewType: type.id as any})} className={`cursor-pointer p-3 rounded-xl border flex flex-col items-center gap-2 ${newModuleData.viewType === type.id ? 'bg-[#C69C6D]/20 border-[#C69C6D] text-[#C69C6D]' : 'bg-[#0a0807] border-[#8B5E3C]/20 text-[#5D4037]'}`}><type.icon size={20} /><span className="font-bold text-[9px] uppercase">{type.label}</span></div>
                                         ))}
                                     </div>
                                     {newModuleData.table && (
@@ -268,7 +405,7 @@ export default function DashboardBuilder({ pageId, title, allowedRoles, initialM
             )}
             
             {isDetailOpen && activeModuleConfig && (
-                <Level3_FormChiTiet isOpen={isDetailOpen} onClose={() => setIsDetailOpen(false)} onSuccess={() => setIsDetailOpen(false)} config={activeModuleConfig} initialData={detailItem} userRole={userRole} />
+                <GenericModule mode="level3" isOpen={isDetailOpen} onClose={() => setIsDetailOpen(false)} onSuccess={() => setIsDetailOpen(false)} config={activeModuleConfig} initialData={detailItem} userRole={userRole} />
             )}
         </div>
     );

@@ -8,8 +8,7 @@ import { Settings, Trash2, GripVertical, Cpu, Gauge, Maximize2, Minimize2 } from
 import { ModuleConfig } from '@/app/GiaoDienTong/DashboardBuilder/KieuDuLieuModule';
 
 import Level1_Widget_Generic from '@/app/GiaoDienTong/ModalDaCap/Modulegeneric/level1generic/widget';
-import Level2_Generic from '@/app/GiaoDienTong/ModalDaCap/Modulegeneric/level2generic/level2generic';
-import Level3_FormChiTiet from '@/app/GiaoDienTong/ModalDaCap/Modulegeneric/level3generic/level3generic';
+import GenericModule from '@/app/GiaoDienTong/ModalDaCap/Modulegeneric/GenericModule';
 import Level2_DanhSachModal from '@/app/GiaoDienTong/ModalDaCap/Modulegeneric/level2generic/level2generic';
 
 const GlobalHideDashboardStyle = () => (
@@ -68,7 +67,7 @@ export default function ModuleItem({ id, data, isAdmin, onDelete, onEdit, onResi
   const renderContent = () => {
       if (data.customId === 'custom_nhan_su') return;
       if (data.moduleType === 'generic') {
-          if (viewType === 'direct_l2') return <div className="w-full h-full overflow-hidden bg-transparent flex flex-col"><Level2_Generic isOpen={true} config={data} isEmbedded={true} onOpenDetail={onOpenDetail} /></div>;
+          if (viewType === 'direct_l2') return <div className="w-full h-full overflow-hidden bg-transparent flex flex-col"><GenericModule mode="level2" isOpen={true} config={data} isEmbedded={true} onOpenDetail={onOpenDetail} /></div>;
           if (viewType === 'direct_l3') return <div className="w-full h-full overflow-hidden bg-transparent relative flex flex-col items-center justify-center group cursor-pointer hover:bg-white/5 transition-colors" onClick={() => handleToggleLevel2(true)}><Cpu size={32} className="text-[#8B5E3C] mb-2 group-hover:text-[#C69C6D] transition-colors"/><span className="text-xs font-bold uppercase text-[#E8D4B9]">Form Nhập Liệu</span><div className="mt-2 px-3 py-1 bg-[#C69C6D] text-black text-[10px] font-bold shadow-lg uppercase group-hover:scale-105 transition-transform">Mở Ngay</div></div>;
           return <Level1_Widget_Generic config={data} onClick={() => handleToggleLevel2(true)} />;
       }
@@ -79,9 +78,9 @@ export default function ModuleItem({ id, data, isAdmin, onDelete, onEdit, onResi
       <>
           {data.moduleType === 'generic' ? (
               viewType === 'direct_l3' ? (
-                  <Level3_FormChiTiet isOpen={true} onClose={() => handleToggleLevel2(false)} onSuccess={() => handleToggleLevel2(false)} config={data} userRole={'admin'} initialData={null} />
+                  <GenericModule mode="level3" isOpen={true} onClose={() => handleToggleLevel2(false)} onSuccess={() => handleToggleLevel2(false)} config={data} userRole={'admin'} initialData={null} />
               ) : (
-                  <Level2_Generic isOpen={true} onClose={() => handleToggleLevel2(false)} config={data} onOpenDetail={onOpenDetail} />
+                  <GenericModule mode="level2" isOpen={true} onClose={() => handleToggleLevel2(false)} config={data} onOpenDetail={onOpenDetail} />
               )
           ) : (
               <Level2_DanhSachModal isOpen={showLevel2} onClose={() => handleToggleLevel2(false)} config={data} onOpenDetail={onOpenDetail} />

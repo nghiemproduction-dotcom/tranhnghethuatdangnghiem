@@ -5,7 +5,7 @@ export const layCauHinhNgoaiLe = (bangDuLieu: string, isCreateMode: boolean) => 
     let customTabs: any[] = [];
     
     // Ngoại lệ cho Nhân sự: Thêm tab Thành tích
-    if (bangDuLieu === 'nhan_su' && !isCreateMode) {
+    if (bangDuLieu === 'nhan_su') {
         customTabs.push({ 
             id: 'thanh_tich', 
             label: 'Thành Tích', 

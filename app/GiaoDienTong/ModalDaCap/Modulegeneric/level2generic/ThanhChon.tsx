@@ -12,7 +12,7 @@ export default function ThanhChon({ count, canDelete, onDelete, onCancel }: Prop
     if (count === 0) return null;
 
     return (
-        <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-[3000] animate-in slide-in-from-bottom-5 duration-300">
+        <div className="fixed bottom-32 left-1/2 transform -translate-x-1/2 z-[3000] animate-in slide-in-from-bottom-5 duration-300">
             <div className="bg-[#1a120f] border border-[#8B5E3C] shadow-[0_0_20px_rgba(0,0,0,0.8)] rounded-full px-6 py-2 flex items-center gap-4">
                 <div className="flex items-center gap-2 border-r border-[#8B5E3C]/30 pr-4">
                     <CheckSquare size={18} className="text-[#C69C6D]" />

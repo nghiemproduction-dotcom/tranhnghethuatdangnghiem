@@ -30,6 +30,27 @@ export interface VirtualColumn {
   matchColumn: string;      
 }
 
+export interface FormExtensions {
+  // Override toàn bộ form component
+  customFormComponent?: React.ComponentType<any>;
+
+  // Extension functions
+  beforeSubmit?: (data: any, config: ModuleConfig) => Promise<any> | any;
+  afterSubmit?: (data: any, config: ModuleConfig) => Promise<void> | void;
+  customValidation?: (data: any, config: ModuleConfig) => { isValid: boolean; errors: Record<string, string> };
+  customFieldRenderer?: (field: CotHienThi, value: any, onChange: (value: any) => void, error?: string) => React.ReactNode;
+
+  // Field-level customizations
+  fieldOverrides?: Record<string, Partial<CotHienThi> & {
+    customRenderer?: (value: any, onChange: (value: any) => void, error?: string) => React.ReactNode;
+    customValidation?: (value: any) => string;
+  }>;
+
+  // Table-specific logic
+  onFormInit?: (formData: any, config: ModuleConfig) => any;
+  onFormChange?: (field: string, value: any, formData: any, config: ModuleConfig) => any;
+}
+
 export interface ModuleConfig {
   id: string;
   tenModule: string;  
@@ -86,6 +107,9 @@ export interface ModuleConfig {
   quyenAdminDetail?: string[]; 
   virtualColumns?: VirtualColumn[]; 
   danhSachCot: CotHienThi[];
+  
+  // 🟢 EXTENSIONS: Hỗ trợ customization cho từng bảng
+  formExtensions?: FormExtensions;
   
   version: string;
   updatedAt: string;

@@ -1,6 +1,6 @@
 'use client';
 import React, { useRef } from 'react';
-import { GripVertical } from 'lucide-react'; 
+import { GripVertical, AlertCircle } from 'lucide-react'; 
 import InputRenderer from './InputRenderer';
 import { CotHienThi } from '../../../DashboardBuilder/KieuDuLieuModule';
 import { useLevel3Context } from './Level3Context'; 
@@ -37,8 +37,8 @@ export default function Tab_ThongTin() {
             // 1. LOGIC ẨN CỘT TỪ DB
             if (col.hienThiDetail === false) return null;
 
-            // 🟢 2. LOGIC CỤ THỂ CHO TAB NÀY (Đã thêm ho_ten)
-            if (['hinh_anh', 'avatar', 'logo', 'lich_su_dang_nhap', 'luong_theo_gio', 'lan_dang_nhap_ts', 'nguoi_tao_id', 'ten_nguoi_tao', 'ho_ten'].includes(col.key)) return null;
+            // 2. LOGIC ẨN CÁC CỘT HỆ THỐNG / AVATAR (Để hiển thị ở chỗ khác đẹp hơn)
+            if (['hinh_anh', 'avatar', 'logo', 'lich_su_dang_nhap', 'luong_theo_gio', 'lan_dang_nhap_ts', 'nguoi_tao', 'ten_nguoi_tao'].includes(col.key)) return null;
             
             // Check quyền
             if (col.permRead && !col.permRead.includes('all') && !canEditColumn(col)) return null;
@@ -55,7 +55,7 @@ export default function Tab_ThongTin() {
                 className={`
                     group transition-all duration-200 
                     flex flex-col md:flex-row md:items-baseline gap-1 md:gap-4
-                    ${isArranging ? 'cursor-move border border-dashed border-[#C69C6D]/50 bg-[#C69C6D]/5 p-2 rounded-lg' : 'py-2 md:py-2'}
+                    ${isArranging ? 'cursor-move border border-dashed border-[#C69C6D]/50 bg-[#C69C6D]/5 p-2 rounded-lg' : 'py-2 md:py-2 border-b border-[#8B5E3C]/10 md:border-none'}
                 `}
             >
                 {/* Label */}
@@ -75,10 +75,23 @@ export default function Tab_ThongTin() {
         );
     };
 
+    // Kiểm tra xem có cột nào để hiển thị không
+    const visibleColumns = config.danhSachCot || [];
+    
+    if (visibleColumns.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center py-10 text-gray-500">
+                <AlertCircle size={32} className="mb-2 opacity-50"/>
+                <p>Không có thông tin chi tiết.</p>
+                <p className="text-xs">Chưa cấu hình cột hiển thị.</p>
+            </div>
+        );
+    }
+
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 w-full px-2">
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-12 gap-y-2">
-                {config.danhSachCot.map((col: CotHienThi, index: number) => renderField(col, index))}
+                {visibleColumns.map((col: CotHienThi, index: number) => renderField(col, index))}
             </div>
         </div>
     );

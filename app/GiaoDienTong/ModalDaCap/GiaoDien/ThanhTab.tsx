@@ -39,14 +39,12 @@ export default function ThanhTab({ danhSachTab, tabHienTai, onChuyenTab }: Props
                             data-active={isActive}
                             className={`
                                 group relative flex items-center gap-2 px-1 py-3 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap transition-all duration-300 border-b-2
-                                ${isActive ? 'text-[#C69C6D] border-[#C69C6D]' : 'text-[#5D4037] border-transparent hover:text-[#A1887F] hover:border-[#A1887F]/30'}
+                                ${isActive ? 'text-[#C69C6D] border-[#C69C6D]' : 'text-[#A1887F] border-transparent hover:text-[#C69C6D] hover:border-[#C69C6D]/30'}
                             `}
                         >
                             {Icon && <Icon size={14} className={`transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} strokeWidth={isActive ? 2.5 : 2} />}
                             <span>{tab.label}</span>
-                            {tab.count !== undefined && tab.count > 0 && (
-                                <span className={`ml-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors ${isActive ? 'bg-[#C69C6D] text-[#1a120f]' : 'bg-[#2a1e1b] text-[#5D4037] group-hover:text-[#A1887F]'}`}>{tab.count}</span>
-                            )}
+                                <span className={`ml-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors ${isActive ? 'bg-[#C69C6D] text-[#1a120f]' : 'bg-[#2a1e1b] text-[#A1887F] group-hover:text-[#C69C6D]'}`}>{tab.count}</span>
                         </button>
                     );
                 })}

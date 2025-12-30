@@ -58,8 +58,8 @@ export default function NutXemThem({ targetId, forceHide = false }: Props) {
     <div 
       className={`fixed left-1/2 -translate-x-1/2 z-[95] transition-all duration-700 ease-in-out
         ${isHidden ? 'opacity-0 translate-y-10 pointer-events-none' : 'opacity-100 translate-y-0 pointer-events-auto'}
-        ${scrollState === 'top' ? 'bottom-28 md:bottom-12' : 'bottom-24 md:bottom-28'} 
-        /* bottom-24 ở chế độ bottom để tránh đè lên footer/menu dưới quá sát */
+        ${scrollState === 'top' ? 'bottom-36 md:bottom-16' : 'bottom-32 md:bottom-36'} 
+        /* Tăng bottom để tránh gradient MenuDuoi che mờ */
       `}
     >
       <button 

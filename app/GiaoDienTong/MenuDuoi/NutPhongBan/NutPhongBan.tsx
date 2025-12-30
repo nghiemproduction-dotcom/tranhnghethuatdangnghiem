@@ -18,6 +18,8 @@ import ModalPhongTho from '@/app/GiaoDienTong/ModalDaCap/ModalPhongTho';
 import ModalPhongCTV from '@/app/GiaoDienTong/ModalDaCap/ModalPhongCTV';
 import ModalPhongPartTime from '@/app/GiaoDienTong/ModalDaCap/ModalPhongPartTime'; 
 import ModalPhongThietKe from '@/app/GiaoDienTong/ModalDaCap/ModalPhongThietKe'; 
+// 🟢 IMPORT PHÒNG TRƯNG BÀY
+import ModalPhongTrungBay from '@/app/GiaoDienTong/ModalDaCap/ModalPhongTrungBay';
 
 interface Props {
     nguoiDung: any;
@@ -31,9 +33,10 @@ export default function NutPhongBan({ nguoiDung, isOpen, onToggle, onClose }: Pr
     const [mounted, setMounted] = useState(false);
     const [itemsPerPage, setItemsPerPage] = useState(10); 
 
+    // 🟢 THÊM STATE: trungbay
     const [openStates, setOpenStates] = useState({
         admin: false, quanly: false, sales: false, tho: false, 
-        parttime: false, ctv: false, thietke: false 
+        parttime: false, ctv: false, thietke: false, trungbay: false
     });
     const searchParams = useSearchParams();
 
@@ -54,13 +57,13 @@ export default function NutPhongBan({ nguoiDung, isOpen, onToggle, onClose }: Pr
     const closeAllModals = () => {
         setOpenStates({ 
             admin: false, quanly: false, sales: false, tho: false, 
-            parttime: false, ctv: false, thietke: false 
+            parttime: false, ctv: false, thietke: false, trungbay: false
         });
     };
 
     useEffect(() => {
         const portal = searchParams.get('portal');
-        if (portal && ['admin', 'quanly', 'sales', 'tho', 'parttime', 'ctv', 'thietke'].includes(portal)) {
+        if (portal && ['admin', 'quanly', 'sales', 'tho', 'parttime', 'ctv', 'thietke', 'trungbay'].includes(portal)) {
             setOpenStates(p => ({ ...p, [portal]: true }));
             if (isOpen) onToggle();
         }
@@ -70,6 +73,9 @@ export default function NutPhongBan({ nguoiDung, isOpen, onToggle, onClose }: Pr
         if (idPhong === 'admin') setOpenStates(p => ({...p, admin: true}));
         else if (idPhong === 'quanly') setOpenStates(p => ({...p, quanly: true}));
         else if (idPhong === 'thietke') setOpenStates(p => ({...p, thietke: true}));
+        // 🟢 XỬ LÝ CLICK TRƯNG BÀY
+        else if (idPhong === 'trungbay') setOpenStates(p => ({...p, trungbay: true}));
+        
         else if (['thosanxuat', 'kythuat', 'tho'].includes(idPhong)) setOpenStates(p => ({...p, tho: true}));
         else if (['sales', 'kinhdoanh'].includes(idPhong)) setOpenStates(p => ({...p, sales: true}));
         else if (['parttime', 'thoivu'].includes(idPhong)) setOpenStates(p => ({...p, parttime: true}));
@@ -129,6 +135,9 @@ export default function NutPhongBan({ nguoiDung, isOpen, onToggle, onClose }: Pr
             <ModalPhongTho isOpen={openStates.tho} onClose={closeAllModals} />
             <ModalPhongPartTime isOpen={openStates.parttime} onClose={closeAllModals} />
             <ModalPhongCTV isOpen={openStates.ctv} onClose={closeAllModals} />
+            
+            {/* 🟢 RENDER MODAL TRƯNG BÀY */}
+            <ModalPhongTrungBay isOpen={openStates.trungbay} onClose={closeAllModals} />
         </>
     );
 

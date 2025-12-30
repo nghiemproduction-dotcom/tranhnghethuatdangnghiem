@@ -1,11 +1,13 @@
 'use client';
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
-import { ModuleConfig } from '@/app/GiaoDienTong/DashboardBuilder/KieuDuLieuModule';
+import { ModuleConfig, CotHienThi } from '@/app/GiaoDienTong/DashboardBuilder/KieuDuLieuModule';
 import ThanhPhanTrang from '@/app/GiaoDienTong/ModalDaCap/GiaoDien/ThanhPhanTrang';
-import Level3_FormChiTiet from '@/app/GiaoDienTong/ModalDaCap/Modulegeneric/level3generic/level3generic';
+import dynamic from 'next/dynamic';
+const Level3_FormChiTiet = dynamic(() => import('@/app/GiaoDienTong/ModalDaCap/Modulegeneric/GenericModule'), { ssr: false });
 
-import { useDuLieu } from './useDuLieu';
+import { useQuery, keepPreviousData, useMutation, useQueryClient } from '@tanstack/react-query'; 
+
 import { layCauHinhDongBo } from './CauHinhDongBo';
 import HeaderNhung from './HeaderNhung';
 import KhungHienThi from './KhungHienThi';
@@ -21,10 +23,12 @@ interface Props {
     extraFilter?: Record<string, any>; 
 }
 
+const ITEMS_PER_PAGE = 20;
+
 export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbedded = false, extraFilter }: Props) {
-    // 🟢 CHỐNG RE-RENDER TỪ PHÍA CHA (Parent Re-render Protection)
+    const queryClient = useQueryClient();
+    
     const configRef = useRef(config);
-    // Chỉ cập nhật ref nếu ID hoặc bảng thay đổi thực sự
     if (config.id !== configRef.current.id || config.bangDuLieu !== configRef.current.bangDuLieu) {
         configRef.current = config;
     }
@@ -36,42 +40,165 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
     }
     const stableExtraFilter = extraFilterRef.current;
 
-    // Hook lấy dữ liệu (đã được fix trong useDuLieu.ts)
-    const { data, setData, loading, setLoading, search, setSearch, page, setPage, total, groupByCol, setGroupByCol, existingColumns, columns, fetchData, ITEMS_PER_PAGE } = useDuLieu(stableConfig, isOpen, stableExtraFilter, isEmbedded);
-    
-    // 🟢 LỌC ID TRÙNG (Fix lỗi warnOnInvalidKey)
-    const uniqueData = useMemo(() => {
-        if (!data) return [];
-        const seen = new Set();
-        return data.filter((item: any) => {
-            const id = item.id || `temp-${Math.random()}`; // Fallback ID
-            if (seen.has(id)) return false;
-            seen.add(id);
-            return true;
-        });
-    }, [data]);
-
-    const syncConfig = layCauHinhDongBo(stableConfig);
-    
+    const [page, setPage] = useState(1);
+    const [search, setSearch] = useState('');
     const [viewMode, setViewMode] = useState<'card' | 'kanban'>('card');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
-    const [syncing, setSyncing] = useState(false);
     const [activeTab, setActiveTab] = useState('ALL');
-    const [tabOptions, setTabOptions] = useState<string[]>([]);
     const [userRole, setUserRole] = useState('khach');
     const [isLevel3Open, setIsLevel3Open] = useState(false);
     const [selectedItem, setSelectedItem] = useState<any>(null);
+    const [syncing, setSyncing] = useState(false);
+    
+    const [groupByCol, setGroupByCol] = useState(stableConfig.widgetData?.groupBy || '');
+    
+    // 🟢 CHỐT: Luôn dùng bảng gốc
+    const tableToQuery = stableConfig.bangDuLieu;
 
     useEffect(() => { if (typeof window !== 'undefined') setUserRole(localStorage.getItem('USER_ROLE') || 'khach'); }, []);
     const canAdd = ['admin', 'quanly', 'boss'].includes(userRole);
     const canDelete = ['admin', 'boss'].includes(userRole);
 
-    useEffect(() => {
-        const event = new CustomEvent('toggle-content-visibility', {
-            detail: { id: `level2-${stableConfig.id}-level3`, open: isLevel3Open }
+    // 🟢 HÀM XÓA CACHE MẠNH MẼ (Dùng cho cả Delete và Save)
+    const forceRefreshAll = () => {
+        // Hủy cache của LIST hiện tại
+        queryClient.invalidateQueries({ queryKey: ['list', tableToQuery] });
+        
+        // 🟢 QUAN TRỌNG: Hủy luôn cache của Widget Level 1 (nếu key chứa tên bảng)
+        // Cách này đảm bảo khi ra ngoài Level 1, nó sẽ thấy dữ liệu mới
+        queryClient.invalidateQueries({ 
+            predicate: (query) => {
+                const key = query.queryKey as any[];
+                // Nếu key có chứa tên bảng (ví dụ: ['widget', 'nhan_su'] hoặc ['count', 'nhan_su'])
+                return key.includes(tableToQuery);
+            }
         });
-        window.dispatchEvent(event);
-    }, [isLevel3Open, stableConfig.id]);
+    };
+
+    // 1. LẤY SCHEMA
+    const { data: schemaCols = [] } = useQuery({
+        queryKey: ['schema', stableConfig.bangDuLieu],
+        queryFn: async () => {
+            try {
+                const { data, error } = await supabase.rpc('get_table_columns', { t_name: stableConfig.bangDuLieu });
+                if (!error && data) {
+                     return data.map((db: any) => ({
+                        key: db.column_name,
+                        label: db.column_name.replaceAll('_', ' '),
+                        kieuDuLieu: db.column_name.includes('anh') ? 'image' : (db.data_type === 'boolean' ? 'boolean' : 'text'),
+                        hienThiList: true,
+                        hienThiDetail: true
+                    }));
+                }
+            } catch (e) { console.error(e); }
+            return [];
+        },
+        staleTime: Infinity,
+        enabled: isOpen
+    });
+
+    const columns: CotHienThi[] = useMemo(() => {
+        const configuredCols = stableConfig.danhSachCot || [];
+        if (configuredCols.length > 0) return configuredCols;
+        return schemaCols;
+    }, [stableConfig.danhSachCot, schemaCols]);
+
+    // 2. LẤY TABS
+    const { data: tabOptions = [] } = useQuery({
+        queryKey: ['tabs', tableToQuery, groupByCol],
+        queryFn: async () => {
+            if (!groupByCol) return [];
+            const { data } = await supabase.from(tableToQuery).select(groupByCol).not(groupByCol, 'is', null);
+            if (data) {
+                const unique = Array.from(new Set(data.map((i: any) => i[groupByCol]))).sort();
+                return unique as string[];
+            }
+            return [];
+        },
+        enabled: !!groupByCol && isOpen,
+        staleTime: 1000 * 60 * 5 
+    });
+
+    // 3. LẤY DỮ LIỆU LIST
+    const { data: queryResult, isLoading: loading } = useQuery({
+        queryKey: ['list', tableToQuery, page, search, activeTab, stableExtraFilter, groupByCol],
+        queryFn: async () => {
+            let query = supabase.from(tableToQuery).select('*', { count: 'exact' });
+
+            if (search) {
+                const textCols = columns.filter(c => ['text', 'select_dynamic'].includes(c.kieuDuLieu)).map(c => c.key);
+                if (textCols.length > 0) {
+                    const orFilter = textCols.map(col => `${col}.ilike.%${search}%`).join(',');
+                    query = query.or(orFilter);
+                }
+            }
+            if (groupByCol && activeTab !== 'ALL') {
+                query = query.eq(groupByCol, activeTab);
+            }
+            if (stableExtraFilter) {
+                Object.entries(stableExtraFilter).forEach(([key, val]) => {
+                    query = query.eq(key, val);
+                });
+            }
+
+            const from = (page - 1) * ITEMS_PER_PAGE;
+            const to = from + ITEMS_PER_PAGE - 1;
+            
+            const hasTaoLuc = columns.some(c => c.key === 'tao_luc');
+            if (hasTaoLuc) query = query.order('tao_luc', { ascending: false });
+            else query = query.order('id', { ascending: false });
+
+            const { data, count, error } = await query.range(from, to);
+            if (error) throw error;
+            return { data, count };
+        },
+        placeholderData: keepPreviousData,
+        enabled: isOpen,
+        // 🟢 CẤM CACHE TUYỆT ĐỐI (Để sửa lỗi dữ liệu ma)
+        staleTime: 0,
+        gcTime: 0,
+        refetchOnMount: 'always'
+    });
+
+    const data = queryResult?.data || [];
+    const total = queryResult?.count || 0;
+    const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+
+    const deleteMutation = useMutation({
+        mutationFn: async (ids: string[]) => {
+            const { error } = await supabase.from(stableConfig.bangDuLieu).delete().in('id', ids);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            forceRefreshAll(); // 🟢 GỌI HÀM REFRESH MẠNH
+            setSelectedIds([]);
+            alert('Đã xóa thành công!');
+        },
+        onError: (err: any) => alert('Lỗi xóa: ' + err.message)
+    });
+
+    const syncConfig = layCauHinhDongBo(stableConfig);
+    const handleSync = async () => {
+        if (!confirm(`Bạn muốn ${syncConfig.tooltip}?`)) return;
+        setSyncing(true);
+        try {
+            const { error } = await supabase.rpc(syncConfig.rpcFunc);
+            if (error) throw error;
+            forceRefreshAll(); // 🟢 GỌI HÀM REFRESH MẠNH
+            alert('Đồng bộ thành công!');
+        } catch (e: any) { alert(e.message); } 
+        finally { setSyncing(false); }
+    };
+
+    const handleDelete = () => {
+        if (!confirm(`Xóa vĩnh viễn ${selectedIds.length} mục?`)) return;
+        deleteMutation.mutate(selectedIds);
+    };
+
+    const handleOpenLevel3 = (item: any) => { 
+        setSelectedItem(item);
+        setIsLevel3Open(true);
+    };
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -80,39 +207,10 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
                 const searchInput = document.getElementById('search-input-level2');
                 if (searchInput) searchInput.focus();
             }
-            if (e.ctrlKey && e.key === 'r') {
-                e.preventDefault();
-                fetchData(page);
-            }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [page, fetchData]);
-
-    useEffect(() => {
-        const loadTabs = async () => {
-            if (groupByCol && existingColumns.includes(groupByCol)) {
-                const { data } = await supabase.from(stableConfig.bangDuLieu).select(groupByCol).not(groupByCol, 'is', null);
-                if (data) setTabOptions(Array.from(new Set(data.map((i: any) => i[groupByCol]))).sort() as string[]);
-            }
-        };
-        loadTabs();
-    }, [groupByCol, existingColumns, stableConfig.bangDuLieu]);
-
-    const handleSync = async () => { if (!confirm(`Bạn muốn ${syncConfig.tooltip}?`)) return; setSyncing(true); try { const { error } = await supabase.rpc(syncConfig.rpcFunc); if (error) throw error; alert('Đồng bộ thành công!'); } catch (e: any) { alert(e.message); } finally { setSyncing(false); } };
-    
-    const handleDelete = async () => { 
-        if (!confirm(`Xóa vĩnh viễn ${selectedIds.length} mục đã chọn?`)) return; 
-        setLoading(true); 
-        await supabase.from(stableConfig.bangDuLieu).delete().in('id', selectedIds); 
-        setLoading(false); 
-        setSelectedIds([]); 
-        fetchData(page, activeTab, search); 
-    };
-
-    const handleOpenLevel3 = (item: any) => { setSelectedItem(item); setIsLevel3Open(true); };
-
-    const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+    }, []);
 
     const MainContent = (
         <div className={`relative w-full h-full bg-transparent ${isEmbedded ? '' : 'animate-in fade-in duration-300'}`}>
@@ -120,7 +218,7 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
                 <div className={`min-h-full ${isEmbedded ? 'pt-[100px]' : 'pt-[110px]'} pb-[130px] px-2 md:px-6`}>
                     <KhungHienThi 
                         loading={loading} 
-                        data={uniqueData} 
+                        data={data} 
                         viewMode={viewMode} 
                         columns={columns} 
                         groupByCol={groupByCol}
@@ -137,7 +235,7 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
                 <div className="absolute top-0 left-0 right-0 z-20 pointer-events-none pt-[85px]">
                     <div className="pointer-events-auto px-4"> 
                         <HeaderNhung 
-                            search={search} onSearchChange={setSearch} onSearchEnter={() => { setPage(1); fetchData(1, activeTab, search); }}
+                            search={search} onSearchChange={setSearch} onSearchEnter={() => setPage(1)}
                             canAdd={canAdd} onAdd={() => handleOpenLevel3(null)}
                             syncConfig={syncConfig} isSyncing={syncing} onSync={handleSync}
                         />
@@ -152,8 +250,8 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
                             <ThanhPhanTrang 
                                 trangHienTai={page} 
                                 tongSoTrang={totalPages} 
-                                onLui={() => page > 1 && fetchData(page - 1)} 
-                                onToi={() => page < totalPages && fetchData(page + 1)} 
+                                onLui={() => setPage(p => Math.max(1, p - 1))} 
+                                onToi={() => setPage(p => Math.min(totalPages, p + 1))} 
                             />
                         </div>
                     )}
@@ -165,9 +263,9 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
                             viewMode={viewMode} 
                             onToggleView={() => setViewMode(v => v === 'card' ? 'kanban' : 'card')}
                             onAdd={() => handleOpenLevel3(null)} 
-                            onRefresh={() => fetchData(page)} 
+                            onRefresh={() => forceRefreshAll()} 
                             onClose={onClose || (() => {})}
-                            onSearch={(k) => { setSearch(k); setPage(1); fetchData(1, activeTab, k); }} 
+                            onSearch={(k) => { setSearch(k); setPage(1); }} 
                             search={search}
                             syncConfig={syncConfig} 
                             isSyncing={syncing} 
@@ -175,6 +273,9 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
                             groupByCol={groupByCol} 
                             columns={columns} 
                             onSetGroupBy={setGroupByCol}
+                            tabs={tabOptions}
+                            activeTab={activeTab}
+                            onTabChange={(t) => { setActiveTab(t); setPage(1); }}
                         />
                     </div>
                 </div>
@@ -190,16 +291,21 @@ export default function TrangChu({ isOpen, onClose, config, onOpenDetail, isEmbe
     );
 
     const Level3Modal = (
-        <Level3_FormChiTiet 
-            isOpen={isLevel3Open} 
-            onClose={() => setIsLevel3Open(false)} 
-            onSuccess={() => fetchData(page, activeTab, search)} 
-            config={stableConfig} 
-            initialData={selectedItem} 
-            userRole={userRole} 
-            userEmail={typeof window !== 'undefined' ? localStorage.getItem('USER_EMAIL') || '' : ''} 
-            parentTitle={stableConfig.tenModule} 
-        />
+        <>
+            <Level3_FormChiTiet mode="level3"
+                isOpen={isLevel3Open} 
+                onClose={() => setIsLevel3Open(false)} 
+                onSuccess={() => {
+                    forceRefreshAll(); // 🟢 REFRESH KHI SAVE TỪ LEVEL 3
+                    setIsLevel3Open(false);
+                }} 
+                config={stableConfig} 
+                initialData={selectedItem ?? null} 
+                userRole={userRole} 
+                userEmail={typeof window !== 'undefined' ? localStorage.getItem('USER_EMAIL') || '' : ''} 
+                parentTitle={stableConfig.tenModule} 
+            />
+        </>
     );
 
     if (isEmbedded) return <>{MainContent}{Level3Modal}</>;

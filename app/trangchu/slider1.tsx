@@ -45,7 +45,7 @@ export default function Slider1() {
       .from('slider_data')
       .select('*')
       .eq('loai_slider', 'slider1')
-      .order('created_at', { ascending: false });
+      .order('tao_luc', { ascending: false });
     
     if (error) {
         console.error("Lỗi tải slider:", error);

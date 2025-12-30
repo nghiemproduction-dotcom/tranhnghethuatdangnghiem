@@ -5,6 +5,8 @@ import './globals.css';
 import ForceFullScreen from '@/app/components/ForceFullScreen';
 // 🟢 IMPORT HỆ THỐNG PHÂN QUYỀN
 import { SecurityProvider } from '@/app/HeThongPhanQuyen'; 
+// 🟢 IMPORT REACT QUERY PROVIDER
+import QueryProvider from '@/app/QueryProvider';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -51,11 +53,13 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body className={`${inter.className} bg-black min-h-screen overflow-hidden overscroll-none`}>
-        {/* 🟢 BỌC PROVIDER Ở ĐÂY ĐỂ DÙNG ĐƯỢC TOÀN APP */}
-        <SecurityProvider>
-            <ForceFullScreen />
-            {children}
-        </SecurityProvider>
+        {/* 🟢 BỌC QUERY PROVIDER Ở NGOÀI CÙNG HOẶC TRONG SECURITY */}
+        <QueryProvider>
+            <SecurityProvider>
+                <ForceFullScreen />
+                {children}
+            </SecurityProvider>
+        </QueryProvider>
       </body>
     </html>
   );

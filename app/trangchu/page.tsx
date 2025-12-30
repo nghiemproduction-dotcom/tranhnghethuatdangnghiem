@@ -170,8 +170,8 @@ export default function TrangChuDashboard() {
                 <MenuDuoi currentUser={nguoiDung} onToggleContent={handleMenuToggle} />
             </div>
 
-            {/* Admin Tools */}
-            <div className="fixed bottom-24 left-6 z-[5001] flex flex-col gap-4">
+            {/* Admin Tools - Tránh gradient MenuDuoi */}
+            <div className="fixed bottom-32 left-6 z-[5001] flex flex-col gap-4">
                 <BackgroundManager onUpdate={handleUpdateBackground} />
             </div>
 

@@ -5,7 +5,8 @@ import { UserCircle } from 'lucide-react';
 
 import NutMenu from '@/app/GiaoDienTong/MenuDuoi/GiaoDien/NutMenu';
 // Import component Level 3
-import TrangChuLevel3 from '@/app/GiaoDienTong/ModalDaCap/Modulegeneric/level3generic/level3generic';
+// import TrangChuLevel3 from '@/app/GiaoDienTong/ModalDaCap/Modulegeneric/level3generic/level3generic';
+import GenericModule from '@/app/GiaoDienTong/ModalDaCap/Modulegeneric/GenericModule';
 
 // CẤU HÌNH CỨNG CHO HỒ SƠ CÁ NHÂN
 // 🟢 QUAN TRỌNG: Sử dụng kiểu 'any' để tránh lỗi TypeScript bắt bẻ các trường như 'tieuDeCot', 'tabs'
@@ -78,13 +79,14 @@ export default function NutCaNhan({ nguoiDung, isOpen, onToggle, onClose }: Prop
 
     // Modal nội dung Level 3
     const modalContent = isOpen && nguoiDung ? (
-        <TrangChuLevel3
+        <GenericModule
+            mode="level3"
             isOpen={isOpen}
             onClose={onClose}
             onSuccess={handleSuccess}
             config={PERSONAL_CONFIG}
             initialData={nguoiDung}
-            userRole={nguoiDung.role || nguoiDung.vi_tri || 'user'} 
+            userRole={nguoiDung.role || nguoiDung.vi_tri || 'user'}
             userEmail={nguoiDung.email}
             parentTitle="HỒ SƠ CÁ NHÂN"
         />

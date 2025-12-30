@@ -134,8 +134,8 @@ export default function NutChucNangLevel3({
     return (
         <div className="fixed inset-x-0 bottom-0 z-[100] pointer-events-none pb-[env(safe-area-inset-bottom)]"> 
             <div className="w-full h-full relative">
-                {/* Điều chỉnh vị trí container chứa nút */}
-                <div className="absolute bottom-0 right-0 pointer-events-auto transform -translate-y-20 md:-translate-y-8 pr-4">
+                {/* Điều chỉnh vị trí container chứa nút - Tránh gradient MenuDuoi */}
+                <div className="absolute bottom-0 right-0 pointer-events-auto transform -translate-y-28 md:-translate-y-16 pr-4">
                     <NutModal danhSachTacVu={validTasks} />
                 </div>
             </div>

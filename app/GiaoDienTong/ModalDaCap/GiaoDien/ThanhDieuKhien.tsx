@@ -30,8 +30,8 @@ export default function ThanhDieuKhien({
     const styleNutNho = "p-1 text-[#5D4037] transition-all duration-200 hover:text-[#F5E6D3] hover:scale-110 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer";
 
     return (
-        // Fixed vị trí: Nằm trên Menu Dưới (khoảng 80px)
-        <div className="fixed bottom-[clamp(70px,15vw,90px)] left-0 right-0 z-[2001] flex items-center justify-center pointer-events-none">
+        // Fixed vị trí: Nằm trên Menu Dưới - Tránh gradient che nút
+        <div className="fixed bottom-[clamp(90px,18vw,110px)] left-0 right-0 z-[2001] flex items-center justify-center pointer-events-none">
             
             <div className="pointer-events-auto flex items-center gap-6 md:gap-12 px-6 py-2 rounded-full backdrop-blur-[2px]">
                 

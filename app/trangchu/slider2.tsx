@@ -44,7 +44,7 @@ export default function Slider2() {
       .from('slider_data')
       .select('*')
       .eq('loai_slider', 'slider2')
-      .order('created_at', { ascending: false });
+      .order('tao_luc', { ascending: false });
     
     if (data && data.length > 0) {
         // Map lại field cho khớp interface

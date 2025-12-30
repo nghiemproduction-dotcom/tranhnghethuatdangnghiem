@@ -31,7 +31,7 @@ export const useDuLieuLevel3 = (config: ModuleConfig, isOpen: boolean, initialDa
             return; 
         }
 
-        const { data: tableInfo } = await supabase.rpc('get_table_schema', { t_name: config.bangDuLieu });
+        const { data: tableInfo } = await supabase.from('information_schema.columns').select('column_name, data_type, is_nullable, column_default, character_maximum_length, numeric_precision, numeric_scale').eq('table_schema', 'public').eq('table_name', config.bangDuLieu).order('ordinal_position');
         const { data: dbConfig } = await supabase.from('cau_hinh_cot').select('*').eq('bang_du_lieu', config.bangDuLieu).order('thu_tu', { ascending: true });
 
         if (tableInfo) {

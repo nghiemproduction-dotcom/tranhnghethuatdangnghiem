@@ -1,8 +1,7 @@
 'use client';
 import React from 'react';
-import { ModuleConfig } from '@/app/GiaoDienTong/DashboardBuilder/KieuDuLieuModule';
-import Level2_Generic from '@/app/GiaoDienTong/ModalDaCap/Modulegeneric/level2generic/level2generic'; 
-
+import type { ModuleConfig } from '@/app/GiaoDienTong/DashboardBuilder/KieuDuLieuModule';
+ 
 // 🟢 CẤU HÌNH CHO BẢNG KHÁCH HÀNG NHÚNG
 const CONFIG_KHACH_HANG_EMBED: ModuleConfig = {
     id: 'khach_hang_embed',
@@ -17,9 +16,7 @@ const CONFIG_KHACH_HANG_EMBED: ModuleConfig = {
     updatedAt: ''
 };
 
-// 🟢 Ép kiểu Level2 để tránh lỗi TypeScript lặt vặt
-const Level2_Any = Level2_Generic as any;
-
+ 
 interface Props {
     nhanSuId: string;
 }
@@ -28,15 +25,7 @@ export default function Tab_KhachHangPhuTrach({ nhanSuId }: Props) {
     return (
         <div className="h-full flex flex-col">
             {/* Khung chứa danh sách */}
-            <div className="flex-1 border border-[#8B5E3C]/20 rounded-xl overflow-hidden relative bg-[#0a0807] shadow-inner min-h-[400px]">
-                <Level2_Any 
-                    isOpen={true}
-                    config={CONFIG_KHACH_HANG_EMBED}
-                    isEmbedded={true} 
-                    // 🟢 Lọc khách hàng theo ID nhân sự này
-                    extraFilter={{ sale_id: nhanSuId }}
-                />
-            </div>
+          
         </div>
     );
 }
