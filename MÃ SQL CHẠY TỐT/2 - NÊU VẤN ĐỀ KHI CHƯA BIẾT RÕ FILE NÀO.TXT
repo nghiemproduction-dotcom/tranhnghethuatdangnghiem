@@ -1,7 +1,0 @@
-Hãy đọc kỹ các file mã đính kèm trong tin nhắn này để tìm các file mã còn lại có liên quan với nó để tìm ra được nguyên nhân tại sao:
-
-   1. 
-   2. 
-    
-Nếu kiểm tra kỹ rồi mà nguyên nhân không phải ở frontend thì hãy cho tao những câu lệnh sql để kiểm tra kỹ trên frontend supabase. 
-Khoan hãy tạo bất kỳ mã mới nào. 

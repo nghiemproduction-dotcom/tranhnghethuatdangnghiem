@@ -1,7 +1,0 @@
--- 1. Cho phép code đọc/ghi thoải mái (Tắt chế độ bảo mật dòng)
-ALTER TABLE public.mau_san_pham DISABLE ROW LEVEL SECURITY;
-
--- 2. Cấp quyền chắc chắn cho API
-GRANT ALL ON TABLE public.mau_san_pham TO anon;
-GRANT ALL ON TABLE public.mau_san_pham TO authenticated;
-GRANT ALL ON TABLE public.mau_san_pham TO service_role;

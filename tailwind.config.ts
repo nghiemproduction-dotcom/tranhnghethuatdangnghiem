@@ -7,7 +7,13 @@ const config: Config = {
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        'serif': ['Playfair Display', 'Georgia', 'serif'],
+        'sans': ['Lora', 'system-ui', 'sans-serif'],
+        'mono': ['Courier New', 'monospace'],
+      },
+    },
   },
   plugins: [],
 };

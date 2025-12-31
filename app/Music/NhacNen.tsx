@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
     Music, Play, Pause, Volume2, VolumeX, Upload, Loader2, X, 
-    SkipForward, Trash2, Repeat1, Shuffle, AlertCircle 
+    SkipForward, Trash2, Repeat1, Shuffle, AlertCircle, Volume1, ChevronUp, ChevronDown, Square
 } from 'lucide-react';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase'; 
 
@@ -17,10 +17,12 @@ interface BaiHat {
 export default function NhacNen() {
     const [danhSachNhac, setDanhSachNhac] = useState<BaiHat[]>([]);
     const [isPlaying, setIsPlaying] = useState(false);
-    const [volume, setVolume] = useState(0.5); 
+    const [volume, setVolume] = useState(0.5);
+    const [isMuted, setIsMuted] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [currentSongIndex, setCurrentSongIndex] = useState(0);
     const [mounted, setMounted] = useState(false);
+    const [showQuickControls, setShowQuickControls] = useState(false);
     
     // State logic (Giữ nguyên phần nâng cấp logic)
     const [isLooping, setIsLooping] = useState(false);   
@@ -30,9 +32,29 @@ export default function NhacNen() {
     const [isUploading, setIsUploading] = useState(false);
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [isUserAuthenticated, setIsUserAuthenticated] = useState(false);
+    const [playlistLoaded, setPlaylistLoaded] = useState(false);
     
     const uploadInputRef = useRef<HTMLInputElement>(null);
     const audioRef = useRef<HTMLAudioElement>(null);
+    const controlsRef = useRef<HTMLDivElement>(null);
+
+    // 🎵 AUTO-PLAY: Phát nhạc khi user login thành công
+    useEffect(() => {
+        if (isUserAuthenticated && playlistLoaded && danhSachNhac.length > 0 && !isPlaying && audioRef.current) {
+            // Delay một chút để đảm bảo audio element sẵn sàng
+            const timer = setTimeout(() => {
+                audioRef.current?.play().then(() => {
+                    setIsPlaying(true);
+                    console.log('🎵 Auto-play nhạc khi login');
+                }).catch(err => {
+                    console.warn('Auto-play failed (có thể do browser policy):', err);
+                    // Auto-play có thể bị chặn bởi browser, đó là bình thường
+                });
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [isUserAuthenticated, playlistLoaded, danhSachNhac.length, isPlaying]);
 
     useEffect(() => {
         setMounted(true);
@@ -40,12 +62,17 @@ export default function NhacNen() {
             const storedUser = localStorage.getItem('USER_INFO');
             const storedRole = localStorage.getItem('USER_ROLE');
             let role = storedRole || '';
+            let isAuthenticated = false;
+            
             if (storedUser) {
                 try {
                     const parsed = JSON.parse(storedUser);
                     role = parsed.role || parsed.vi_tri || parsed.chuc_vu || role;
+                    isAuthenticated = true; // User đã đăng nhập
                 } catch (e) { console.error(e); }
             }
+            
+            setIsUserAuthenticated(isAuthenticated);
             if (['admin', 'quanly', 'boss'].includes(role.toLowerCase().trim())) {
                 setIsAdmin(true);
             }
@@ -55,21 +82,16 @@ export default function NhacNen() {
 
     const fetchDanhSachNhac = async () => {
         try {
-            // 🟢 GIỮ NGUYÊN FIX DATA: Thử 'tao_luc' trước, nếu lỗi thì fallback
-            let { data, error } = await supabase.storage
+            // 'tao_luc' không phải column chuẩn của Storage -> gây 400. Dùng created_at luôn.
+            const { data, error } = await supabase.storage
                 .from('nhac-nen')
-                .list('', { sortBy: { column: 'tao_luc', order: 'asc' } });
+                .list('', { sortBy: { column: 'created_at', order: 'asc' } });
 
             if (error) {
-                console.warn("Lỗi sort 'tao_luc', thử 'created_at'...", error);
-                const retry = await supabase.storage
-                    .from('nhac-nen')
-                    .list('', { sortBy: { column: 'created_at', order: 'asc' } });
-                data = retry.data;
-                error = retry.error;
+                console.warn("Không thể load playlist nhạc:", error);
+                setPlaylistLoaded(true);
+                return; // Return early instead of throwing
             }
-
-            if (error) throw error;
 
             if (data) {
                 const songs: BaiHat[] = data
@@ -85,19 +107,30 @@ export default function NhacNen() {
                         };
                     });
                 setDanhSachNhac(songs);
+                setPlaylistLoaded(true); // 🎵 Đánh dấu playlist đã load xong
                 setErrorMsg(null);
-                // Tự động phát nhạc khi có danh sách bài hát
-                if (songs.length > 0 && !isPlaying) {
-                    setIsPlaying(true);
-                }
             }
         } catch (err: any) {
             console.error("Lỗi tải playlist:", err);
             setErrorMsg("Không thể tải danh sách nhạc.");
+            setPlaylistLoaded(true); // Cũng đánh dấu là đã cố gắng load, để auto-play không chờ mãi
         }
     };
 
-    useEffect(() => { if (audioRef.current) audioRef.current.volume = volume; }, [volume]);
+    useEffect(() => { if (audioRef.current) audioRef.current.volume = isMuted ? 0 : volume; }, [volume, isMuted]);
+
+    // Close quick controls when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (controlsRef.current && !controlsRef.current.contains(e.target as Node)) {
+                setShowQuickControls(false);
+            }
+        };
+        if (showQuickControls) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [showQuickControls]);
 
     useEffect(() => {
         if (audioRef.current && danhSachNhac.length > 0) {
@@ -110,11 +143,11 @@ export default function NhacNen() {
 
     const togglePlay = () => {
         if (!audioRef.current || danhSachNhac.length === 0) return;
-        if (isPlaying) { 
+        if (audioRef.current.paused) { 
+            audioRef.current.play().then(() => setIsPlaying(true)).catch(console.error);
+        } else { 
             audioRef.current.pause(); 
             setIsPlaying(false); 
-        } else { 
-            audioRef.current.play().then(() => setIsPlaying(true)).catch(console.error);
         }
     };
 
@@ -253,18 +286,159 @@ export default function NhacNen() {
 
     return (
         <>
-            <audio ref={audioRef} src={danhSachNhac[currentSongIndex]?.url || ''} onEnded={handleSongEnded} onError={(e) => console.error("Audio error", e)}/>
+            <audio 
+                ref={audioRef} 
+                src={danhSachNhac[currentSongIndex]?.url || ''} 
+                onEnded={handleSongEnded} 
+                onError={(e) => {
+                    console.warn("Audio load error, skipping to next track");
+                    handleNext(); // Skip to next song on error
+                }}
+            />
             
-            {/* 🟢 ĐÃ KHÔI PHỤC VỊ TRÍ GỐC (RELATIVE) */}
-            {!isOpen && (
-                <button 
-                    onClick={() => setIsOpen(true)}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center relative active:scale-95 transition-all border shadow-lg z-[5000] ${isPlaying ? 'bg-[#C69C6D] border-[#C69C6D] text-black shadow-[0_0_15px_rgba(198,156,109,0.4)] animate-[spin_4s_linear_infinite]' : 'bg-black/40 border-white/20 text-white hover:bg-white/10 backdrop-blur-md'}`}
-                    title="Mở trình phát nhạc"
-                >
-                    <Music size={18} />
-                </button>
-            )}
+            {/* Main Music Button - INLINE (no fixed positioning) */}
+            <div ref={controlsRef} className="relative">
+                {/* Quick Controls Panel - Dropdown style */}
+                {showQuickControls && (
+                    <div className="absolute top-full right-0 mt-2 bg-black/95 backdrop-blur-lg border border-white/20 rounded-2xl shadow-xl animate-in slide-in-from-top-2 duration-200 z-50 min-w-[280px]">
+                        {/* Player Controls */}
+                        <div className="px-4 py-3 border-b border-white/10 space-y-3">
+                            {/* Current Song */}
+                            <div className="text-xs font-semibold text-[#C69C6D] px-2 line-clamp-1 text-center">
+                                {danhSachNhac.length > 0 ? danhSachNhac[currentSongIndex]?.name : 'Chưa có nhạc'}
+                            </div>
+                            
+                        {/* Quick Control Buttons */}
+                            <div className="flex items-center justify-center gap-3">
+                                {/* Play */}
+                                <button
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        if (audioRef.current?.paused) {
+                                            audioRef.current?.play().then(() => setIsPlaying(true)).catch(console.error);
+                                        }
+                                    }}
+                                    disabled={danhSachNhac.length === 0}
+                                    className="p-2.5 text-white/60 hover:text-white hover:bg-[#C69C6D]/10 rounded-lg transition-colors disabled:opacity-30"
+                                    title="Phát"
+                                >
+                                    <Play size={18} fill="currentColor" className="ml-0.5" />
+                                </button>
+                                
+                                {/* Stop */}
+                                <button
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        if (audioRef.current) {
+                                            audioRef.current.pause();
+                                            audioRef.current.currentTime = 0;
+                                            setIsPlaying(false);
+                                        }
+                                    }}
+                                    disabled={danhSachNhac.length === 0}
+                                    className="p-2.5 text-white/60 hover:text-white hover:bg-[#C69C6D]/10 rounded-lg transition-colors disabled:opacity-30"
+                                    title="Dừng"
+                                >
+                                    <Square size={18} fill="currentColor" />
+                                </button>
+                            </div>
+                        </div>
+                        
+                        {/* Volume Control */}
+                        <div className="px-4 py-3 border-b border-white/10">
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsMuted(!isMuted);
+                                    }}
+                                    className={`p-1.5 rounded-lg transition-all ${
+                                        isMuted 
+                                            ? 'bg-red-500/20 text-red-400' 
+                                            : 'text-white/60 hover:text-white hover:bg-white/10'
+                                    }`}
+                                    title={isMuted ? 'Bật âm' : 'Tắt âm'}
+                                >
+                                    {isMuted ? <VolumeX size={16} /> : <Volume1 size={16} />}
+                                </button>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.05"
+                                    value={isMuted ? 0 : volume}
+                                    onChange={(e) => {
+                                        const val = parseFloat(e.target.value);
+                                        setVolume(val);
+                                        if (val > 0) setIsMuted(false);
+                                    }}
+                                    className="flex-1 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-[#C69C6D]"
+                                />
+                                <span className="text-xs text-white/40 w-8">{Math.round((isMuted ? 0 : volume) * 100)}%</span>
+                            </div>
+                        </div>
+                        
+                        {/* Mode Buttons */}
+                        <div className="px-4 py-3 flex items-center justify-between gap-2">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsLooping(!isLooping);
+                                }}
+                                className={`flex-1 p-2 text-xs rounded-lg transition-all font-semibold ${
+                                    isLooping
+                                        ? 'bg-[#C69C6D]/20 text-[#C69C6D]'
+                                        : 'bg-white/5 text-white/60 hover:bg-white/10'
+                                }`}
+                                title="Lặp 1 bài"
+                            >
+                                <Repeat1 size={14} className="mx-auto" />
+                            </button>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsShuffling(!isShuffling);
+                                }}
+                                className={`flex-1 p-2 text-xs rounded-lg transition-all font-semibold ${
+                                    isShuffling
+                                        ? 'bg-[#C69C6D]/20 text-[#C69C6D]'
+                                        : 'bg-white/5 text-white/60 hover:bg-white/10'
+                                }`}
+                                title="Trộn bài"
+                            >
+                                <Shuffle size={14} className="mx-auto" />
+                            </button>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsOpen(true);
+                                }}
+                                className="flex-1 p-2 text-xs bg-white/5 text-white/60 hover:bg-white/10 rounded-lg transition-all font-semibold"
+                                title="Mở playlist đầy đủ"
+                            >
+                                <Music size={14} className="mx-auto" />
+                            </button>
+                        </div>
+                    </div>
+                )}
+                
+                {/* Main Music Button - 1 nút duy nhất */}
+                {!isOpen && (
+                    <button 
+                        onClick={() => setShowQuickControls(!showQuickControls)}
+                        className={`w-10 h-10 rounded-full flex items-center justify-center relative active:scale-95 transition-all border shadow-lg ${
+                            isPlaying 
+                                ? 'bg-[#C69C6D] border-[#C69C6D] text-black shadow-[0_0_15px_rgba(198,156,109,0.4)] animate-[spin_4s_linear_infinite]' 
+                                : 'bg-black/40 border-white/20 text-white hover:bg-white/10 backdrop-blur-md'
+                        }`}
+                        title="Điều khiển nhạc"
+                    >
+                        <Music size={18} />
+                    </button>
+                )}
+            </div>
             
             {mounted && createPortal(modalContent, document.body)}
         </>

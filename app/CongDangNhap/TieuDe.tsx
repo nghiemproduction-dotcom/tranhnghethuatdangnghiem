@@ -1,5 +1,0 @@
-'use client';
-// Trả về null để không hiển thị gì cả
-export default function TieuDe() {
-  return null;
-}

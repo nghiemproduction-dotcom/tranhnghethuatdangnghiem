@@ -63,12 +63,12 @@ export default function Slider2() {
         try {
           const compressed = await compressImage(e.target.files[0], 0.7, 800); // Nén mạnh hơn cho slider nhỏ
           setEditForm(prev => ({ ...prev, file: compressed, previewUrl: URL.createObjectURL(compressed) }));
-        } catch(e) { alert("Lỗi nén ảnh"); }
+        } catch(e) { alert("Xin lỗi, không thể nén ảnh. Vui lòng thử lại."); }
       }
   };
 
   const handleSave = async () => {
-      if (!editForm.file) return alert("Cần chọn ảnh");
+      if (!editForm.file) return alert("Xin vui lòng chọn ảnh cho tác phẩm");
       setIsLoading(true);
       try {
           const fileName = `slider2-${Date.now()}.jpg`;
@@ -84,16 +84,16 @@ export default function Slider2() {
               hinh_anh: publicUrl.publicUrl
           }]);
           
-          alert("Thêm sản phẩm thành công!");
+          alert("Tác phẩm đã được thêm vào bộ sưu tập thành công!");
           setIsEditing(false);
           setEditForm({ name: '', price: '', file: null, previewUrl: '' });
           fetchProducts();
-      } catch (err: any) { alert("Lỗi: " + err.message); } 
+      } catch (err: any) { alert("Xin lỗi, có lỗi xảy ra: " + err.message); } 
       finally { setIsLoading(false); }
   };
 
   const handleDelete = async (id: number) => {
-      if(!confirm("Xóa sản phẩm này?")) return;
+      if(!confirm("Bạn có chắc chắn muốn xóa tác phẩm này khỏi bộ sưu tập?")) return;
       await supabase.from('slider_data').delete().eq('id', id);
       fetchProducts();
   };
@@ -102,12 +102,12 @@ export default function Slider2() {
     <div className="w-full bg-black/40 backdrop-blur-md border border-white/5 rounded-xl p-4 md:p-6 relative">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-[#C69C6D] text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-          <Star size={14} fill="currentColor" /> Sản phẩm nổi bật
+          <Star size={14} fill="currentColor" /> Tác phẩm tiêu biểu
         </h3>
         
         {isAdmin && (
-            <button onClick={() => setIsEditing(true)} className="text-[10px] bg-[#C69C6D] text-black px-2 py-1 rounded font-bold hover:bg-white">
-                <Plus size={10} className="inline mr-1"/> THÊM MỚI
+            <button onClick={() => setIsEditing(true)} className="text-[10px] bg-[#C69C6D] text-black px-2 py-1 rounded font-bold hover:bg-white active:scale-95">
+                <Plus size={10} className="inline mr-1"/> THÊM TÁC PHẨM
             </button>
         )}
       </div>
@@ -116,14 +116,14 @@ export default function Slider2() {
       {isEditing && (
           <div className="absolute top-0 left-0 w-full h-full z-50 bg-black/95 p-4 rounded-xl flex flex-col justify-center items-center">
               <div className="w-full max-w-xs space-y-3">
-                  <h4 className="text-[#C69C6D] font-bold text-center mb-2">THÊM SẢN PHẨM</h4>
+                  <h4 className="text-[#C69C6D] font-bold text-center mb-2">THÊM TÁC PHẨM MỚI</h4>
                   <input className="w-full bg-white/10 p-2 rounded text-white text-xs border border-white/20" placeholder="Tên tác phẩm" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} />
                   <input className="w-full bg-white/10 p-2 rounded text-white text-xs border border-white/20" placeholder="Giá tiền (VNĐ)" value={editForm.price} onChange={e => setEditForm({...editForm, price: e.target.value})} />
                   <input type="file" accept="image/*" onChange={handleFileChange} className="text-white text-xs" />
                   
                   <div className="flex gap-2 mt-2">
-                      <button onClick={handleSave} disabled={isLoading} className="flex-1 bg-[#C69C6D] text-black py-2 rounded text-xs font-bold">{isLoading ? "Lưu..." : "LƯU"}</button>
-                      <button onClick={() => setIsEditing(false)} className="flex-1 bg-white/10 text-white py-2 rounded text-xs font-bold">HỦY</button>
+                      <button onClick={handleSave} disabled={isLoading} className="flex-1 bg-[#C69C6D] text-black py-2 rounded text-xs font-bold active:scale-95">{isLoading ? "Đang lưu..." : "LƯU TÁC PHẨM"}</button>
+                      <button onClick={() => setIsEditing(false)} className="flex-1 bg-white/10 text-white py-2 rounded text-xs font-bold active:scale-95">HỦY</button>
                   </div>
               </div>
           </div>
@@ -154,7 +154,7 @@ export default function Slider2() {
 
                 {/* Nút xóa (Admin) */}
                 {isAdmin && (
-                    <button onClick={() => handleDelete(item.id)} className="absolute top-2 right-2 bg-red-600/80 p-1.5 rounded text-white hover:bg-red-500 z-20">
+                    <button onClick={() => handleDelete(item.id)} className="absolute top-2 right-2 bg-red-600/80 p-1.5 rounded text-white hover:bg-red-500 z-20 active:scale-95">
                         <Trash2 size={12}/>
                     </button>
                 )}

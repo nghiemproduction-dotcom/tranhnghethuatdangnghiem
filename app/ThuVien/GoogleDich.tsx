@@ -1,5 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
+import { useAppSettings, LanguageCode } from '@/app/ThuVien/AppSettingsContext';
 
 const LANGUAGES = [
   { code: 'vi', label: 'Tiếng Việt', flag: 'https://flagcdn.com/w40/vn.png' },
@@ -11,9 +12,18 @@ const LANGUAGES = [
 ];
 
 export default function GoogleDich() {
-  const [currentLang, setCurrentLang] = useState('vi');
+  // 🌐 Đồng bộ với AppSettingsContext
+  const { language, setLanguage } = useAppSettings();
+  
+  // currentLang dùng string vì Google Translate hỗ trợ nhiều ngôn ngữ hơn AppSettings
+  const [currentLang, setCurrentLang] = useState<string>(language);
   const [showMenu, setShowMenu] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+
+  // Đồng bộ khi language từ context thay đổi
+  useEffect(() => {
+    setCurrentLang(language);
+  }, [language]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -52,6 +62,12 @@ export default function GoogleDich() {
     document.cookie = `googtrans=/auto/${langCode}; path=/;`;
     setCurrentLang(langCode);
     setShowMenu(false);
+    
+    // 🌐 Đồng bộ với AppSettingsContext (chỉ vi/en)
+    if (langCode === 'vi' || langCode === 'en') {
+      setLanguage(langCode as LanguageCode);
+    }
+    
     window.location.reload(); 
   };
 

@@ -197,10 +197,10 @@ export default function Slider1() {
         </div>
 
         {/* NÚT ĐIỀU HƯỚNG */}
-        <button onClick={prevSlide} className="absolute left-4 top-1/2 -translate-y-1/2 z-30 p-3 bg-black/40 border border-[#C69C6D] text-[#C69C6D] hover:bg-[#C69C6D] hover:text-black transition-all rounded-full opacity-0 group-hover/slider:opacity-100">
+        <button onClick={prevSlide} className="absolute left-4 top-1/2 -translate-y-1/2 z-30 p-3 bg-black/40 border border-[#C69C6D] text-[#C69C6D] hover:bg-[#C69C6D] hover:text-black transition-all rounded-full opacity-0 group-hover/slider:opacity-100 active:scale-95">
             <ChevronLeft size={24} />
         </button>
-        <button onClick={nextSlide} className="absolute right-4 top-1/2 -translate-y-1/2 z-30 p-3 bg-black/40 border border-[#C69C6D] text-[#C69C6D] hover:bg-[#C69C6D] hover:text-black transition-all rounded-full opacity-0 group-hover/slider:opacity-100">
+        <button onClick={nextSlide} className="absolute right-4 top-1/2 -translate-y-1/2 z-30 p-3 bg-black/40 border border-[#C69C6D] text-[#C69C6D] hover:bg-[#C69C6D] hover:text-black transition-all rounded-full opacity-0 group-hover/slider:opacity-100 active:scale-95">
             <ChevronRight size={24} />
         </button>
       </div>
@@ -209,7 +209,7 @@ export default function Slider1() {
       {isAdmin && (
         <div className="absolute top-4 left-4 z-50">
             {!isEditing ? (
-                <button onClick={() => setIsEditing(true)} className="flex items-center gap-2 bg-[#C69C6D] text-black px-4 py-2 rounded-md font-bold text-xs shadow-lg hover:bg-white transition-colors border-2 border-white/20">
+                <button onClick={() => setIsEditing(true)} className="flex items-center gap-2 bg-[#C69C6D] text-black px-4 py-2 rounded-md font-bold text-xs shadow-lg hover:bg-white transition-colors border-2 border-white/20 active:scale-95">
                     <Plus size={14}/> Thêm Slide Mới
                 </button>
             ) : (

@@ -1,17 +1,68 @@
 'use server';
 
 import postgres from 'postgres';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
-// Kết nối DB
+// Kết nối DB (Dùng Postgres.js cho các lệnh DDL mạnh)
 const sql = postgres(process.env.DATABASE_URL!, {
   ssl: 'require',
   max: 10,
   idle_timeout: 20, 
 });
 
-// --- 1. LẤY DANH SÁCH BẢNG & TRẠNG THÁI RLS ---
+// 🛡️ 1. HÀM KIỂM TRA QUYỀN ADMIN (BẮT BUỘC)
+async function requireAdmin() {
+    const cookieStore = cookies();
+    
+    const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                get(name: string) {
+                    return cookieStore.get(name)?.value
+                },
+                set(name: string, value: string, options: any) {},
+                remove(name: string, options: any) {},
+            },
+        }
+    );
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !user.email) throw new Error("Unauthorized: Bạn chưa đăng nhập");
+
+    // Check email hoặc bảng nhan_su để xem có phải admin không
+    const { data: nhanSu } = await supabase
+        .from('nhan_su')
+        .select('vi_tri')
+        .eq('email', user.email)
+        .single();
+    
+    // Chỉ cho phép Admin hoặc Quản lý cấp cao
+    const allowedRoles = ['admin', 'boss', 'quanly'];
+    const userRole = nhanSu?.vi_tri?.toLowerCase().replace(/\s/g, '') || '';
+    
+    const isAllowed = allowedRoles.some(r => userRole.includes(r));
+
+    if (!isAllowed) {
+        throw new Error("Forbidden: Bạn không có quyền quản trị Database");
+    }
+}
+
+// 🛡️ 2. HÀM KIỂM TRA TÊN BẢNG/CỘT (CHỐNG SQL INJECTION)
+function validateIdentifier(name: string) {
+    if (!/^[a-zA-Z0-9_]+$/.test(name)) {
+        throw new Error(`Tên không hợp lệ: ${name}. Chỉ chấp nhận chữ, số và gạch dưới.`);
+    }
+}
+
+// --- CÁC HÀM ACTION ---
+
+// --- 1. LẤY DANH SÁCH BẢNG ---
 export async function getTablesWithRLSAction() {
     try {
+        await requireAdmin(); // 🛡️ Check quyền
         const tables = await sql`
             SELECT c.relname as table_name, c.relrowsecurity as rls_enabled
             FROM pg_class c
@@ -25,18 +76,16 @@ export async function getTablesWithRLSAction() {
     }
 }
 
-// --- 2. KIỂM TRA TRẠNG THÁI RLS CỦA 1 BẢNG ---
+// --- 2. KIỂM TRA RLS ---
 export async function checkTableRLSAction(tableName: string) {
     try {
+        await requireAdmin();
         const [result] = await sql`
             SELECT c.relrowsecurity as rls_enabled
             FROM pg_class c
             JOIN pg_namespace n ON n.oid = c.relnamespace
-            WHERE n.nspname = 'public' 
-              AND c.relkind = 'r'
-              AND c.relname = ${tableName}
+            WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname = ${tableName}
         `;
-        
         if (!result) return { success: false, error: "Bảng không tồn tại" };
         return { success: true, rls_enabled: result.rls_enabled };
     } catch (error: any) {
@@ -44,15 +93,14 @@ export async function checkTableRLSAction(tableName: string) {
     }
 }
 
-// --- 3. LẤY SCHEMA (DANH SÁCH CỘT) CỦA BẢNG (MỚI) ---
-// Hàm này phục vụ cho Bước 1 để load các cột vào dropdown
+// --- 3. LẤY SCHEMA ---
 export async function getTableSchemaAction(tableName: string) {
     try {
+        await requireAdmin();
         const columns = await sql`
             SELECT column_name, data_type, is_nullable, column_default
             FROM information_schema.columns 
-            WHERE table_schema = 'public' 
-              AND table_name = ${tableName}
+            WHERE table_schema = 'public' AND table_name = ${tableName}
             ORDER BY ordinal_position;
         `;
         return { success: true, data: Array.from(columns) };
@@ -61,32 +109,72 @@ export async function getTableSchemaAction(tableName: string) {
     }
 }
 
-// --- 4. TOGGLE RLS (BẬT/TẮT) ---
+// --- 4. TOGGLE RLS (NGUY HIỂM - CẦN CHECK KỸ) ---
 export async function toggleRLSAction(tableName: string, enable: boolean) {
     try {
+        await requireAdmin(); // 🛡️ Check quyền cực quan trọng
+        validateIdentifier(tableName); // 🛡️ Check SQL Injection
+
         if (enable) {
-            await sql`ALTER TABLE ${sql(tableName)} ENABLE ROW LEVEL SECURITY`;
+            await sql.unsafe(`ALTER TABLE "${tableName}" ENABLE ROW LEVEL SECURITY`);
         } else {
-            await sql`ALTER TABLE ${sql(tableName)} DISABLE ROW LEVEL SECURITY`;
-            await sql`GRANT ALL ON TABLE ${sql(tableName)} TO anon, authenticated, service_role`;
+            await sql.unsafe(`ALTER TABLE "${tableName}" DISABLE ROW LEVEL SECURITY`);
+            await sql.unsafe(`GRANT ALL ON TABLE "${tableName}" TO anon, authenticated, service_role`);
         }
         return { success: true };
     } catch (error: any) { return { success: false, error: error.message }; }
 }
 
-// --- 5. LẤY DỮ LIỆU PHÂN TRANG ---
+// --- 5. LẤY DỮ LIỆU PHÂN TRANG (ĐÃ SỬA LỖI SORT COLUMN) ---
 export async function getTableDataPaginatedAction(tableName: string, page: number, pageSize: number) {
     try {
+        await requireAdmin();
+        validateIdentifier(tableName);
+        
+        // 🟢 BƯỚC 1: Tìm cột sắp xếp hợp lệ (Tránh lỗi column does not exist)
+        const columns = await sql`
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_schema = 'public' AND table_name = ${tableName}
+        `;
+        
+        const colNames = Array.from(columns).map(c => c.column_name);
+        let sortCol = 'id'; // Mặc định sort theo id nếu không tìm thấy ngày
+        
+        // Ưu tiên các cột thời gian phổ biến
+        if (colNames.includes('tao_luc')) sortCol = 'tao_luc';
+        else if (colNames.includes('created_at')) sortCol = 'created_at';
+        else if (colNames.includes('date_created')) sortCol = 'date_created';
+        
+        // Nếu không có id luôn (hiếm gặp), lấy cột đầu tiên
+        if (!colNames.includes('id') && sortCol === 'id' && colNames.length > 0) {
+             sortCol = colNames[0];
+        }
+
         const offset = (page - 1) * pageSize;
-        const data = await sql`SELECT * FROM ${sql(tableName)} ORDER BY tao_luc DESC LIMIT ${pageSize} OFFSET ${offset}`;
-        const [count] = await sql`SELECT count(*) as total FROM ${sql(tableName)}`;
-        return { success: true, data: Array.from(data), total: Number(count.total) };
+        
+        // 🟢 BƯỚC 2: Query an toàn với cột sắp xếp động
+        const data = await sql.unsafe(`SELECT * FROM "${tableName}" ORDER BY "${sortCol}" DESC LIMIT ${pageSize} OFFSET ${offset}`);
+        
+        const [countResult] = await sql.unsafe(`SELECT count(*) as total FROM "${tableName}"`);
+        
+        return { 
+            success: true, 
+            data: Array.from(data), 
+            total: Number(countResult.total) 
+        };
     } catch (error: any) { return { success: false, error: error.message }; }
 }
 
 // --- 6. TẠO KHÓA NGOẠI ---
 export async function createForeignKeyAction(table: string, col: string, refTable: string, refCol: string = 'id') {
     try {
+        await requireAdmin();
+        validateIdentifier(table);
+        validateIdentifier(col);
+        validateIdentifier(refTable);
+        validateIdentifier(refCol);
+
         const constraintName = `fk_${table}_${col}_${Date.now()}`;
         await sql.unsafe(`
             ALTER TABLE "${table}" ADD CONSTRAINT "${constraintName}" 
@@ -99,22 +187,25 @@ export async function createForeignKeyAction(table: string, col: string, refTabl
 // --- 7. QUẢN LÝ CẤU TRÚC BẢNG (CORE) ---
 export async function manageTableStructureAction(tableName: string, columnsDef: any[]) {
   try {
+    await requireAdmin();
     if (!tableName) throw new Error("Tên bảng không được để trống");
+    validateIdentifier(tableName);
 
-    await sql`
-      CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
+    await sql.unsafe(`
+      CREATE TABLE IF NOT EXISTS "${tableName}" (
         id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
         tao_luc timestamptz DEFAULT now()
       )
-    `;
+    `);
 
     try {
-        await sql`ALTER TABLE ${sql(tableName)} DISABLE ROW LEVEL SECURITY`;
-        await sql`GRANT ALL ON TABLE ${sql(tableName)} TO anon, authenticated, service_role`;
+        await sql.unsafe(`ALTER TABLE "${tableName}" DISABLE ROW LEVEL SECURITY`);
+        await sql.unsafe(`GRANT ALL ON TABLE "${tableName}" TO anon, authenticated, service_role`);
     } catch (e) {}
 
     for (const col of columnsDef) {
         if (['id', 'tao_luc'].includes(col.name)) continue;
+        validateIdentifier(col.name);
 
         try {
             const [existing] = await sql`SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = ${tableName} AND column_name = ${col.name}`;
@@ -123,17 +214,14 @@ export async function manageTableStructureAction(tableName: string, columnsDef: 
             if (col.defaultValue !== undefined && col.defaultValue !== null && col.defaultValue !== '') {
                 let val = String(col.defaultValue).trim();
                 val = val.replace(/::[a-zA-Z0-9_ ]+$/, ''); 
-
                 const isFuncOrNum = ['now()', 'gen_random_uuid()', 'true', 'false', 'current_timestamp'].includes(val.toLowerCase()) || !isNaN(Number(val));
-
                 if (isFuncOrNum) {
                     safeDefault = val;
                 } else {
-                    if (val.startsWith("'") && val.endsWith("'")) {
-                        safeDefault = val;
-                    } else {
-                        if (col.type.endsWith('[]') && !val.startsWith('{')) val = `{${val}}`;
-                        safeDefault = `'${val}'`;
+                    if (val.startsWith("'") && val.endsWith("'")) safeDefault = val;
+                    else {
+                         if (col.type.endsWith('[]') && !val.startsWith('{')) val = `{${val}}`;
+                         safeDefault = `'${val.replace(/'/g, "''")}'`; 
                     }
                 }
             }
@@ -166,8 +254,164 @@ export async function unlockTableAction(tableName: string) {
 
 export async function addColumnAction(tableName: string, colName: string, colType: string) {
     try {
+        await requireAdmin();
+        validateIdentifier(tableName);
+        validateIdentifier(colName);
+        
         await sql.unsafe(`ALTER TABLE "${tableName}" ADD COLUMN "${colName}" ${colType}`);
         return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+// --- 9. CẬP NHẬT DỮ LIỆU ---
+export async function updateTableCellAction(tableName: string, id: string, column: string, value: any) {
+    try {
+        await requireAdmin();
+        validateIdentifier(tableName);
+        validateIdentifier(column);
+
+        // Xử lý giá trị đặc biệt
+        let finalValue = value;
+        if (value === '' || value === null) finalValue = null;
+
+        await sql.unsafe(`
+            UPDATE "${tableName}" 
+            SET "${column}" = $1 
+            WHERE id = $2
+        `, [finalValue, id]);
+
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+// --- 🟢 10. LẤY DỮ LIỆU NHÂN SỰ (CÓ SEARCH & FILTER) ---
+export async function getNhanSuDataAction(page: number, pageSize: number, search: string, filterRole: string) {
+    try {
+        await requireAdmin();
+        
+        let query = `SELECT * FROM "nhan_su" WHERE 1=1`;
+        const params: any[] = [];
+        let paramCount = 1;
+
+        if (search) {
+            query += ` AND (ho_ten ILIKE $${paramCount} OR so_dien_thoai ILIKE $${paramCount} OR email ILIKE $${paramCount})`;
+            params.push(`%${search}%`);
+            paramCount++;
+        }
+
+        if (filterRole && filterRole !== 'all') {
+            query += ` AND vi_tri_normalized = $${paramCount}`;
+            params.push(filterRole);
+            paramCount++;
+        }
+
+        const countQuery = query.replace('SELECT *', 'SELECT count(*) as total');
+        const offset = (page - 1) * pageSize;
+        query += ` ORDER BY tao_luc DESC LIMIT ${pageSize} OFFSET ${offset}`;
+
+        const data = await sql.unsafe(query, params);
+        const [countResult] = await sql.unsafe(countQuery, params);
+
+        return { 
+            success: true, 
+            data: Array.from(data), 
+            total: Number(countResult.total) 
+        };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+// --- 🟢 11. CẬP NHẬT NHÂN SỰ ---
+export async function updateNhanSuAction(id: string, data: any) {
+    try {
+        await requireAdmin();
+        
+        // 🟢 FIX LỖI 428C9: BỎ CỘT luong_theo_gio VÌ LÀ GENERATED COLUMN
+        await sql.unsafe(`
+            UPDATE "nhan_su"
+            SET ho_ten = $1,
+                so_dien_thoai = $2,
+                vi_tri = $3,
+                vi_tri_normalized = $4,
+                email = $5,
+                luong_thang = $6,
+                thuong_doanh_thu = $7,
+                ngan_hang = $8,
+                so_tai_khoan = $9,
+                hinh_anh = $10
+            WHERE id = $11
+        `, [
+            data.ho_ten, 
+            data.so_dien_thoai, 
+            data.vi_tri, 
+            data.vi_tri_normalized, 
+            data.email || '',
+            data.luong_thang || 0,
+            data.thuong_doanh_thu || 0,
+            data.ngan_hang || null,
+            data.so_tai_khoan || null,
+            data.hinh_anh || null,
+            id
+        ]);
+        
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+// --- 🟢 12. TẠO MỚI NHÂN SỰ ---
+export async function createNhanSuAction(data: any) {
+    try {
+        await requireAdmin();
+        
+        // 🟢 FIX LỖI 428C9: BỎ CỘT luong_theo_gio VÌ LÀ GENERATED COLUMN
+        await sql.unsafe(`
+            INSERT INTO "nhan_su" (
+                ho_ten, so_dien_thoai, vi_tri, vi_tri_normalized, email, 
+                trang_thai, luong_thang, thuong_doanh_thu, 
+                ngan_hang, so_tai_khoan, hinh_anh
+            )
+            VALUES ($1, $2, $3, $4, $5, 'Đang hoạt động', $6, $7, $8, $9, $10)
+        `, [
+            data.ho_ten, 
+            data.so_dien_thoai, 
+            data.vi_tri, 
+            data.vi_tri_normalized, 
+            data.email,
+            data.luong_thang || 0,
+            data.thuong_doanh_thu || 0,
+            data.ngan_hang || null,
+            data.so_tai_khoan || null,
+            data.hinh_anh || null
+        ]);
+        
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+// --- 🟢 13. LẤY GIÁ TRỊ DUY NHẤT CỦA CỘT (Dùng cho Dropdown) ---
+export async function getDistinctValuesAction(tableName: string, columnName: string) {
+    try {
+        await requireAdmin();
+        validateIdentifier(tableName);
+        validateIdentifier(columnName);
+
+        const data = await sql.unsafe(`
+            SELECT DISTINCT "${columnName}" 
+            FROM "${tableName}" 
+            WHERE "${columnName}" IS NOT NULL AND "${columnName}" != ''
+            ORDER BY "${columnName}" ASC
+        `);
+        
+        return { success: true, data: Array.from(data).map(row => row[columnName]) };
     } catch (error: any) {
         return { success: false, error: error.message };
     }

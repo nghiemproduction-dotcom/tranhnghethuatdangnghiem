@@ -123,13 +123,13 @@ export default function BackgroundManager({ onUpdate }: Props) {
           </h4>
 
           <div className="flex gap-1 bg-white/10 p-1 rounded">
-            <button onClick={() => setDeviceType('desktop')} className={`flex-1 p-1.5 rounded flex justify-center ${deviceType === 'desktop' ? 'bg-[#C69C6D] text-black' : 'text-white hover:bg-white/10'}`} title="Desktop">
+            <button onClick={() => setDeviceType('desktop')} className={`flex-1 p-1.5 rounded flex justify-center transition-all active:scale-95 ${deviceType === 'desktop' ? 'bg-[#C69C6D] text-black' : 'text-white hover:bg-white/10'}`} title="Desktop">
                 <Monitor size={14} />
             </button>
-            <button onClick={() => setDeviceType('tablet')} className={`flex-1 p-1.5 rounded flex justify-center ${deviceType === 'tablet' ? 'bg-[#C69C6D] text-black' : 'text-white hover:bg-white/10'}`} title="Tablet">
+            <button onClick={() => setDeviceType('tablet')} className={`flex-1 p-1.5 rounded flex justify-center transition-all active:scale-95 ${deviceType === 'tablet' ? 'bg-[#C69C6D] text-black' : 'text-white hover:bg-white/10'}`} title="Tablet">
                 <Tablet size={14} />
             </button>
-            <button onClick={() => setDeviceType('mobile')} className={`flex-1 p-1.5 rounded flex justify-center ${deviceType === 'mobile' ? 'bg-[#C69C6D] text-black' : 'text-white hover:bg-white/10'}`} title="Mobile">
+            <button onClick={() => setDeviceType('mobile')} className={`flex-1 p-1.5 rounded flex justify-center transition-all active:scale-95 ${deviceType === 'mobile' ? 'bg-[#C69C6D] text-black' : 'text-white hover:bg-white/10'}`} title="Mobile">
                 <Smartphone size={14} />
             </button>
           </div>
@@ -139,7 +139,7 @@ export default function BackgroundManager({ onUpdate }: Props) {
           <button 
             onClick={handleUpload} 
             disabled={status !== 'idle'}
-            className="bg-[#C69C6D] text-black text-xs font-bold py-2 rounded flex items-center justify-center gap-2 hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-[#C69C6D] text-black text-xs font-bold py-2 rounded flex items-center justify-center gap-2 hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
           >
             {status !== 'idle' ? <Loader2 size={14} className="animate-spin"/> : <Upload size={14} />}
             {getStatusText()}

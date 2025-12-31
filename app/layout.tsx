@@ -3,10 +3,14 @@ import { Inter } from 'next/font/google';
 import './globals.css'; 
 
 import ForceFullScreen from '@/app/components/ForceFullScreen';
-// 🟢 IMPORT HỆ THỐNG PHÂN QUYỀN
-import { SecurityProvider } from '@/app/HeThongPhanQuyen'; 
 // 🟢 IMPORT REACT QUERY PROVIDER
 import QueryProvider from '@/app/QueryProvider';
+// 🟢 IMPORT USER PROVIDER
+import { UserProvider } from '@/app/ThuVien/UserContext';
+// 🟢 IMPORT APP SETTINGS PROVIDER (Theme + Language)
+import { AppSettingsProvider } from '@/app/ThuVien/AppSettingsContext';
+// ✅ IMPORT ERROR BOUNDARY
+import ErrorBoundary from '@/app/components/ErrorBoundary';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -53,13 +57,18 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body className={`${inter.className} bg-black min-h-screen overflow-hidden overscroll-none`}>
-        {/* 🟢 BỌC QUERY PROVIDER Ở NGOÀI CÙNG HOẶC TRONG SECURITY */}
-        <QueryProvider>
-            <SecurityProvider>
+        {/* 🟢 BỌC USER PROVIDER CHO HỆ THỐNG AUTH */}
+        <UserProvider>
+          {/* 🟢 BỌC APP SETTINGS PROVIDER CHO THEME + LANGUAGE */}
+          <AppSettingsProvider>
+            <QueryProvider>
+              <ErrorBoundary>
                 <ForceFullScreen />
                 {children}
-            </SecurityProvider>
-        </QueryProvider>
+              </ErrorBoundary>
+            </QueryProvider>
+          </AppSettingsProvider>
+        </UserProvider>
       </body>
     </html>
   );
