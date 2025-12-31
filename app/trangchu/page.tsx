@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { PlayCircle, Star, ArrowRight, LogIn } from 'lucide-react';
 
@@ -21,7 +21,8 @@ import { useAppSettings } from '@/app/ThuVien/AppSettingsContext';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const BASE_IMG_URL = `${SUPABASE_URL}/storage/v1/object/public/hinh-nen`;
 
-export default function TrangChuDashboard() {
+// 🟢 ĐỔI TÊN COMPONENT CHÍNH THÀNH Content (Không export default nữa)
+function TrangChuContent() {
     const router = useRouter();
     const pathname = usePathname(); // Lấy đường dẫn hiện tại
     const searchParams = useSearchParams(); // Lấy query parameters
@@ -441,7 +442,7 @@ export default function TrangChuDashboard() {
                     </div>
 
                     <div className="w-full max-w-6xl mx-auto px-4 relative z-20">
-                         <div className="text-center mb-12"><h2 className="text-stroke-title text-3xl font-serif mt-2 text-transparent">Tri Thức & Hành Trình</h2></div>
+                          <div className="text-center mb-12"><h2 className="text-stroke-title text-3xl font-serif mt-2 text-transparent">Tri Thức & Hành Trình</h2></div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div className="p-8 rounded-xl bg-white/5 border border-white/10 hover:border-[#C69C6D]/50 transition-all hover:-translate-y-1">
                                 <div className="flex items-center gap-2 mb-4 text-[#C69C6D] text-xs font-bold font-sans uppercase"><Star size={12}/> <span>Triển Lãm</span></div>
@@ -474,19 +475,19 @@ export default function TrangChuDashboard() {
                 <BackgroundManager onUpdate={handleUpdateBackground} />
             </div>
 
-                        {isVisitor && (
-                            <button
-                                onClick={handleGoToLogin}
-                                className="fixed bottom-6 right-4 sm:bottom-8 sm:right-6 z-[5002] flex items-center gap-2 sm:gap-2.5 px-4 sm:px-5 py-3 sm:py-3.5 rounded-full
-                                    bg-gradient-to-r from-[#C69C6D] via-[#F2D3A0] to-[#C69C6D]
-                                    text-black font-semibold text-sm sm:text-base tracking-wide
-                                    shadow-[0_10px_30px_rgba(0,0,0,0.35)] border border-white/20
-                                    backdrop-blur-md hover:scale-[1.02] active:scale-95 transition-transform duration-200"
-                            >
-                                <LogIn size={18} className="opacity-80" />
-                                <span className="whitespace-nowrap">{t('auth.loginRegister')}</span>
-                            </button>
-                        )}
+            {isVisitor && (
+                <button
+                    onClick={handleGoToLogin}
+                    className="fixed bottom-6 right-4 sm:bottom-8 sm:right-6 z-[5002] flex items-center gap-2 sm:gap-2.5 px-4 sm:px-5 py-3 sm:py-3.5 rounded-full
+                        bg-gradient-to-r from-[#C69C6D] via-[#F2D3A0] to-[#C69C6D]
+                        text-black font-semibold text-sm sm:text-base tracking-wide
+                        shadow-[0_10px_30px_rgba(0,0,0,0.35)] border border-white/20
+                        backdrop-blur-md hover:scale-[1.02] active:scale-95 transition-transform duration-200"
+                >
+                    <LogIn size={18} className="opacity-80" />
+                    <span className="whitespace-nowrap">{t('auth.loginRegister')}</span>
+                </button>
+            )}
 
             <style jsx global>{`
                 /* Ẩn thanh cuộn */
@@ -508,5 +509,14 @@ export default function TrangChuDashboard() {
                 }
             `}</style>
         </div>
+    );
+}
+
+// 🟢 EXPORT DEFAULT MỚI: BỌC TRONG SUSPENSE
+export default function TrangChuDashboard() {
+    return (
+        <Suspense fallback={<div className="w-full h-screen bg-[#050505] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C69C6D]"></div></div>}>
+            <TrangChuContent />
+        </Suspense>
     );
 }
