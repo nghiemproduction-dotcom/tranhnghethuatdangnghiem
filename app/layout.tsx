@@ -4,6 +4,7 @@ import './globals.css';
 import NutHoTro from '@/app/components/NutHoTro';
 import TuVanKhachHang from '@/app/components/TuVanKhachHang'; // 🟢 MỚI: Import nút của nhân viên
 import ForceFullScreen from '@/app/components/ForceFullScreen';
+import PushManager from '@/app/components/PushManager'; // 🔔 MỚI: Import trình quản lý thông báo đẩy
 // 🟢 IMPORT REACT QUERY PROVIDER
 import QueryProvider from '@/app/QueryProvider';
 // 🟢 IMPORT USER PROVIDER
@@ -34,7 +35,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'ArtSpace ERP',
+    title: 'NghiemArt ERP',
   },
 };
 
@@ -72,6 +73,9 @@ export default function RootLayout({
 
                 {/* 🟢 NÚT TƯ VẤN CHO NHÂN VIÊN (Tự ẩn nếu là khách) */}
                 <TuVanKhachHang />
+
+                {/* 🔔 QUẢN LÝ THÔNG BÁO ĐẨY (PUSH NOTIFICATIONS) */}
+                <PushManager />
 
               </ErrorBoundary>
             </QueryProvider>

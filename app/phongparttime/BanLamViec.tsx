@@ -1,342 +1,222 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-    Clock, Calendar, CheckCircle, XCircle, DollarSign, 
-    Coffee, Briefcase, Timer, Loader2, PlayCircle, StopCircle 
+    Play, CheckCircle, Clock, Camera, Loader2, 
+    AlertTriangle, Banknote, RefreshCw, Briefcase, PlusCircle 
 } from 'lucide-react';
+// 👇 Import thêm hàm mới
+import { getMyTasksAction, getAvailableJobsAction, startJobAction, completeJobAction, getMySalaryToday, claimJobAction } from '@/app/actions/QuyenHanSanXuat';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
-import { useUser } from '@/app/ThuVien/UserContext';
-
-// 🟢 Đã xóa import sonner để fix lỗi
-// import { toast } from 'sonner'; 
-
-// Cấu hình hiển thị trạng thái
-const PRIORITY_CONFIG: any = { 
-    high: { label: 'Cao', color: 'text-red-400 border-red-400/30 bg-red-400/10' }, 
-    medium: { label: 'Trung bình', color: 'text-[#C69C6D] border-[#C69C6D]/30 bg-[#C69C6D]/10' }, 
-    low: { label: 'Thấp', color: 'text-gray-400 border-gray-400/30 bg-gray-400/10' } 
-};
-
-const TASK_STATUS_CONFIG: any = { 
-    completed: { label: 'Hoàn thành', color: 'bg-green-500/20 text-green-400' }, 
-    in_progress: { label: 'Đang làm', color: 'bg-[#C69C6D]/20 text-[#C69C6D]' }, 
-    pending: { label: 'Chưa làm', color: 'bg-white/10 text-gray-300' } 
-};
+import { compressImage } from '@/app/ThuVien/compressImage';
 
 export default function BanLamViec() {
-    const { user } = useUser();
-    const [loading, setLoading] = useState(true);
-    const [isCheckedIn, setIsCheckedIn] = useState(false);
-    const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<'my_jobs' | 'new_jobs'>('my_jobs');
+    const [tasks, setTasks] = useState<any[]>([]);      // Việc của tôi
+    const [newJobs, setNewJobs] = useState<any[]>([]); // Việc mới chưa ai nhận
     
-    // Data States
-    const [attendanceToday, setAttendanceToday] = useState<any>(null);
-    const [shifts, setShifts] = useState<any[]>([]); // Lịch sử chấm công
-    const [tasks, setTasks] = useState<any[]>([]);   // Danh sách nhiệm vụ
-    const [stats, setStats] = useState({
-        hoursMonth: 0,
-        salaryEst: 0,
-        tasksDone: 0,
-        tasksTotal: 0
-    });
+    const [salary, setSalary] = useState(0);
+    const [loading, setLoading] = useState(true);
+    const [processingId, setProcessingId] = useState<string | null>(null);
+    
+    // Upload State
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [uploadingJobId, setUploadingJobId] = useState<string | null>(null);
 
-    useEffect(() => {
-        if (user?.id) {
-            fetchData();
-        }
-    }, [user?.id]);
+    useEffect(() => { loadData(); }, []);
 
-    const fetchData = async () => {
+    const loadData = async () => {
         setLoading(true);
+        const [resTasks, resNewJobs, resSalary] = await Promise.all([
+            getMyTasksAction(),
+            getAvailableJobsAction(), // Lấy việc mới
+            getMySalaryToday()
+        ]);
+        
+        if (resTasks.success) setTasks(resTasks.data || []);
+        if (resNewJobs.success) setNewJobs(resNewJobs.data || []);
+        if (resSalary.success) setSalary(resSalary.total || 0);
+        setLoading(false);
+    };
+
+    // Hàm nhận việc
+    const handleClaim = async (jobId: string) => {
+        setProcessingId(jobId);
+        const res = await claimJobAction(jobId);
+        if (res.success) {
+            alert("Đã nhận việc thành công! Bắt đầu làm ngay nhé.");
+            loadData();
+            setActiveTab('my_jobs'); // Chuyển về tab việc của tôi
+        } else {
+            alert("Lỗi: " + res.error);
+        }
+        setProcessingId(null);
+    };
+
+    const handleStart = async (jobId: string) => {
+        if (!confirm("Bắt đầu tính giờ làm?")) return;
+        setProcessingId(jobId);
+        const res = await startJobAction(jobId);
+        if (res.success) loadData();
+        else alert(res.error);
+        setProcessingId(null);
+    };
+
+    const handleFinishClick = (jobId: string) => {
+        setUploadingJobId(jobId);
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !uploadingJobId) return;
+
+        setProcessingId(uploadingJobId);
         try {
-            const today = new Date().toISOString().split('T')[0];
+            const compressed = await compressImage(file, 0.6, 800);
+            const fileName = `evidence_${Date.now()}.jpg`;
+            const { error: upErr } = await supabase.storage.from('evidence').upload(fileName, compressed);
+            if (upErr) throw upErr;
+            const { data } = supabase.storage.from('evidence').getPublicUrl(fileName);
 
-            // 1. Kiểm tra chấm công hôm nay
-            const { data: todayData } = await supabase
-                .from('cham_cong')
-                .select('*')
-                .eq('nhan_su_id', user?.id)
-                .eq('ngay', today)
-                .is('thoi_gian_ra', null) // Chưa check-out
-                .maybeSingle();
-
-            if (todayData) {
-                setIsCheckedIn(true);
-                setCurrentSessionId(todayData.id);
-                setAttendanceToday(todayData);
+            const res = await completeJobAction(uploadingJobId, data.publicUrl, "Hoàn thành qua App");
+            
+            if (res.success) {
+                alert("🎉 Tuyệt vời! Đã cộng lương.");
+                loadData();
+            } else {
+                alert("Lỗi: " + res.error);
             }
-
-            // 2. Lấy lịch sử chấm công (Gần đây)
-            const { data: shiftData } = await supabase
-                .from('cham_cong')
-                .select('*')
-                .eq('nhan_su_id', user?.id)
-                .order('created_at', { ascending: false })
-                .limit(5);
-            
-            setShifts(shiftData || []);
-
-            // 3. Lấy nhiệm vụ
-            const { data: taskData } = await supabase
-                .from('nhiem_vu')
-                .select('*')
-                .eq('nhan_su_id', user?.id)
-                .order('han_chot', { ascending: true });
-            
-            setTasks(taskData || []);
-
-            // 4. Tính toán thống kê (Giả lập tính lương cơ bản)
-            const doneTasks = taskData?.filter(t => t.trang_thai === 'completed').length || 0;
-            setStats({
-                hoursMonth: 0, // Cần logic tính tổng giờ
-                salaryEst: 0,  // Cần logic nhân lương
-                tasksDone: doneTasks,
-                tasksTotal: taskData?.length || 0
-            });
-
-        } catch (error) {
-            console.error("Lỗi tải dữ liệu bàn làm việc:", error);
+        } catch (err: any) {
+            alert("Lỗi: " + err.message);
         } finally {
-            setLoading(false);
+            setProcessingId(null);
+            setUploadingJobId(null);
+            if(fileInputRef.current) fileInputRef.current.value = '';
         }
     };
-
-    const handleCheckIn = async () => {
-        if (!user?.id) return;
-        try {
-            const { data, error } = await supabase.from('cham_cong').insert({
-                nhan_su_id: user.id,
-                ngay: new Date().toISOString().split('T')[0],
-                thoi_gian_vao: new Date().toISOString()
-            }).select().single();
-
-            if (error) throw error;
-
-            setIsCheckedIn(true);
-            setCurrentSessionId(data.id);
-            setAttendanceToday(data);
-            
-            // 🟢 Dùng alert thay vì toast
-            alert("✅ Check-in thành công! Chúc bạn một ngày làm việc hiệu quả.");
-            
-            fetchData(); 
-        } catch (error: any) {
-            alert("Lỗi check-in: " + error.message);
-        }
-    };
-
-    const handleCheckOut = async () => {
-        if (!currentSessionId) return;
-        try {
-            const { error } = await supabase.from('cham_cong').update({
-                thoi_gian_ra: new Date().toISOString()
-            }).eq('id', currentSessionId);
-
-            if (error) throw error;
-
-            setIsCheckedIn(false);
-            setCurrentSessionId(null);
-            setAttendanceToday(null);
-
-            // 🟢 Dùng alert thay vì toast
-            alert("👋 Check-out thành công! Hẹn gặp lại.");
-            
-            fetchData();
-        } catch (error: any) {
-            alert("Lỗi check-out: " + error.message);
-        }
-    };
-
-    if (loading) {
-        return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#C69C6D]" /></div>;
-    }
 
     return (
-        <div className="w-full h-full animate-fade-in-up pb-20">
-            {/* Header Section */}
-            <div className="mb-8">
-                <div className="flex items-center gap-4 mb-6">
-                    <div className="bg-[#C69C6D]/10 p-3 rounded-lg border border-[#C69C6D]/30 shadow-[0_0_20px_rgba(198,156,109,0.2)]">
-                        <Coffee className="w-6 h-6 text-[#C69C6D]" />
-                    </div>
+        <div className="w-full h-full bg-[#0a0a0a] text-white overflow-hidden flex flex-col">
+            {/* Header Lương */}
+            <div className="p-6 bg-gradient-to-r from-[#1a1a1a] to-[#0a0a0a] border-b border-[#C69C6D]/30 shrink-0 shadow-xl">
+                <div className="flex justify-between items-center">
                     <div>
-                    <h1 className="text-3xl md:text-4xl font-serif font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#F5E6D3] to-[#C69C6D]">
-    Không Gian Sáng Tạo
-</h1>
-<p className="text-white/60 mt-1 font-light tracking-wide text-sm md:text-base italic">
-    "Nơi đam mê kết tinh thành tác phẩm" - Chào nghệ nhân {user?.ho_ten}
-</p>
+                        <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-1">Lương tạm tính tháng này</p>
+                        <h1 className="text-3xl font-black text-[#C69C6D] flex items-center gap-2">
+                            <Banknote size={28}/> {salary.toLocaleString('vi-VN')}₫
+                        </h1>
                     </div>
-                </div>
-            </div>
-
-            {/* Check-in / Check-out Panel */}
-            <div className={`backdrop-blur-md border rounded-2xl p-6 mb-8 relative overflow-hidden group transition-all duration-500
-                ${isCheckedIn 
-                    ? 'bg-[#C69C6D]/10 border-[#C69C6D]/50 shadow-[0_0_30px_rgba(198,156,109,0.15)]' 
-                    : 'bg-white/5 border-[#C69C6D]/30'
-                }`}
-            >
-                <div className="absolute inset-0 bg-gradient-to-r from-[#C69C6D]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
-                    <div className="text-center md:text-left">
-                        <h2 className="text-2xl font-bold mb-2 text-[#F5E6D3] font-serif">
-                       {isCheckedIn ? 'Đang trong phiên sáng tạo 🎨' : 'Khởi tạo nguồn cảm hứng ✨'}</h2>
-                        <p className="text-white/70 text-xs md:text-sm">
-                            {isCheckedIn 
-                                ? `Bắt đầu lúc: ${new Date(attendanceToday?.thoi_gian_vao).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})} - Đừng quên check-out!` 
-                                : 'Hãy Check-in để hệ thống bắt đầu tính giờ công cho bạn.'}
-                        </p>
-                    </div>
-                    <button 
-                        onClick={isCheckedIn ? handleCheckOut : handleCheckIn}
-                        className={`flex items-center gap-3 px-8 py-3 rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg transition-all transform hover:scale-105 active:scale-95 
-                        ${isCheckedIn 
-                            ? 'bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500 hover:text-white' 
-                            : 'bg-[#C69C6D] text-black hover:bg-[#F5E6D3]'
-                        }`}
-                    >
-                        {isCheckedIn ? <><StopCircle size={18}/> Check-out</> : <><PlayCircle size={18}/> Check-in</>}
+                    <button onClick={loadData} className="p-3 bg-white/5 rounded-full hover:bg-white/10 active:scale-95 transition-all">
+                        <RefreshCw size={20} className={loading ? "animate-spin" : ""}/>
                     </button>
                 </div>
             </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <StatCard 
-                    icon={Clock} 
-                    title="Giờ làm tháng này" 
-                    value={`${stats.hoursMonth}h`} 
-                    change="Cập nhật theo thực tế" 
-                    color="blue" 
-                />
-                <StatCard 
-                    icon={DollarSign} 
-                    title="Lương tạm tính" 
-                    value={`${(stats.salaryEst / 1000000).toFixed(1)}M`} 
-                    change="Chưa bao gồm thưởng" 
-                    color="green" 
-                />
-                <StatCard 
-                    icon={CheckCircle} 
-                    title="Nhiệm vụ xong" 
-                    value={`${stats.tasksDone}/${stats.tasksTotal}`} 
-                    change={`${stats.tasksTotal > 0 ? Math.round((stats.tasksDone/stats.tasksTotal)*100) : 0}%`} 
-                    color="purple" 
-                />
-                <StatCard 
-                    icon={Calendar} 
-                    title="Ca làm gần nhất" 
-                    value={shifts.length.toString()} 
-                    change="Lần chấm công" 
-                    color="orange" 
-                />
+            {/* TABS */}
+            <div className="flex border-b border-white/10 bg-[#111]">
+                <button 
+                    onClick={() => setActiveTab('my_jobs')}
+                    className={`flex-1 py-4 text-xs font-black uppercase tracking-wider border-b-2 transition-all ${activeTab === 'my_jobs' ? 'border-[#C69C6D] text-[#C69C6D] bg-white/5' : 'border-transparent text-gray-500'}`}
+                >
+                    Việc Của Tôi ({tasks.length})
+                </button>
+                <button 
+                    onClick={() => setActiveTab('new_jobs')}
+                    className={`flex-1 py-4 text-xs font-black uppercase tracking-wider border-b-2 transition-all flex items-center justify-center gap-2 ${activeTab === 'new_jobs' ? 'border-[#C69C6D] text-[#C69C6D] bg-white/5' : 'border-transparent text-gray-500'}`}
+                >
+                    Sàn Việc Mới 
+                    {newJobs.length > 0 && <span className="bg-red-600 text-white px-1.5 py-0.5 rounded-full text-[9px] animate-pulse">{newJobs.length}</span>}
+                </button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Lịch sử chấm công */}
-                <div className="lg:col-span-2 bg-black/40 backdrop-blur-sm rounded-xl border border-white/10 p-6">
-                    <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-3">
-                        <h3 className="text-lg font-bold text-[#C69C6D] font-serif flex items-center gap-2">
-                            <Calendar className="w-4 h-4" /> Lịch sử chấm công
-                        </h3>
-                    </div>
-                    <div className="space-y-3">
-                        {shifts.length === 0 ? (
-                            <div className="text-center text-white/30 text-sm py-4">Chưa có dữ liệu chấm công</div>
-                        ) : (
-                            shifts.map((shift) => (
-                                <div key={shift.id} className="p-3 rounded-lg border border-white/5 bg-white/5 hover:border-[#C69C6D]/30 transition-all">
-                                    <div className="flex items-center justify-between">
+            {/* DANH SÁCH */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                
+                {/* TAB VIỆC MỚI */}
+                {activeTab === 'new_jobs' && (
+                    <>
+                        {newJobs.length === 0 && !loading && (
+                            <div className="text-center py-20 text-white/30"><Briefcase size={40} className="mx-auto mb-2 opacity-30"/><p>Hiện chưa có đơn hàng nào cần làm</p></div>
+                        )}
+                        {newJobs.map(job => (
+                            <div key={job.id} className="p-5 rounded-2xl border border-white/10 bg-[#111] hover:border-[#C69C6D]/50 transition-all flex flex-col gap-3">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <span className="text-[10px] font-black bg-white/10 px-2 py-1 rounded text-white/60 mb-2 inline-block">ĐƠN: {job.ma_don}</span>
+                                        <h3 className="text-lg font-bold text-white">{job.ten_item_hien_thi}</h3>
+                                        <p className="text-sm text-gray-400">Số lượng: <b className="text-white">{job.so_luong}</b> • {job.ten_quy_trinh}</p>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => handleClaim(job.id)}
+                                    disabled={!!processingId}
+                                    className="w-full py-3 bg-[#C69C6D] hover:bg-white text-black rounded-xl font-black uppercase text-xs flex items-center justify-center gap-2 shadow-lg active:scale-95"
+                                >
+                                    {processingId === job.id ? <Loader2 className="animate-spin"/> : <PlusCircle size={18}/>}
+                                    NHẬN VIỆC NAY
+                                </button>
+                            </div>
+                        ))}
+                    </>
+                )}
+
+                {/* TAB VIỆC CỦA TÔI */}
+                {activeTab === 'my_jobs' && (
+                    <>
+                        {tasks.length === 0 && !loading && (
+                            <div className="text-center py-20 text-white/30 flex flex-col items-center">
+                                <CheckCircle size={48} className="mb-4 opacity-20"/>
+                                <p className="text-sm font-bold uppercase">Bạn đang rảnh rỗi. Qua tab "Sàn Việc Mới" nhận việc đi!</p>
+                            </div>
+                        )}
+                        {tasks.map(task => {
+                            const isStarted = task.trang_thai === 'dang_lam';
+                            return (
+                                <div key={task.id} className={`relative p-5 rounded-2xl border-2 transition-all ${isStarted ? 'bg-[#C69C6D]/10 border-[#C69C6D] shadow-[0_0_20px_rgba(198,156,109,0.2)]' : 'bg-[#151515] border-white/5'}`}>
+                                    <div className="flex justify-between items-start mb-4">
                                         <div>
-                                            <p className="font-bold text-[#F5E6D3] text-sm">
-                                                {new Date(shift.ngay).toLocaleDateString('vi-VN', {weekday: 'long', day: '2-digit', month: '2-digit'})}
-                                            </p>
-                                            <div className="flex items-center gap-3 text-xs text-gray-400 mt-1 font-mono">
-                                                <span className="flex items-center gap-1">
-                                                    <PlayCircle className="w-3 h-3 text-green-400"/> 
-                                                    {new Date(shift.thoi_gian_vao).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})}
-                                                </span>
-                                                <span className="flex items-center gap-1">
-                                                    <StopCircle className="w-3 h-3 text-red-400"/> 
-                                                    {shift.thoi_gian_ra ? new Date(shift.thoi_gian_ra).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'}) : '---'}
-                                                </span>
-                                            </div>
+                                            <span className="text-[10px] font-black bg-white/10 px-2 py-1 rounded text-white/60 mb-2 inline-block">{task.ma_lenh}</span>
+                                            <h3 className="text-lg font-bold text-white mb-1">{task.ten_item_hien_thi}</h3>
+                                            <p className="text-sm text-gray-400">SL: <b className="text-white">{task.so_luong}</b> • {task.ten_quy_trinh}</p>
                                         </div>
-                                        <div className="text-right">
-                                            {shift.thoi_gian_ra ? (
-                                                <span className="text-xs font-bold bg-green-900/30 text-green-400 px-2 py-1 rounded border border-green-500/20">Hoàn thành</span>
-                                            ) : (
-                                                <span className="text-xs font-bold bg-[#C69C6D]/20 text-[#C69C6D] px-2 py-1 rounded border border-[#C69C6D]/30 animate-pulse">Đang làm</span>
-                                            )}
+                                        {isStarted && <span className="animate-pulse text-[#C69C6D]"><Clock size={24}/></span>}
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-3">
+                                        {!isStarted ? (
+                                            <button 
+                                                onClick={() => handleStart(task.id)}
+                                                disabled={!!processingId}
+                                                className="w-full py-4 bg-white/5 hover:bg-[#C69C6D] hover:text-black border border-white/10 rounded-xl font-black uppercase tracking-widest text-sm transition-all active:scale-95 flex items-center justify-center gap-2"
+                                            >
+                                                {processingId === task.id ? <Loader2 className="animate-spin"/> : <Play size={20} fill="currentColor"/>}
+                                                BẮT ĐẦU LÀM
+                                            </button>
+                                        ) : (
+                                            <button 
+                                                onClick={() => handleFinishClick(task.id)}
+                                                disabled={!!processingId}
+                                                className="w-full py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-black uppercase tracking-widest text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg"
+                                            >
+                                                {processingId === task.id ? <Loader2 className="animate-spin"/> : <Camera size={20}/>}
+                                                CHỤP ẢNH & XONG
+                                            </button>
+                                        )}
+                                    </div>
+                                    {task.ghi_chu_don && (
+                                        <div className="mt-4 p-3 bg-black/40 rounded-lg border border-white/5 flex items-start gap-2">
+                                            <AlertTriangle size={16} className="text-yellow-500 shrink-0 mt-0.5"/>
+                                            <p className="text-xs text-yellow-500/80 italic">{task.ghi_chu_don}</p>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
-                            ))
-                        )}
-                    </div>
-                </div>
-
-                {/* Danh sách nhiệm vụ */}
-                <div className="bg-black/40 backdrop-blur-sm rounded-xl border border-white/10 p-6">
-                    <h3 className="text-lg font-bold text-[#C69C6D] font-serif mb-4 flex items-center gap-2 border-b border-white/5 pb-3">
-                        📋 Nhiệm vụ
-                    </h3>
-                    <div className="space-y-4">
-                        {tasks.length === 0 ? (
-                            <div className="text-center text-white/30 text-sm py-4">Không có nhiệm vụ nào</div>
-                        ) : (
-                            tasks.map((task) => (
-                                <div key={task.id} className="p-3 rounded-lg border border-white/5 bg-white/5 hover:border-[#C69C6D]/30 transition-all">
-                                    <div className="flex items-start justify-between mb-2">
-                                        <h4 className="font-medium text-gray-200 text-xs flex-1 mr-2">{task.tieu_de}</h4>
-                                        <span className={`text-[10px] px-2 py-0.5 rounded border font-bold uppercase tracking-wider ${PRIORITY_CONFIG[task.muc_do]?.color}`}>
-                                            {PRIORITY_CONFIG[task.muc_do]?.label || task.muc_do}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center justify-between mt-2">
-                                        <span className="text-[10px] text-gray-500 font-mono flex items-center gap-1">
-                                            <Calendar className="w-3 h-3" /> {task.han_chot ? new Date(task.han_chot).toLocaleDateString('vi-VN') : 'Không hạn'}
-                                        </span>
-                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${TASK_STATUS_CONFIG[task.trang_thai]?.color || 'text-gray-500'}`}>
-                                            {TASK_STATUS_CONFIG[task.trang_thai]?.label || task.trang_thai}
-                                        </span>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                    <button className="w-full mt-4 py-2 border border-dashed border-white/20 rounded-lg text-white/40 hover:border-[#C69C6D] hover:text-[#C69C6D] transition-colors text-xs font-bold uppercase tracking-widest">
-                        + Báo cáo công việc
-                    </button>
-                </div>
+                            );
+                        })}
+                    </>
+                )}
             </div>
-        </div>
-    );
-}
 
-// Component phụ StatCard
-function StatCard({ icon: Icon, title, value, change, color }: any) {
-    const colorClasses: any = {
-        blue: 'bg-blue-500/10 text-blue-400',
-        green: 'bg-green-500/10 text-green-400',
-        purple: 'bg-purple-500/10 text-purple-400',
-        orange: 'bg-orange-500/10 text-orange-400'
-    };
-
-    return (
-        <div className="bg-black/40 backdrop-blur-sm rounded-xl border border-white/10 p-4 hover:border-[#C69C6D]/50 transition-all group">
-            <div className="flex items-start justify-between mb-3">
-                <div className={`p-2 rounded-lg ${colorClasses[color]}`}>
-                    <Icon className="w-5 h-5" />
-                </div>
-                <span className="text-xs font-medium text-gray-400 group-hover:text-white transition-colors">{change}</span>
-            </div>
-            <div>
-                <p className="text-xs text-gray-500 mb-1 font-serif italic">{title}</p>
-                <p className="text-2xl font-bold text-[#F5E6D3]">{value}</p>
-            </div>
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" capture="environment"/>
         </div>
     );
 }

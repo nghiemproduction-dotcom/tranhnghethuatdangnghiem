@@ -34,7 +34,7 @@ interface AppSettingsContextType {
 const translations: Record<LanguageCode, Record<string, string>> = {
   vi: {
     // Chung - Tông giọng trang trọng
-    'app.name': 'ArtSpace Management',
+    'app.name': 'NghiemArt Management',
     'app.loading': 'Đang khởi tạo...',
     'app.error': 'Đã có sự cố',
     'app.save': 'Lưu Tác Phẩm',
@@ -136,7 +136,7 @@ const translations: Record<LanguageCode, Record<string, string>> = {
   },
   en: {
     // Common
-    'app.name': 'ArtSpace System',
+    'app.name': 'NghiemArt System',
     'app.loading': 'Initializing...',
     'app.error': 'An error occurred',
     'app.save': 'Save Artwork',

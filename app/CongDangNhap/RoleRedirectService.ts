@@ -14,10 +14,17 @@ const normalizeString = (str: string | null | undefined): string => {
 // 🟢 CẤU HÌNH DỰ PHÒNG (Khớp 100% với file CSV routing_permissions)
 // Giúp hệ thống vẫn chạy ngon kể cả khi Database bị chặn quyền đọc
 const FALLBACK_ROUTES: Record<string, string> = {
+    // Nhóm Quản Trị
     'admin': '/phongadmin',
     'boss': '/phongadmin',
     'quanly': '/phongquanly',
+    
+    // Nhóm Nghiệp Vụ
     'sales': '/phongsales',
+    'ketoan': '/phongketoan',   // ✅ Mới: Kế toán
+    'thukho': '/phongkho',      // ✅ Mới: Thủ kho
+    
+    // Nhóm Sản Xuất
     'congtacvien': '/phongctv',
     'ctv': '/phongctv',
     'parttime': '/phongparttime',
@@ -25,7 +32,8 @@ const FALLBACK_ROUTES: Record<string, string> = {
     'tho': '/phongtho',
     'kythuat': '/phongtho',
     'thietke': '/phongthietke',
-    // Khách hàng
+    
+    // Nhóm Khách hàng
     'vip': '/trangchu',
     'doitac': '/trangchu',
     'moi': '/trangchu',
@@ -35,13 +43,24 @@ const FALLBACK_ROUTES: Record<string, string> = {
 };
 
 const FALLBACK_ALLOWED_ROUTES: Record<string, string[]> = {
-    'admin': ['/phongadmin', '/dashboard', '/settings'],
-    'quanly': ['/phongquanly', '/dashboard'],
-    'sales': ['/phongsales', '/dathang'],
+    // Admin & Boss: Full quyền
+    'admin': ['/phongadmin', '/phongquanly', '/phongkho', '/phongketoan', '/phongsales', '/phongparttime', '/phongctv', '/phongthietke', '/dashboard', '/settings'],
+    'boss': ['/phongadmin', '/phongquanly', '/phongkho', '/phongketoan', '/phongsales', '/phongparttime', '/phongctv', '/phongthietke', '/dashboard', '/settings'],
+    
+    // Quản lý: Được xem Kho, Kế toán để duyệt
+    'quanly': ['/phongquanly', '/phongkho', '/phongketoan', '/dashboard'],
+    
+    // Nghiệp vụ cụ thể
+    'sales': ['/phongsales', '/dathang', '/phongkho'], // ✅ Sales được xem kho để báo khách
+    'ketoan': ['/phongketoan', '/dashboard'],          // ✅ Mới
+    'thukho': ['/phongkho', '/dashboard'],             // ✅ Mới
+    
+    // Sản xuất
     'parttime': ['/phongparttime'],
     'thosanxuat': ['/phongtho'],
     'congtacvien': ['/phongctv'],
     'thietke': ['/phongthietke'],
+    
     // Khách hàng
     'khach': ['/trangchu', '/dathang', '/giohang']
 };
@@ -156,6 +175,8 @@ export class RoleRedirectService {
             'quanly': 'quanly',
             'boss': 'quanly',
             'sales': 'sales',
+            'ketoan': 'ketoan', // ✅ Mới
+            'thukho': 'thukho', // ✅ Mới
             'thosanxuat': 'tho',
             'tho': 'tho',
             'kythuat': 'tho',
@@ -179,6 +200,8 @@ export class RoleRedirectService {
             'admin': 'Phòng Admin',
             'quanly': 'Phòng Quản Lý',
             'sales': 'Phòng Sales',
+            'ketoan': 'Phòng Kế Toán', // ✅ Mới
+            'thukho': 'Kho Tổng',      // ✅ Mới
             'thosanxuat': 'Phòng Thợ',
             'thietke': 'Phòng Thiết Kế',
             'parttime': 'Phòng Part-time',

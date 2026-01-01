@@ -21,14 +21,14 @@
 |--------|-------|--------|----------------|
 | Tommy Nghiêm | nghiemproduction@gmail.com | Admin | `0939852511` |
 | Chi | nguyenhongkhanhchi@gmail.com | Quản lý | `0939941588` |
-| Ms. Sale | sales@artspace.vn | Sales | `0909000111` |
-| Nguyễn Văn Bán | sales2@artspace.vn | Sales | `0901234567` |
-| Trần Thị CTV | ctv1@artspace.vn | Cộng Tác Viên | `0912345678` |
-| Lê Văn Hợp Tác | ctv2@artspace.vn | Cộng Tác Viên | `0923456789` |
-| Phạm Thị Part | parttime1@artspace.vn | Part-time | `0934567890` |
-| Hoàng Văn Thời Vụ | parttime2@artspace.vn | Part-time | `0945678901` |
-| Võ Văn Thợ | tho1@artspace.vn | Thợ Sản Xuất | `0956789012` |
-| Đỗ Thị Design | design@artspace.vn | Thiết Kế | `0967890123` |
+| Ms. Sale | sales@NghiemArt.vn | Sales | `0909000111` |
+| Nguyễn Văn Bán | sales2@NghiemArt.vn | Sales | `0901234567` |
+| Trần Thị CTV | ctv1@NghiemArt.vn | Cộng Tác Viên | `0912345678` |
+| Lê Văn Hợp Tác | ctv2@NghiemArt.vn | Cộng Tác Viên | `0923456789` |
+| Phạm Thị Part | parttime1@NghiemArt.vn | Part-time | `0934567890` |
+| Hoàng Văn Thời Vụ | parttime2@NghiemArt.vn | Part-time | `0945678901` |
+| Võ Văn Thợ | tho1@NghiemArt.vn | Thợ Sản Xuất | `0956789012` |
+| Đỗ Thị Design | design@NghiemArt.vn | Thiết Kế | `0967890123` |
 
 ---
 
@@ -84,14 +84,14 @@ Password: [số điện thoại tương ứng]
 [
   {"email": "nghiemproduction@gmail.com", "ho_ten": "Tommy Nghiêm", "user_type": "nhan_su", "vi_tri": "Admin"},
   {"email": "nguyenhongkhanhchi@gmail.com", "ho_ten": "Chi", "user_type": "nhan_su", "vi_tri": "Quản lý"},
-  {"email": "sales@artspace.vn", "ho_ten": "Ms. Sale", "user_type": "nhan_su", "vi_tri": "Sales"},
-  {"email": "sales2@artspace.vn", "ho_ten": "Nguyễn Văn Bán", "user_type": "nhan_su", "vi_tri": "Sales"},
-  {"email": "ctv1@artspace.vn", "ho_ten": "Trần Thị CTV", "user_type": "nhan_su", "vi_tri": "Cộng Tác Viên"},
-  {"email": "ctv2@artspace.vn", "ho_ten": "Lê Văn Hợp Tác", "user_type": "nhan_su", "vi_tri": "Cộng Tác Viên"},
-  {"email": "parttime1@artspace.vn", "ho_ten": "Phạm Thị Part", "user_type": "nhan_su", "vi_tri": "Part-time"},
-  {"email": "parttime2@artspace.vn", "ho_ten": "Hoàng Văn Thời Vụ", "user_type": "nhan_su", "vi_tri": "Part-time"},
-  {"email": "tho1@artspace.vn", "ho_ten": "Võ Văn Thợ", "user_type": "nhan_su", "vi_tri": "Thợ Sản Xuất"},
-  {"email": "design@artspace.vn", "ho_ten": "Đỗ Thị Design", "user_type": "nhan_su", "vi_tri": "Thiết Kế"},
+  {"email": "sales@NghiemArt.vn", "ho_ten": "Ms. Sale", "user_type": "nhan_su", "vi_tri": "Sales"},
+  {"email": "sales2@NghiemArt.vn", "ho_ten": "Nguyễn Văn Bán", "user_type": "nhan_su", "vi_tri": "Sales"},
+  {"email": "ctv1@NghiemArt.vn", "ho_ten": "Trần Thị CTV", "user_type": "nhan_su", "vi_tri": "Cộng Tác Viên"},
+  {"email": "ctv2@NghiemArt.vn", "ho_ten": "Lê Văn Hợp Tác", "user_type": "nhan_su", "vi_tri": "Cộng Tác Viên"},
+  {"email": "parttime1@NghiemArt.vn", "ho_ten": "Phạm Thị Part", "user_type": "nhan_su", "vi_tri": "Part-time"},
+  {"email": "parttime2@NghiemArt.vn", "ho_ten": "Hoàng Văn Thời Vụ", "user_type": "nhan_su", "vi_tri": "Part-time"},
+  {"email": "tho1@NghiemArt.vn", "ho_ten": "Võ Văn Thợ", "user_type": "nhan_su", "vi_tri": "Thợ Sản Xuất"},
+  {"email": "design@NghiemArt.vn", "ho_ten": "Đỗ Thị Design", "user_type": "nhan_su", "vi_tri": "Thiết Kế"},
   {"email": "vip1@example.com", "ho_ten": "Nguyễn Đại Gia", "user_type": "khach_hang", "phan_loai": "VIP"},
   {"email": "vip2@example.com", "ho_ten": "Trần Kim Cương", "user_type": "khach_hang", "phan_loai": "VIP"},
   {"email": "khactam@gmail.com", "ho_ten": "Trần Khắc Tâm", "user_type": "khach_hang", "phan_loai": "VIP"},

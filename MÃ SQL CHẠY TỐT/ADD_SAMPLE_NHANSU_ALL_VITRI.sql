@@ -40,36 +40,36 @@ END $$;
 
 -- Sales - thêm 1 người
 INSERT INTO nhan_su (id, ho_ten, email, so_dien_thoai, vi_tri, vi_tri_normalized, trang_thai)
-SELECT gen_random_uuid(), 'Nguyễn Văn Bán', 'sales2@artspace.vn', '0901234567', 'Sales', 'sales', 'Đang làm việc'
-WHERE NOT EXISTS (SELECT 1 FROM nhan_su WHERE email = 'sales2@artspace.vn');
+SELECT gen_random_uuid(), 'Nguyễn Văn Bán', 'sales2@NghiemArt.vn', '0901234567', 'Sales', 'sales', 'Đang làm việc'
+WHERE NOT EXISTS (SELECT 1 FROM nhan_su WHERE email = 'sales2@NghiemArt.vn');
 
 -- Cộng Tác Viên - thêm 2 người
 INSERT INTO nhan_su (id, ho_ten, email, so_dien_thoai, vi_tri, vi_tri_normalized, trang_thai)
-SELECT gen_random_uuid(), 'Trần Thị CTV', 'ctv1@artspace.vn', '0912345678', 'Cộng Tác Viên', 'congtacvien', 'Đang làm việc'
-WHERE NOT EXISTS (SELECT 1 FROM nhan_su WHERE email = 'ctv1@artspace.vn');
+SELECT gen_random_uuid(), 'Trần Thị CTV', 'ctv1@NghiemArt.vn', '0912345678', 'Cộng Tác Viên', 'congtacvien', 'Đang làm việc'
+WHERE NOT EXISTS (SELECT 1 FROM nhan_su WHERE email = 'ctv1@NghiemArt.vn');
 
 INSERT INTO nhan_su (id, ho_ten, email, so_dien_thoai, vi_tri, vi_tri_normalized, trang_thai)
-SELECT gen_random_uuid(), 'Lê Văn Hợp Tác', 'ctv2@artspace.vn', '0923456789', 'Cộng Tác Viên', 'congtacvien', 'Đang làm việc'
-WHERE NOT EXISTS (SELECT 1 FROM nhan_su WHERE email = 'ctv2@artspace.vn');
+SELECT gen_random_uuid(), 'Lê Văn Hợp Tác', 'ctv2@NghiemArt.vn', '0923456789', 'Cộng Tác Viên', 'congtacvien', 'Đang làm việc'
+WHERE NOT EXISTS (SELECT 1 FROM nhan_su WHERE email = 'ctv2@NghiemArt.vn');
 
 -- Part-time - thêm 2 người
 INSERT INTO nhan_su (id, ho_ten, email, so_dien_thoai, vi_tri, vi_tri_normalized, trang_thai)
-SELECT gen_random_uuid(), 'Phạm Thị Part', 'parttime1@artspace.vn', '0934567890', 'Part-time', 'parttime', 'Đang làm việc'
-WHERE NOT EXISTS (SELECT 1 FROM nhan_su WHERE email = 'parttime1@artspace.vn');
+SELECT gen_random_uuid(), 'Phạm Thị Part', 'parttime1@NghiemArt.vn', '0934567890', 'Part-time', 'parttime', 'Đang làm việc'
+WHERE NOT EXISTS (SELECT 1 FROM nhan_su WHERE email = 'parttime1@NghiemArt.vn');
 
 INSERT INTO nhan_su (id, ho_ten, email, so_dien_thoai, vi_tri, vi_tri_normalized, trang_thai)
-SELECT gen_random_uuid(), 'Hoàng Văn Thời Vụ', 'parttime2@artspace.vn', '0945678901', 'Part-time', 'parttime', 'Đang làm việc'
-WHERE NOT EXISTS (SELECT 1 FROM nhan_su WHERE email = 'parttime2@artspace.vn');
+SELECT gen_random_uuid(), 'Hoàng Văn Thời Vụ', 'parttime2@NghiemArt.vn', '0945678901', 'Part-time', 'parttime', 'Đang làm việc'
+WHERE NOT EXISTS (SELECT 1 FROM nhan_su WHERE email = 'parttime2@NghiemArt.vn');
 
 -- Thợ Sản Xuất - thêm 1 người
 INSERT INTO nhan_su (id, ho_ten, email, so_dien_thoai, vi_tri, vi_tri_normalized, trang_thai)
-SELECT gen_random_uuid(), 'Võ Văn Thợ', 'tho1@artspace.vn', '0956789012', 'Thợ Sản Xuất', 'thosanxuat', 'Đang làm việc'
-WHERE NOT EXISTS (SELECT 1 FROM nhan_su WHERE email = 'tho1@artspace.vn');
+SELECT gen_random_uuid(), 'Võ Văn Thợ', 'tho1@NghiemArt.vn', '0956789012', 'Thợ Sản Xuất', 'thosanxuat', 'Đang làm việc'
+WHERE NOT EXISTS (SELECT 1 FROM nhan_su WHERE email = 'tho1@NghiemArt.vn');
 
 -- Thiết Kế - thêm 1 người
 INSERT INTO nhan_su (id, ho_ten, email, so_dien_thoai, vi_tri, vi_tri_normalized, trang_thai)
-SELECT gen_random_uuid(), 'Đỗ Thị Design', 'design@artspace.vn', '0967890123', 'Thiết Kế', 'thietke', 'Đang làm việc'
-WHERE NOT EXISTS (SELECT 1 FROM nhan_su WHERE email = 'design@artspace.vn');
+SELECT gen_random_uuid(), 'Đỗ Thị Design', 'design@NghiemArt.vn', '0967890123', 'Thiết Kế', 'thietke', 'Đang làm việc'
+WHERE NOT EXISTS (SELECT 1 FROM nhan_su WHERE email = 'design@NghiemArt.vn');
 
 -- BƯỚC 4: Cập nhật vi_tri_normalized cho tất cả nhân sự cũ
 UPDATE nhan_su 

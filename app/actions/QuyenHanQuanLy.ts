@@ -12,6 +12,7 @@ const sql = postgres(process.env.DATABASE_URL!, {
 });
 
 // 🛡️ 1. CHECK QUYỀN QUẢN LÝ (ADMIN + BOSS + QUANLY)
+// 🟢 CẬP NHẬT: So sánh Email không phân biệt hoa thường (Case-insensitive)
 async function requireManager() {
     const cookieStore = cookies();
     
@@ -29,33 +30,78 @@ async function requireManager() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user || !user.email) throw new Error("Unauthorized: Bạn chưa đăng nhập");
 
-    const { data: nhanSu } = await supabase
-        .from('nhan_su')
-        .select('vi_tri, vi_tri_normalized')
-        .eq('email', user.email)
-        .single();
+    // Lấy thông tin nhân sự (Dùng lower(email) để chắc ăn)
+    const [nhanSu] = await sql`
+        SELECT vi_tri, vi_tri_normalized 
+        FROM nhan_su 
+        WHERE lower(email) = lower(${user.email})
+        LIMIT 1
+    `;
     
     // ✅ DANH SÁCH QUYỀN ĐƯỢC PHÉP
     const allowedRoles = ['admin', 'boss', 'quanly'];
     const userRoleNormalized = (nhanSu?.vi_tri_normalized || '').toLowerCase();
     
-    // Check normalized trước, fallback về text cũ nếu cần
     const isAllowed = allowedRoles.includes(userRoleNormalized);
 
     if (!isAllowed) {
         throw new Error("Forbidden: Bạn không có quyền Quản Lý nghiệp vụ này");
     }
+    
+    return user; // Trả về user để dùng tiếp nếu cần
 }
 
 function validateIdentifier(name: string) {
     if (!/^[a-zA-Z0-9_]+$/.test(name)) throw new Error("Tên bảng/cột không hợp lệ");
 }
 
-// --- NGHIỆP VỤ NHÂN SỰ ---
+// --- 💬 NGHIỆP VỤ CHAT & HỖ TRỢ (MỚI BỔ SUNG) ---
+
+// 1. Lấy danh sách tất cả phiên chat (Dành cho quản lý soi)
+export async function getManagerChatSessionsAction(filterStatus: string = 'all') {
+    try {
+        await requireManager();
+
+        let query = `
+            SELECT 
+                s.*,
+                ns.ho_ten as ten_sales_phu_trach
+            FROM tu_van_sessions s
+            LEFT JOIN nhan_su ns ON s.nhan_su_phu_trach_id = ns.id
+            WHERE 1=1
+        `;
+
+        if (filterStatus !== 'all') {
+            query += ` AND s.trang_thai = '${filterStatus}'`;
+        }
+
+        query += ` ORDER BY s.cap_nhat_luc DESC LIMIT 100`;
+
+        const data = await sql.unsafe(query);
+        return { success: true, data: Array.from(data) };
+    } catch (error: any) { return { success: false, error: error.message }; }
+}
+
+// 2. Lấy nội dung tin nhắn của 1 phiên (Soi chi tiết)
+export async function getManagerChatMessagesAction(sessionId: string) {
+    try {
+        await requireManager();
+
+        const data = await sql`
+            SELECT * FROM tu_van_messages 
+            WHERE session_id = ${sessionId} 
+            ORDER BY tao_luc ASC
+        `;
+        
+        return { success: true, data: Array.from(data) };
+    } catch (error: any) { return { success: false, error: error.message }; }
+}
+
+// --- 👥 NGHIỆP VỤ NHÂN SỰ ---
 
 export async function getNhanSuDataAction(page: number, pageSize: number, search: string, filterRole: string) {
     try {
-        await requireManager(); // 🛡️ Check quyền
+        await requireManager(); 
         
         let query = `SELECT * FROM "nhan_su" WHERE 1=1`;
         const params: any[] = [];
@@ -149,7 +195,7 @@ export async function bulkUpdateNhanSuAction(ids: string[], data: { vi_tri?: str
     } catch (error: any) { return { success: false, error: error.message }; }
 }
 
-// --- NGHIỆP VỤ KHÁCH HÀNG ---
+// --- 🤝 NGHIỆP VỤ KHÁCH HÀNG ---
 
 export async function getKhachHangDataAction(page: number, pageSize: number, search: string, filterRole: string) {
     try {
@@ -248,4 +294,36 @@ export async function getDistinctValuesAction(tableName: string, columnName: str
         `);
         return { success: true, data: Array.from(data).map(row => row[columnName]) };
     } catch (error: any) { return { success: false, error: error.message }; }
+}
+
+// 🟢 LẤY TÁC PHẨM HOÀN THIỆN (Dữ liệu cho Phòng Trưng Bày)
+export async function getFinishedArtworksAction(limit: number = 50) {
+    try {
+        await requireManager(); 
+
+        const data = await sql`
+            SELECT 
+                nk.id, 
+                nk.anh_thanh_pham, 
+                nk.thoi_gian_ket_thuc,
+                ns.ho_ten as ten_nghe_nhan,
+                vt.ten_vat_tu as ten_tac_pham,
+                vt.ma_sku,
+                dh.ma_don
+            FROM nhat_ky_san_xuat nk
+            JOIN nhan_su ns ON nk.nhan_su_thuc_hien = ns.id
+            JOIN lenh_san_xuat lsx ON nk.lenh_san_xuat_id = lsx.id
+            JOIN don_hang_chi_tiet dhct ON lsx.don_hang_chi_tiet_id = dhct.id
+            JOIN don_hang dh ON dhct.don_hang_id = dh.id
+            JOIN vat_tu vt ON dhct.vat_tu_id = vt.id
+            WHERE nk.anh_thanh_pham IS NOT NULL 
+            AND nk.ket_qua = 'dat'
+            ORDER BY nk.thoi_gian_ket_thuc DESC
+            LIMIT ${limit}
+        `;
+        
+        return { success: true, data: Array.from(data) };
+    } catch (error: any) { 
+        return { success: false, error: error.message }; 
+    }
 }

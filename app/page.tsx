@@ -258,7 +258,7 @@ export default function TrangChaoMung() {
 
                 <div className="mt-8 md:mt-12 opacity-40">
                      <p className="text-sm tracking-[0.2em] uppercase font-bold text-gray-500 drop-shadow-sm">
-                        © {new Date().getFullYear()} DANG NGHIEM ART
+                        © {new Date().getFullYear()} DANG NghiemArt
                      </p>
                 </div>
             </div>
