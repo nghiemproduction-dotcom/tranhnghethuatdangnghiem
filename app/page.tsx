@@ -27,9 +27,29 @@ export default function TrangChaoMung() {
 
     // 🟢 LOGIC KIỂM TRA ĐĂNG NHẬP (CỰC KỲ QUAN TRỌNG)
     useEffect(() => {
+        // Dọn dẹp cache hỏng (tránh JSON.parse 'undefined')
+        const cleanupStaleLocalStorage = () => {
+            const cached = localStorage.getItem('USER_INFO');
+            if (cached === 'undefined') {
+                localStorage.removeItem('USER_INFO');
+            } else if (cached) {
+                try { JSON.parse(cached); } catch { localStorage.removeItem('USER_INFO'); }
+            }
+
+            // Xóa token Supabase nếu bị ghi sai thành 'undefined'
+            Object.keys(localStorage)
+                .filter(key => key.startsWith('sb-'))
+                .forEach(key => {
+                    if (localStorage.getItem(key) === 'undefined') {
+                        localStorage.removeItem(key);
+                    }
+                });
+        };
+
         const checkSession = async () => {
             setIsCheckingAuth(true);
             try {
+                cleanupStaleLocalStorage();
                 // 1. Hỏi thẳng Server xem còn phiên đăng nhập không
                 const { data: { session }, error } = await supabase.auth.getSession();
                 
@@ -62,10 +82,17 @@ export default function TrangChaoMung() {
 
         checkSession();
 
-        // 2. Lắng nghe sự kiện đăng xuất (để cập nhật UI tức thì)
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-            if (event === 'SIGNED_OUT') {
-                console.log("👋 Phát hiện sự kiện Đăng Xuất");
+        // 2. Lắng nghe sự kiện đăng nhập/đăng xuất (để cập nhật UI tức thì)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+            console.log(`🔔 Auth state changed: ${event}`);
+            
+            if (event === 'SIGNED_IN') {
+                // ✅ Khi đăng nhập thành công -> Re-check session
+                console.log('✅ SIGNED_IN detected - Re-checking session');
+                await checkSession();
+            } else if (event === 'SIGNED_OUT') {
+                // ✅ Khi đăng xuất -> Reset user
+                console.log("👋 SIGNED_OUT detected - Clearing user");
                 setNguoiDung(null);
                 localStorage.removeItem('USER_INFO');
                 localStorage.removeItem('USER_ROLE');
@@ -89,6 +116,14 @@ export default function TrangChaoMung() {
         const timer = setTimeout(() => setShowGreeting(false), 5000);
         return () => clearTimeout(timer);
     }, [nguoiDung, language]);
+
+    // 🟢 AUTO-REDIRECT khi user login
+    useEffect(() => {
+        if (!nguoiDung || isRedirecting) return;
+        
+        console.log('🟢 AUTO-REDIRECT TRIGGERED - User detected:', nguoiDung.ho_ten);
+        handleMainAction();
+    }, [nguoiDung]);
 
     const handleGuestVisit = () => {
         window.location.reload(); 

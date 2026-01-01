@@ -1,74 +1,67 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { 
-    Search, Filter, Phone, MessageCircle, Edit3, 
-    User, MapPin, RefreshCw, Loader2, Plus 
-} from 'lucide-react';
-import { getNhanSuDataAction } from '@/app/actions/admindb';
-
-// 🟢 IMPORT FORM NHẬP LIỆU MỚI
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, Plus, Loader2, User, Phone, MapPin, MoreHorizontal, Trash2 } from 'lucide-react';
+import { getNhanSuDataAction, deleteNhanSuAction } from '@/app/actions/admindb';
 import FormNhanSu from './FormNhanSu';
+import NhanSuDetail from './NhanSuDetail';
+
+// 🟢 HÀM HỖ TRỢ TÌM KIẾM THÔNG MINH (Chuẩn hóa Tiếng Việt)
+const toNonAccentVietnamese = (str: string) => {
+    if (!str) return '';
+    str = str.toLowerCase();
+    str = str.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a");
+    str = str.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e");
+    str = str.replace(/ì|í|ị|ỉ|ĩ/g, "i");
+    str = str.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, "o");
+    str = str.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, "u");
+    str = str.replace(/ỳ|ý|ỵ|ỷ|ỹ/g, "y");
+    str = str.replace(/đ/g, "d");
+    // Kết hợp các dấu rời (NFD)
+    str = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return str;
+};
 
 interface NhanSu {
     id: string;
     ho_ten: string;
     vi_tri: string;
+    vi_tri_normalized: string;
     so_dien_thoai: string;
     email: string;
     hinh_anh?: string;
     trang_thai?: string;
-    vi_tri_normalized?: string;
+    luong_thang?: number;
+    ngan_hang?: string;
+    so_tai_khoan?: string;
 }
 
-const calculatePageSize = () => {
-    if (typeof window === 'undefined') return 12;
-    const w = window.innerWidth;
-    if (w < 640) return 6; 
-    if (w < 1024) return 9; 
-    return 12;
-};
+interface Props {
+    allowDelete?: boolean;
+}
 
-export default function NhanSuManager() {
+export default function NhanSuManager({ allowDelete = false }: Props) {
     const [employees, setEmployees] = useState<NhanSu[]>([]);
     const [loading, setLoading] = useState(true);
-    const [totalRows, setTotalRows] = useState(0);
-    
     const [searchTerm, setSearchTerm] = useState('');
-    const [positionFilter, setPositionFilter] = useState('all');
-    const [currentPage, setCurrentPage] = useState(1);
-    const [pageSize, setPageSize] = useState(12);
+    const [activeTab, setActiveTab] = useState('all');
 
-    // 🟢 STATE ĐIỀU KHIỂN MODAL FORM MỚI
     const [isFormOpen, setIsFormOpen] = useState(false);
-    const [editingData, setEditingData] = useState<any>(null);
-
-    useEffect(() => {
-        setPageSize(calculatePageSize());
-        const handleResize = () => setPageSize(calculatePageSize());
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
+    const [isDetailOpen, setIsDetailOpen] = useState(false);
+    const [selectedEmployee, setSelectedEmployee] = useState<NhanSu | null>(null);
+    const [isEditMode, setIsEditMode] = useState(false);
 
     useEffect(() => {
         fetchData();
-    }, [currentPage, pageSize, positionFilter]);
-
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (currentPage !== 1) setCurrentPage(1);
-            else fetchData();
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [searchTerm]);
+    }, []);
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            const res = await getNhanSuDataAction(currentPage, pageSize, searchTerm, positionFilter);
+            // Load tối đa 1000 bản ghi để xử lý tìm kiếm phía Client cho mượt
+            const res = await getNhanSuDataAction(1, 1000, '', ''); 
             if (res.success && res.data) {
                 setEmployees(res.data as unknown as NhanSu[]);
-                setTotalRows(res.total || 0);
             }
         } catch (error) {
             console.error("Lỗi:", error);
@@ -77,169 +70,120 @@ export default function NhanSuManager() {
         }
     };
 
-    // Handler mở form thêm mới
-    const handleAddNew = () => {
-        setEditingData(null); // Reset data
-        setIsFormOpen(true);
-    };
+    const tabs = useMemo(() => {
+        const counts: Record<string, number> = { all: employees.length };
+        employees.forEach(emp => {
+            const role = emp.vi_tri_normalized || 'other';
+            counts[role] = (counts[role] || 0) + 1;
+        });
+        const tabList = [
+            { id: 'all', label: 'TẤT CẢ' },
+            { id: 'quanly', label: 'QUẢN LÝ' },
+            { id: 'sales', label: 'SALES' },
+            { id: 'thosanxuat', label: 'THỢ' },
+            { id: 'parttime', label: 'PART-TIME' },
+            { id: 'congtacvien', label: 'CTV' },
+        ];
+        return tabList.map(tab => ({ ...tab, count: counts[tab.id] || 0 }));
+    }, [employees]);
 
-    // Handler mở form sửa
-    const handleEdit = (emp: NhanSu) => {
-        setEditingData(emp); // Set data cần sửa
-        setIsFormOpen(true);
-    };
+    // 🟢 LOGIC LỌC THÔNG MINH (Smart Filter)
+    const filteredList = useMemo(() => {
+        // Chuẩn hóa từ khóa tìm kiếm 1 lần để tối ưu
+        const normalizedSearch = toNonAccentVietnamese(searchTerm);
 
-    const handleSaveSuccess = () => {
-        fetchData(); // Reload lại danh sách sau khi lưu
-    };
+        return employees.filter(emp => {
+            // Chuẩn hóa tên và số điện thoại của nhân viên
+            const normalizedName = toNonAccentVietnamese(emp.ho_ten);
+            const phone = emp.so_dien_thoai || '';
 
-    const handleCall = (phone: string) => {
-        if (!phone) return alert("Chưa có số điện thoại");
-        window.open(`tel:${phone}`, '_self');
-    };
+            // So sánh: Tên chứa từ khóa HOẶC SĐT chứa từ khóa
+            const matchSearch = normalizedName.includes(normalizedSearch) || phone.includes(normalizedSearch);
+            
+            // So sánh Tab
+            const matchTab = activeTab === 'all' || emp.vi_tri_normalized === activeTab;
+            
+            return matchSearch && matchTab;
+        });
+    }, [employees, searchTerm, activeTab]);
 
-    const totalPages = Math.ceil(totalRows / pageSize);
+    const handleAddNew = () => { setSelectedEmployee(null); setIsEditMode(false); setIsFormOpen(true); };
+    const handleCardClick = (emp: NhanSu) => { setSelectedEmployee(emp); setIsDetailOpen(true); };
+    const handleSwitchToEdit = () => { setIsDetailOpen(false); setIsEditMode(true); setIsFormOpen(true); };
+    const handleSaveSuccess = () => { fetchData(); setIsFormOpen(false); };
+
+    const handleDelete = async (e: React.MouseEvent, id: string, name: string) => {
+        e.stopPropagation();
+        if (!confirm(`Bạn có chắc muốn xóa nhân sự: ${name}?`)) return;
+        try {
+            const res = await deleteNhanSuAction(id);
+            if (res.success) { alert("Đã xóa thành công!"); fetchData(); } 
+            else { alert("Lỗi xóa: " + res.error); }
+        } catch (err) { console.error(err); }
+    };
 
     return (
-        <div className="w-full h-full flex flex-col bg-[#121212] overflow-hidden">
-            
-            {/* HEADER */}
-            <div className="p-4 border-b border-white/10 bg-[#1a1a1a] flex flex-col md:flex-row justify-between items-center gap-4 shrink-0">
-                <div className="flex items-center gap-3 w-full md:w-auto">
-                    <div className="bg-[#C69C6D]/10 p-2 rounded-lg border border-[#C69C6D]/30">
-                        <User className="text-[#C69C6D]" size={20} />
-                    </div>
-                    <div>
-                        <h2 className="text-sm font-bold text-white uppercase tracking-wider">Danh Sách Nhân Sự</h2>
-                        <p className="text-[10px] text-white/50 font-mono">Tổng: {totalRows}</p>
-                    </div>
+        <div className="w-full h-full flex flex-col bg-[#050505] overflow-hidden relative">
+            {/* TOOLBAR */}
+            <div className="shrink-0 p-4 flex gap-3 items-center justify-between bg-[#0a0a0a] border-b border-white/5">
+                <div className="relative group w-full md:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-[#C69C6D] transition-colors" size={16} />
+                    <input 
+                        type="text" 
+                        placeholder="Tìm tên, sđt..." 
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-[#C69C6D] font-bold uppercase transition-all"
+                    />
                 </div>
-
-                <div className="flex items-center gap-2 w-full md:w-auto flex-1 justify-end">
-                    
-                    {/* 🟢 NÚT GỌI MODAL THÊM MỚI */}
-                    <button 
-                        onClick={handleAddNew}
-                        className="flex items-center gap-2 px-3 py-2 bg-[#C69C6D] hover:bg-white text-black text-xs font-bold rounded-lg transition-all shadow-lg active:scale-95"
-                    >
-                        <Plus size={16} /> <span className="hidden sm:inline">Thêm Mới</span>
-                    </button>
-
-                    <div className="h-6 w-[1px] bg-white/10 mx-1"></div>
-
-                    <select 
-                        value={positionFilter}
-                        onChange={(e) => setPositionFilter(e.target.value)}
-                        className="bg-black/30 border border-white/10 text-white text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-[#C69C6D]"
-                    >
-                        <option value="all">Tất cả vị trí</option>
-                        <option value="quanly">Quản Lý</option>
-                        <option value="sales">Sales</option>
-                        <option value="thosanxuat">Thợ</option>
-                        <option value="parttime">Part-time</option>
-                        <option value="congtacvien">CTV</option>
-                    </select>
-
-                    <div className="relative group w-full md:w-48">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-[#C69C6D]" size={14} />
-                        <input 
-                            type="text" 
-                            placeholder="Tìm tên, sđt..." 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full bg-black/30 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-[#C69C6D]"
-                        />
-                    </div>
-
-                    <button onClick={fetchData} className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white transition-colors">
-                        <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-                    </button>
-                </div>
+                <button onClick={handleAddNew} className="flex items-center gap-2 px-4 py-2 bg-[#C69C6D] hover:bg-white text-black text-xs font-black rounded-lg transition-all shadow-[0_0_15px_rgba(198,156,109,0.3)] active:scale-95 uppercase tracking-wider">
+                    <Plus size={16} strokeWidth={3} /> <span className="hidden sm:inline">Thêm Mới</span>
+                </button>
             </div>
 
-            {/* GRID CARD */}
-            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-[#0a0a0a]">
+            {/* TAB LIST */}
+            <div className="shrink-0 px-4 pt-2 pb-0 flex gap-4 overflow-x-auto scrollbar-hide border-b border-white/5 bg-[#050505]">
+                <style jsx>{` .scrollbar-hide::-webkit-scrollbar { display: none; } `}</style>
+                {tabs.map(tab => (
+                    <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`pb-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap border-b-2 transition-all flex items-center gap-2 ${activeTab === tab.id ? 'text-[#C69C6D] border-[#C69C6D]' : 'text-gray-500 border-transparent hover:text-white'}`}>
+                        {tab.label} <span className={`px-1.5 py-0.5 rounded text-[9px] ${activeTab === tab.id ? 'bg-[#C69C6D] text-black' : 'bg-white/10 text-gray-400'}`}>{tab.count}</span>
+                    </button>
+                ))}
+            </div>
+
+            {/* CARD GRID */}
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#050505] scrollbar-hide">
                 {loading ? (
-                    <div className="h-full flex items-center justify-center">
-                        <Loader2 className="animate-spin text-[#C69C6D]" size={32} />
-                    </div>
-                ) : employees.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-white/30">
-                        <User size={48} className="opacity-20 mb-4" />
-                        <p>Không tìm thấy dữ liệu</p>
-                    </div>
+                    <div className="h-full flex items-center justify-center flex-col"><Loader2 className="animate-spin text-[#C69C6D] mb-4" size={32} /><p className="text-[#C69C6D]/50 text-xs uppercase tracking-[0.2em] animate-pulse">ĐANG TẢI...</p></div>
+                ) : filteredList.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-white/20"><User size={48} className="mb-4 opacity-20" /><p className="text-xs uppercase tracking-widest font-bold">KHÔNG TÌM THẤY '{searchTerm}'</p></div>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-10">
-                        {employees.map((emp) => (
-                            <div key={emp.id} className="group relative bg-[#151515] border border-white/5 hover:border-[#C69C6D]/50 rounded-xl p-5 transition-all hover:bg-[#1a1a1a] shadow-lg flex flex-col items-center">
-                                {/* Nút Edit gọi Modal mới */}
-                                <button 
-                                    onClick={() => handleEdit(emp)}
-                                    className="absolute top-3 right-3 p-1.5 text-white/30 hover:text-[#C69C6D] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                    <Edit3 size={14} />
-                                </button>
-
-                                <div className="w-16 h-16 rounded-full border-2 border-[#C69C6D]/30 p-0.5 mb-3 relative overflow-hidden">
-                                    {emp.hinh_anh ? (
-                                        // 🟢 FIX HIỂN THỊ ẢNH: Thêm key là URL để buộc re-render khi URL thay đổi
-                                        <img 
-                                            key={emp.hinh_anh} 
-                                            src={emp.hinh_anh} 
-                                            alt={emp.ho_ten} 
-                                            className="w-full h-full rounded-full object-cover" 
-                                        />
-                                    ) : (
-                                        <div className="w-full h-full rounded-full bg-white/5 flex items-center justify-center text-white/30">
-                                            <User size={24} />
-                                        </div>
-                                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
+                        {filteredList.map((emp, idx) => (
+                            <div key={emp.id} onClick={() => handleCardClick(emp)} className="group relative bg-[#0f0f0f] border border-white/5 hover:border-[#C69C6D]/50 rounded-xl p-4 transition-all hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)] cursor-pointer overflow-hidden flex items-center gap-4" style={{ animationDelay: `${idx * 0.05}s` }}>
+                                <div className="relative shrink-0 w-14 h-14 rounded-full border border-white/10 p-0.5 bg-black overflow-hidden group-hover:border-[#C69C6D] transition-colors">
+                                    {emp.hinh_anh ? <img src={emp.hinh_anh} alt={emp.ho_ten} className="w-full h-full rounded-full object-cover" /> : <div className="w-full h-full rounded-full bg-[#1a1a1a] flex items-center justify-center text-white/20"><User size={20} /></div>}
                                 </div>
-
-                                <h3 className="text-white font-bold text-sm mb-1 text-center truncate w-full">{emp.ho_ten}</h3>
-                                <div className="px-2 py-0.5 rounded bg-[#C69C6D]/10 text-[#C69C6D] text-[10px] font-bold uppercase mb-4">
-                                    {emp.vi_tri || 'Chưa cập nhật'}
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="text-white font-bold text-sm truncate uppercase tracking-wide group-hover:text-[#C69C6D] transition-colors">{emp.ho_ten}</h3>
+                                    <p className="text-[10px] text-[#C69C6D] font-bold uppercase mb-1">{emp.vi_tri || '---'}</p>
+                                    <div className="flex items-center gap-2 text-[10px] text-white/40 font-mono"><Phone size={10} /><span className="truncate">{emp.so_dien_thoai || '---'}</span></div>
                                 </div>
-
-                                <div className="w-full space-y-1 mb-4 text-[11px] text-white/50">
-                                    <div className="flex items-center gap-2">
-                                        <Phone size={10} className="shrink-0" />
-                                        <span className="truncate">{emp.so_dien_thoai || '---'}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <MapPin size={10} className="shrink-0" />
-                                        <span className="truncate">{emp.email || '---'}</span>
-                                    </div>
-                                </div>
-
-                                <div className="w-full grid grid-cols-2 gap-2 mt-auto">
-                                    <button onClick={() => handleCall(emp.so_dien_thoai)} className="flex items-center justify-center gap-1 py-1.5 rounded bg-green-500/10 hover:bg-green-500/20 text-green-500 text-[10px] font-bold border border-green-500/30">
-                                        <Phone size={12} /> GỌI
+                                {allowDelete ? (
+                                    <button onClick={(e) => handleDelete(e, emp.id, emp.ho_ten)} className="p-2 text-white/20 hover:text-red-500 hover:bg-white/5 rounded-lg transition-all" title="Xóa nhân sự">
+                                        <Trash2 size={16} />
                                     </button>
-                                    <button className="flex items-center justify-center gap-1 py-1.5 rounded bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 text-[10px] font-bold border border-blue-500/30">
-                                        <MessageCircle size={12} /> CHAT
-                                    </button>
-                                </div>
+                                ) : (
+                                    <div className="text-white/10 group-hover:text-[#C69C6D] transition-colors"><MoreHorizontal size={16} /></div>
+                                )}
                             </div>
                         ))}
                     </div>
                 )}
             </div>
 
-            <div className="p-3 border-t border-white/10 bg-[#1a1a1a] flex justify-between items-center shrink-0 text-xs text-white/60">
-                <span className="font-medium hidden sm:block">Trang {currentPage} / {totalPages || 1}</span>
-                <div className="flex gap-2 mx-auto sm:mx-0">
-                    <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="px-3 py-1 bg-white/5 hover:bg-white/10 rounded disabled:opacity-30">Trước</button>
-                    <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)} className="px-3 py-1 bg-white/5 hover:bg-white/10 rounded disabled:opacity-30">Sau</button>
-                </div>
-            </div>
-
-            <FormNhanSu 
-                isOpen={isFormOpen} 
-                onClose={() => setIsFormOpen(false)} 
-                initialData={editingData}
-                onSuccess={handleSaveSuccess}
-            />
+            <FormNhanSu isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} initialData={selectedEmployee} onSuccess={handleSaveSuccess} />
+            <NhanSuDetail isOpen={isDetailOpen} data={selectedEmployee} onClose={() => setIsDetailOpen(false)} onEdit={handleSwitchToEdit} />
         </div>
     );
 }

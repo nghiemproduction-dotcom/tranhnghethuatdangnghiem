@@ -317,39 +317,29 @@ export default function CongDangNhap({ isOpen, onClose, isGateKeeper = false }: 
             document.cookie = 'VISITOR_MODE=; Path=/; Max-Age=0; SameSite=Lax';
 
             // 5. Redirect - Close modal first if needed
-            if (isModal && onClose) {
-                onClose(); 
-            }
+            console.log('✅ LOGIN SUCCESS, waiting for session persist...');
             
-            // ✅ Sử dụng normalized value từ database trực tiếp
-            // Gọi service đã được fix fallback
-            let redirectUrl = await getRedirectUrl(finalUser.userType, finalRoleNormalized);
+            // ✅ CRITICAL: Wait for Supabase session to fully persist
+            await new Promise(resolve => setTimeout(resolve, 1500));
             
-            // 🛑 SAFETY CHECK: Chống loop vô tận
-            // Nếu là nhân sự mà lại redirect về trang chủ (do lỗi DB) -> Force về phòng tương ứng
-            if (finalUser.userType === 'nhan_su' && (redirectUrl === '/' || redirectUrl === '/trangchu')) {
-                 console.warn("⚠️ Redirect Safety Triggered: Nhân sự bị đẩy về trang chủ -> Force redirect to dedicated room.");
-                 if (finalRoleNormalized.includes('quanly')) redirectUrl = '/phongquanly';
-                 else if (finalRoleNormalized.includes('admin')) redirectUrl = '/phongadmin';
-                 else if (finalRoleNormalized.includes('sales')) redirectUrl = '/phongsales';
-                 else redirectUrl = '/phongparttime'; // Fallback an toàn nhất
-            }
-
-            console.log('✅ LOGIN SUCCESS -> TARGET:', redirectUrl);
-            
-            // ✅ CRITICAL: Wait for Supabase to save session to localStorage
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            // Verify session is in localStorage
+            // Verify session is persisted
             const { data: { session: verifySession } } = await supabase.auth.getSession();
             if (!verifySession) {
                 console.error('❌ SESSION NOT PERSISTED');
                 throw new Error('Session không được lưu. Vui lòng thử lại.');
             }
             
-            // Force hard refresh to redirect destination
-            console.log('🔄 EXECUTING REDIRECT...');
-            window.location.href = redirectUrl;
+            console.log('✅ SESSION VERIFIED - Now closing modal');
+            
+            // ✅ Only close modal AFTER session is verified
+            if (isModal && onClose) {
+                console.log('✅ Modal closing, parent will detect session and redirect');
+                onClose();
+            } else {
+                // If not in modal, navigate to home
+                console.log('🔄 Non-modal mode: Navigating to home');
+                router.push('/');
+            }
 
         } catch (err: any) { 
             const errorMsg = err?.message || 'Lỗi không xác định';

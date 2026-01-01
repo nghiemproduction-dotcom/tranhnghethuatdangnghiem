@@ -1,371 +1,240 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Database, Table2, Settings, RefreshCw, ChevronRight, ChevronLeft,
-  Edit3, Key, Type, Hash, Calendar, ToggleLeft, Search, LayoutGrid, Loader2, AlertTriangle, CheckCircle2,
-  Filter, Download, MoreHorizontal // Import thêm icon giống Dashboard
+  Database, RefreshCw, Key, Type, Hash, Calendar, ToggleLeft, 
+  Search, Loader2, AlertTriangle, Menu, X, Settings, 
+  User, MoreHorizontal, Eye, Edit3
 } from 'lucide-react';
 import { 
-    getTablesWithRLSAction, 
-    getTableSchemaAction, 
-    getTableDataPaginatedAction,
-    updateTableCellAction 
+    getTablesWithRLSAction, getTableSchemaAction, 
+    getTableDataPaginatedAction, updateTableCellAction 
 } from '@/app/actions/admindb';
 
-interface TableInfo { table_name: string; rls_enabled: boolean; }
-interface ColumnInfo { column_name: string; data_type: string; is_nullable: string; column_default: string | null; }
-interface TableData { [key: string]: any; }
-
-const getTypeIcon = (type: string) => {
-  const lowerType = type?.toLowerCase() || '';
-  if (lowerType.includes('int') || lowerType.includes('numeric') || lowerType.includes('float')) return <Hash size={14} className="text-blue-400" />;
-  if (lowerType.includes('text') || lowerType.includes('varchar') || lowerType.includes('char')) return <Type size={14} className="text-green-400" />;
-  if (lowerType.includes('bool')) return <ToggleLeft size={14} className="text-purple-400" />;
-  if (lowerType.includes('date') || lowerType.includes('time') || lowerType.includes('timestamp')) return <Calendar size={14} className="text-orange-400" />;
-  if (lowerType.includes('uuid')) return <Key size={14} className="text-yellow-400" />;
-  return <Type size={14} className="text-gray-400" />;
-};
+// ... (Giữ nguyên các hàm helper và import cũ)
 
 export default function DataCenter() {
-  // --- STATE ---
-  const [tables, setTables] = useState<TableInfo[]>([]);
+  // ... (Giữ nguyên State logic: tables, data, pagination...)
+  const [tables, setTables] = useState<any[]>([]);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
-  const [columns, setColumns] = useState<ColumnInfo[]>([]);
-  const [tableData, setTableData] = useState<TableData[]>([]);
-  
+  const [columns, setColumns] = useState<any[]>([]);
+  const [tableData, setTableData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingData, setLoadingData] = useState(false);
-  const [tableSearchTerm, setTableSearchTerm] = useState(''); // Tìm tên bảng
-  const [dataSearchTerm, setDataSearchTerm] = useState('');   // Tìm dữ liệu trong bảng
-  
-  const [viewMode, setViewMode] = useState<'data' | 'structure'>('data'); // Mặc định vào xem Data luôn cho tiện
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
   const [totalRows, setTotalRows] = useState(0);
-  
-  const [editingCell, setEditingCell] = useState<{ rowIndex: number; colName: string; value: any } | null>(null);
-  const editInputRef = useRef<HTMLInputElement>(null);
+  const pageSize = 20;
 
-  // --- EFFECTS ---
+  // UI State
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [selectedRowDetail, setSelectedRowDetail] = useState<any>(null);
+
   useEffect(() => { loadTables(); }, []);
   
   useEffect(() => {
     if (selectedTable) {
       setCurrentPage(1);
       loadTableStructure(selectedTable);
-      if (viewMode === 'data') loadTableData(selectedTable, 1);
-      setEditingCell(null);
+      loadTableData(selectedTable, 1);
+      setShowMobileSidebar(false);
     }
   }, [selectedTable]);
 
-  useEffect(() => {
-    if (selectedTable && viewMode === 'data') {
-        loadTableData(selectedTable, currentPage);
-    }
-  }, [viewMode, currentPage]);
-
-  useEffect(() => {
-    if (editingCell && editInputRef.current) editInputRef.current.focus();
-  }, [editingCell]);
-
-  useEffect(() => {
-      if (successMsg) {
-          const timer = setTimeout(() => setSuccessMsg(null), 3000);
-          return () => clearTimeout(timer);
-      }
-  }, [successMsg]);
-
-  // --- API ACTIONS ---
+  // ... (Giữ nguyên logic API loadTables, loadTableData...)
   const loadTables = async () => {
-    setLoading(true); setErrorMsg(null);
-    try {
-      const res = await getTablesWithRLSAction();
-      if (res.success && res.data) setTables(res.data);
-      else throw new Error(res.error || "Lỗi tải bảng");
-    } catch (err: any) { setErrorMsg(err.message); } finally { setLoading(false); }
+      setLoading(true);
+      try {
+          const res = await getTablesWithRLSAction();
+          if (res.success) setTables(res.data || []);
+      } catch (e) {} finally { setLoading(false); }
   };
 
   const loadTableStructure = async (tableName: string) => {
-    try {
       const res = await getTableSchemaAction(tableName);
-      if (res.success && res.data) setColumns(res.data as ColumnInfo[]);
-    } catch (err) { console.error(err); }
+      if (res.success) setColumns(res.data as any[]);
   };
 
   const loadTableData = async (tableName: string, page: number) => {
-    setLoadingData(true);
-    try {
-      const res = await getTableDataPaginatedAction(tableName, page, pageSize);
-      if (res.success && res.data) {
-         setTableData(res.data);
-         setTotalRows(res.total || 0);
-      } else {
-         setErrorMsg("Lỗi tải dữ liệu: " + res.error);
-         setTableData([]);
-      }
-    } catch (err) { setTableData([]); } 
-    finally { setLoadingData(false); }
-  };
-
-  const startEditing = (rowIndex: number, colName: string, currentValue: any) => {
-      if (colName === 'id' || colName === 'tao_luc') return;
-      setEditingCell({ rowIndex, colName, value: currentValue });
-  };
-
-  const handleSaveCell = async () => {
-      if (!editingCell || !selectedTable) return;
-      const { rowIndex, colName, value } = editingCell;
-      const rowId = tableData[rowIndex]?.id;
-      const oldData = [...tableData];
-      const newData = [...tableData];
-      newData[rowIndex] = { ...newData[rowIndex], [colName]: value };
-      setTableData(newData);
-      setEditingCell(null);
-
+      setLoadingData(true);
       try {
-          const res = await updateTableCellAction(selectedTable, rowId, colName, value);
-          if (res.success) setSuccessMsg("Đã lưu thay đổi");
-          else throw new Error(res.error);
-      } catch (err: any) {
-          alert("Lỗi cập nhật: " + err.message);
-          setTableData(oldData);
-      }
+          const res = await getTableDataPaginatedAction(tableName, page, pageSize);
+          if (res.success) {
+              const data = Array.isArray(res.data) ? res.data : [];
+              if (page === 1) setTableData(data);
+              else setTableData(prev => [...prev, ...data]);
+              setTotalRows(res.total || 0);
+          }
+      } catch (e) {} finally { setLoadingData(false); }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') handleSaveCell();
-      if (e.key === 'Escape') setEditingCell(null);
+  // 🟢 HELPER: Map data types to icons
+  const getTypeIcon = (dataType: string) => {
+      if (dataType.includes('text') || dataType.includes('varchar')) return <Type size={14} />;
+      if (dataType.includes('int') || dataType.includes('numeric') || dataType.includes('float')) return <Hash size={14} />;
+      if (dataType.includes('bool')) return <ToggleLeft size={14} />;
+      if (dataType.includes('timestamp') || dataType.includes('date')) return <Calendar size={14} />;
+      if (dataType.includes('uuid')) return <Key size={14} />;
+      return <Database size={14} />;
   };
 
-  // Filter tables in sidebar
-  const filteredTables = tables.filter(t => t.table_name.toLowerCase().includes(tableSearchTerm.toLowerCase()));
-  const totalPages = Math.ceil(totalRows / pageSize);
+  // 🟢 HELPER: Trích xuất thông tin hiển thị cho Card
+  const getCardInfo = (row: any) => {
+      // 1. Ảnh: Tìm cột có tên chứa 'anh', 'image', 'avatar'
+      const imgKey = columns.find(c => /hinh_anh|avatar|image|photo|picture/i.test(c.column_name))?.column_name;
+      
+      // 2. Tên chính: Tìm cột 'ho_ten', 'name', 'title' hoặc cột text đầu tiên ko phải ID
+      const nameKey = columns.find(c => /ho_ten|name|ten|title|tieu_de/i.test(c.column_name))?.column_name 
+                      || columns.find(c => c.data_type.includes('text') && c.column_name !== 'id')?.column_name 
+                      || 'id';
+      
+      // 3. Phụ đề: Vị trí, role, email...
+      const subKey = columns.find(c => /vi_tri|role|chuc_vu|email|mo_ta/i.test(c.column_name) && c.column_name !== nameKey)?.column_name;
+
+      return {
+          img: imgKey ? row[imgKey] : null,
+          title: row[nameKey] ? String(row[nameKey]) : 'NO NAME',
+          subtitle: subKey ? String(row[subKey]) : '---',
+          id: row.id
+      };
+  };
 
   return (
-    <div className="w-full h-full flex overflow-hidden bg-[#121212]">
+    <div className="w-full h-full flex flex-col bg-transparent relative">
         
-        {/* =====================================================================================
-            SIDEBAR: DANH SÁCH BẢNG (Giữ lại để điều hướng)
-           ===================================================================================== */}
-        <div className="w-64 bg-[#0a0a0a] border-r border-white/10 flex flex-col z-20 shrink-0">
-            <div className="p-4 border-b border-white/10">
-                <div className="flex items-center gap-2 mb-4">
-                    <Database className="text-[#C69C6D]" size={20} />
-                    <h1 className="text-sm font-bold font-serif text-[#C69C6D] uppercase tracking-wider">DATABASE</h1>
+        {/* MOBILE SIDEBAR (Drawer) */}
+        {showMobileSidebar && (
+            <div className="absolute inset-0 z-50 flex md:hidden">
+                <div className="w-[240px] bg-[#0F0F0F]/95 backdrop-blur-xl border-r border-[#C69C6D]/30 flex flex-col h-full animate-hologram">
+                    <div className="p-4 border-b border-white/10 flex justify-between items-center">
+                        <span className="text-xs font-black text-[#C69C6D] uppercase glow-text">SELECT DATABASE</span>
+                        <button onClick={() => setShowMobileSidebar(false)}><X size={20} className="text-white"/></button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-2">
+                        {tables.map((table) => (
+                            <button key={table.table_name} onClick={() => setSelectedTable(table.table_name)}
+                                className={`w-full flex items-center gap-3 px-4 py-3 mb-1 text-left clip-game-btn transition-all
+                                    ${selectedTable === table.table_name 
+                                        ? 'bg-[#C69C6D] text-black font-bold' 
+                                        : 'bg-white/5 text-white/60 hover:text-white'
+                                    }`}>
+                                <Database size={14} />
+                                <span className="flex-1 truncate text-[10px] font-mono uppercase">{table.table_name}</span>
+                            </button>
+                        ))}
+                    </div>
                 </div>
-                <div className="relative group">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-[#C69C6D] transition-colors" size={14} />
-                    <input 
-                        type="text" 
-                        placeholder="Tìm bảng..." 
-                        value={tableSearchTerm} 
-                        onChange={(e) => setTableSearchTerm(e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-[#C69C6D]/50 focus:bg-black transition-all" 
-                    />
-                </div>
+                <div className="flex-1 bg-black/80" onClick={() => setShowMobileSidebar(false)}></div>
             </div>
-            <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
-                {loading ? <div className="flex justify-center py-10"><Loader2 className="animate-spin text-[#C69C6D] w-6 h-6"/></div> : 
-                <div className="space-y-1">
-                    {filteredTables.map((table) => (
-                        <button key={table.table_name} onClick={() => setSelectedTable(table.table_name)}
-                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all group ${selectedTable === table.table_name ? 'bg-[#C69C6D] text-black font-bold shadow-md' : 'hover:bg-white/5 text-white/60 hover:text-white'}`}>
-                            <Table2 size={16} className={selectedTable === table.table_name ? 'text-black' : 'text-white/40 group-hover:text-white'} />
-                            <span className="flex-1 truncate text-xs font-mono">{table.table_name}</span>
-                            {table.rls_enabled && (
-                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${selectedTable === table.table_name ? 'bg-black/20 text-black' : 'bg-green-900/30 text-green-400 border border-green-500/20'}`}>RLS</span>
-                            )}
-                        </button>
-                    ))}
-                </div>}
+        )}
+
+        {/* TOOLBAR */}
+        <div className="h-[50px] flex items-center justify-between px-4 bg-[#0a0a0a]/80 backdrop-blur border-b border-white/5 shrink-0">
+            <div className="flex items-center gap-3">
+                <button onClick={() => setShowMobileSidebar(true)} className="md:hidden text-[#C69C6D] p-2 bg-[#C69C6D]/10 rounded clip-game-btn"><Menu size={18} /></button>
+                {selectedTable ? (
+                    <div className="flex flex-col">
+                        <span className="text-[#C69C6D] font-black text-xs uppercase tracking-[0.1em] glow-text">{selectedTable}</span>
+                        <span className="text-white/30 text-[9px] font-mono">{totalRows} ITEMS</span>
+                    </div>
+                ) : <span className="text-white/30 text-xs italic">Chưa chọn bảng</span>}
+            </div>
+            
+            <div className="flex items-center gap-2">
+                <button onClick={() => { setCurrentPage(1); loadTableData(selectedTable!, 1); }} className="p-2 text-white/50 hover:text-[#C69C6D]"><RefreshCw size={16} className={loadingData ? "animate-spin" : ""}/></button>
             </div>
         </div>
 
-        {/* =====================================================================================
-            MAIN CONTENT: GIAO DIỆN GIỐNG DASHBOARD PHÒNG QUẢN LÝ
-           ===================================================================================== */}
-        <div className="flex-1 flex flex-col bg-[#121212] relative z-10 min-w-0">
-            {selectedTable ? (
-                <>
-                {/* 1. HEADER CÔNG CỤ (Giống Dashboard) */}
-                <div className="p-4 border-b border-white/10 bg-[#1a1a1a] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
-                    
-                    {/* Tabs con: Dữ Liệu vs Cấu Trúc */}
-                    <div className="flex flex-wrap gap-2">
-                        <button
-                            onClick={() => setViewMode('data')}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all border
-                                ${viewMode === 'data' 
-                                    ? 'bg-[#C69C6D]/10 border-[#C69C6D] text-[#C69C6D]' 
-                                    : 'bg-transparent border-transparent text-white/60 hover:bg-white/5 hover:text-white'
-                                }
-                            `}
-                        >
-                            <LayoutGrid size={14} /> DỮ LIỆU ({totalRows})
-                        </button>
-                        <button
-                            onClick={() => setViewMode('structure')}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all border
-                                ${viewMode === 'structure' 
-                                    ? 'bg-[#C69C6D]/10 border-[#C69C6D] text-[#C69C6D]' 
-                                    : 'bg-transparent border-transparent text-white/60 hover:bg-white/5 hover:text-white'
-                                }
-                            `}
-                        >
-                            <Settings size={14} /> CẤU TRÚC ({columns.length})
-                        </button>
-                    </div>
-
-                    {/* Search & Actions (Giống Dashboard) */}
-                    <div className="flex items-center gap-2 w-full md:w-auto">
-                        {/* Search Bar */}
-                        <div className="relative group flex-1 md:w-64">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-[#C69C6D] transition-colors" size={16} />
-                            <input 
-                                type="text" 
-                                placeholder={`Tìm trong ${selectedTable}...`} 
-                                value={dataSearchTerm}
-                                onChange={(e) => setDataSearchTerm(e.target.value)}
-                                className="w-full bg-black/30 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs text-white focus:outline-none focus:border-[#C69C6D] transition-all"
-                            />
-                        </div>
-                        
-                        {/* Action Buttons */}
-                        <button 
-                            onClick={() => viewMode === 'data' ? loadTableData(selectedTable, currentPage) : loadTableStructure(selectedTable)}
-                            className="p-2 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 text-white/80 transition-colors"
-                            title="Làm mới"
-                        >
-                            <RefreshCw size={16} className={loadingData ? "animate-spin" : ""} />
-                        </button>
-                        
-                        {/* Thông báo thành công/lỗi nhỏ gọn */}
-                        {successMsg && <span className="text-green-400 text-xs flex items-center animate-fade-in"><CheckCircle2 size={14} className="mr-1"/> Đã lưu</span>}
-                        {errorMsg && <span className="text-red-400 text-xs flex items-center animate-fade-in"><AlertTriangle size={14} className="mr-1"/> Lỗi</span>}
-                    </div>
+        {/* 🟢 CARD GRID (GAME STYLE) */}
+        <div className="flex-1 overflow-y-auto p-3 custom-scrollbar">
+            {!selectedTable ? (
+                <div className="h-full flex flex-col items-center justify-center text-white/20">
+                    <Database size={64} className="mb-4 opacity-20"/>
+                    <p className="text-xs uppercase tracking-widest">Select a data source</p>
+                    <button onClick={() => setShowMobileSidebar(true)} className="mt-6 px-6 py-3 bg-[#C69C6D] text-black font-bold text-xs clip-game-btn glow-border">OPEN LIST</button>
                 </div>
-
-                {/* 2. BẢNG DỮ LIỆU (Giống Dashboard) */}
-                <div className="flex-1 overflow-auto bg-[#0a0a0a] relative custom-scrollbar">
-                    <table className="w-full border-collapse min-w-[1000px]">
-                        {/* Header Sticky */}
-                        <thead className="sticky top-0 z-10 bg-[#151515] shadow-md border-b border-white/10">
-                            {viewMode === 'structure' ? (
-                                <tr>
-                                    <th className="px-6 py-3 text-center text-xs font-bold text-[#C69C6D] uppercase tracking-wider w-16">#</th>
-                                    <th className="px-6 py-3 text-left text-xs font-bold text-[#C69C6D] uppercase tracking-wider">Tên Cột</th>
-                                    <th className="px-6 py-3 text-left text-xs font-bold text-[#C69C6D] uppercase tracking-wider">Kiểu Dữ Liệu</th>
-                                    <th className="px-6 py-3 text-center text-xs font-bold text-[#C69C6D] uppercase tracking-wider">Nullable</th>
-                                    <th className="px-6 py-3 text-left text-xs font-bold text-[#C69C6D] uppercase tracking-wider">Mặc Định</th>
-                                </tr>
-                            ) : (
-                                <tr>
-                                    <th className="sticky left-0 z-20 bg-[#151515] px-4 py-3 text-center text-xs font-bold text-[#C69C6D] uppercase tracking-wider w-16 shadow-[2px_0_5px_rgba(0,0,0,0.5)]">#</th>
-                                    {columns.map(c => (
-                                        <th key={c.column_name} className="px-6 py-3 text-left text-xs font-bold text-[#C69C6D] uppercase tracking-wider whitespace-nowrap bg-[#151515] border-r border-white/5 group cursor-help" title={c.data_type}>
-                                            <div className="flex items-center gap-2">
-                                                {getTypeIcon(c.data_type)} {c.column_name}
-                                            </div>
-                                        </th>
-                                    ))}
-                                </tr>
-                            )}
-                        </thead>
-
-                        {/* Body */}
-                        <tbody className="divide-y divide-white/5">
-                            {viewMode === 'structure' ? (
-                                columns.map((col, idx) => (
-                                    <tr key={col.column_name} className="hover:bg-white/5 transition-colors">
-                                        <td className="px-6 py-4 text-xs font-mono text-white/40 text-center">{idx + 1}</td>
-                                        <td className="px-6 py-4 text-xs font-mono font-bold text-white">{col.column_name}</td>
-                                        <td className="px-6 py-4"><div className="flex items-center gap-2 bg-white/5 px-2 py-1 rounded w-fit border border-white/5">{getTypeIcon(col.data_type)}<span className="text-xs text-white/80">{col.data_type}</span></div></td>
-                                        <td className="px-6 py-4 text-center">{col.is_nullable === 'YES' ? <span className="text-green-500 text-xs">✓</span> : <span className="text-red-500 text-xs">✕</span>}</td>
-                                        <td className="px-6 py-4 text-xs text-white/50 font-mono">{col.column_default || '-'}</td>
-                                    </tr>
-                                ))
-                            ) : loadingData ? (
-                                <tr><td colSpan={columns.length + 1} className="text-center py-20"><Loader2 className="animate-spin inline text-[#C69C6D] w-8 h-8"/></td></tr>
-                            ) : tableData.length === 0 ? (
-                                <tr><td colSpan={columns.length + 1} className="text-center py-20 text-white/30 text-sm">Chưa có dữ liệu</td></tr>
-                            ) : (
-                                tableData.map((row, idx) => (
-                                    <tr key={idx} className="hover:bg-white/5 transition-colors group h-12">
-                                        <td className="sticky left-0 z-10 bg-[#0a0a0a] group-hover:bg-[#1a1a1a] border-r border-white/10 px-4 py-3 text-xs text-white/40 font-mono text-center shadow-[2px_0_5px_rgba(0,0,0,0.5)]">
-                                            {(currentPage - 1) * pageSize + idx + 1}
-                                        </td>
-                                        {columns.map(col => {
-                                            const isEditing = editingCell?.rowIndex === idx && editingCell?.colName === col.column_name;
-                                            const isEditable = col.column_name !== 'id' && col.column_name !== 'tao_luc';
-                                            return (
-                                                <td key={col.column_name} 
-                                                    className={`px-6 py-3 text-xs font-mono border-r border-white/5 whitespace-nowrap relative
-                                                        ${isEditable ? 'cursor-pointer hover:bg-white/10' : 'cursor-default opacity-50'}
-                                                        ${isEditing ? 'p-0 bg-[#C69C6D]/10 ring-1 ring-[#C69C6D] z-10' : 'text-white/80'}
-                                                    `}
-                                                    onClick={() => isEditable && !isEditing && startEditing(idx, col.column_name, row[col.column_name])}
-                                                >
-                                                    {isEditing ? (
-                                                        <input ref={editInputRef} type="text" className="w-full h-full bg-[#1a1a1a] text-white px-4 outline-none absolute inset-0"
-                                                            value={editingCell.value ?? ''} onChange={(e) => setEditingCell({ ...editingCell, value: e.target.value })}
-                                                            onBlur={handleSaveCell} onKeyDown={handleKeyDown} />
-                                                    ) : (
-                                                        <span className="block max-w-[250px] truncate">{String(row[col.column_name] ?? '')}</span>
-                                                    )}
-                                                </td>
-                                            );
-                                        })}
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                    {/* Spacer cuối bảng */}
-                    <div className="h-10 w-full"></div>
-                </div>
-
-                {/* 3. FOOTER PAGINATION (Giống Dashboard) */}
-                {viewMode === 'data' && (
-                    <div className="p-3 border-t border-white/10 bg-[#1a1a1a] flex justify-between items-center shrink-0 text-xs text-white/60">
-                        <div className="font-medium">
-                            Hiển thị <span className="text-white">{(currentPage - 1) * pageSize + 1}</span> - <span className="text-white">{Math.min(currentPage * pageSize, totalRows)}</span> / <span className="text-[#C69C6D] font-bold">{totalRows}</span> dòng
-                        </div>
-                        <div className="flex gap-2">
-                            <button 
-                                disabled={currentPage === 1}
-                                onClick={() => setCurrentPage(p => p - 1)}
-                                className="px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded disabled:opacity-50 transition-colors flex items-center"
-                            >
-                                <ChevronLeft size={14}/> Trước
-                            </button>
-                            
-                            <span className="px-3 py-1.5 bg-[#C69C6D] text-black rounded font-bold shadow-md">{currentPage}</span>
-                            
-                            <button 
-                                disabled={currentPage >= totalPages}
-                                onClick={() => setCurrentPage(p => p + 1)}
-                                className="px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded disabled:opacity-50 transition-colors flex items-center"
-                            >
-                                Sau <ChevronRight size={14}/>
-                            </button>
-                        </div>
-                    </div>
-                )}
-                </>
+            ) : tableData.length === 0 && !loadingData ? (
+                <div className="text-center py-20 text-white/30 text-xs">NO DATA FOUND</div>
             ) : (
-                // EMPTY STATE
-                <div className="flex-1 flex items-center justify-center flex-col text-white/20 animate-in fade-in zoom-in-95 duration-500">
-                    <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-6 shadow-[0_0_60px_rgba(255,255,255,0.05)] border border-white/5">
-                        <Database size={48} className="opacity-50 text-[#C69C6D]"/>
+                <>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 pb-10">
+                        {tableData.map((row, idx) => {
+                            const info = getCardInfo(row);
+                            return (
+                                <div key={idx} onClick={() => setSelectedRowDetail(row)}
+                                    className="group relative aspect-square bg-[#121212] border border-white/10 hover:border-[#C69C6D] transition-all flex flex-col items-center justify-center p-5 animate-hologram clip-game-card cursor-pointer overflow-hidden"
+                                    style={{ animationDelay: `${idx * 0.05}s` }}
+                                >
+                                    {/* Background Grid Effect */}
+                                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/pixel-weave.png')] opacity-10 pointer-events-none"></div>
+                                    
+                                    {/* Avatar */}
+                                    <div className="relative w-20 h-20 rounded-full border-2 border-[#C69C6D]/30 group-hover:border-[#C69C6D] p-0.5 transition-colors mb-3 shrink-0">
+                                        {info.img ? (
+                                            <img src={info.img} alt="img" className="w-full h-full rounded-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full rounded-full bg-[#1a1a1a] flex items-center justify-center text-white/20"><User size={32}/></div>
+                                        )}
+                                        {/* Status Dot */}
+                                        <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-black rounded-full shadow-[0_0_5px_lime]"></div>
+                                    </div>
+
+                                    {/* Info */}
+                                    <div className="text-center w-full z-10">
+                                        <h3 className="text-sm font-bold text-white truncate w-full mb-1 group-hover:text-[#C69C6D] transition-colors">{info.title}</h3>
+                                        <p className="text-[10px] text-white/40 uppercase tracking-wide truncate w-full border-t border-white/5 pt-1.5">{info.subtitle}</p>
+                                    </div>
+
+                                    {/* Hover Actions */}
+                                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                                        <button className="text-[#C69C6D] hover:scale-125 transition-transform"><Eye size={20}/></button>
+                                        <button className="text-white hover:scale-125 transition-transform"><Edit3 size={20}/></button>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
-                    <h3 className="text-xl font-serif text-white/40 mb-2">Trung Tâm Dữ Liệu</h3>
-                    <p className="text-sm text-white/30">Vui lòng chọn bảng từ danh sách bên trái</p>
-                </div>
+
+                    {/* LOAD MORE BUTTON */}
+                    {tableData.length < totalRows && (
+                        <div className="pb-8 pt-2">
+                            <button 
+                                onClick={() => { setCurrentPage(prev => prev + 1); loadTableData(selectedTable, currentPage + 1); }}
+                                className="w-full py-3 bg-[#1a1a1a] border border-white/10 text-[#C69C6D] text-[10px] font-bold uppercase tracking-[0.2em] clip-game-btn hover:bg-[#C69C6D] hover:text-black transition-all"
+                            >
+                                {loadingData ? <Loader2 className="animate-spin mx-auto" size={16}/> : 'LOAD MORE DATA'}
+                            </button>
+                        </div>
+                    )}
+                </>
             )}
         </div>
+
+        {/* MODAL DETAIL */}
+        {selectedRowDetail && (
+            <div className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-md flex items-end sm:items-center justify-center animate-in fade-in">
+                <div className="w-full sm:w-[450px] h-[70vh] sm:h-auto bg-[#0a0a0a] border-t sm:border border-[#C69C6D] shadow-[0_0_50px_rgba(198,156,109,0.2)] flex flex-col animate-in slide-in-from-bottom duration-300">
+                    <div className="p-4 border-b border-white/10 flex justify-between items-center bg-[#111]">
+                        <span className="text-xs font-black text-[#C69C6D] uppercase tracking-widest glow-text">DATA DETAILS</span>
+                        <button onClick={() => setSelectedRowDetail(null)}><X size={20} className="text-white hover:text-red-500"/></button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
+                        {columns.map(col => (
+                            <div key={col.column_name} className="group">
+                                <span className="text-[9px] text-[#C69C6D]/70 uppercase font-bold tracking-wider mb-1 flex items-center gap-2">
+                                    {getTypeIcon(col.data_type)} {col.column_name}
+                                </span>
+                                <div className="text-sm text-white/90 font-mono bg-white/5 p-3 rounded border border-white/5 break-all group-hover:border-[#C69C6D]/30 transition-colors">
+                                    {String(selectedRowDetail[col.column_name] ?? 'null')}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="p-4 bg-[#050505] border-t border-white/10 flex gap-3">
+                        <button className="flex-1 py-3 bg-[#C69C6D] text-black font-bold text-xs uppercase clip-game-btn hover:brightness-110">EDIT</button>
+                        <button onClick={() => setSelectedRowDetail(null)} className="flex-1 py-3 bg-white/10 text-white font-bold text-xs uppercase clip-game-btn hover:bg-white/20">CLOSE</button>
+                    </div>
+                </div>
+            </div>
+        )}
     </div>
   );
 }

@@ -1,68 +1,57 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* 1. CẤU HÌNH FONT & CỠ CHỮ */
-html {
-  font-family: 'Lora', Georgia, serif;
-  /* Tăng base size lên để đảm bảo 1rem = 16px * 112.5% ~ 18px */
-  font-size: 112.5%; 
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
-}
-
-/* 🟢 QUAN TRỌNG: ÉP CỠ CHỮ TỐI THIỂU 13PX TOÀN APP */
-body, button, input, textarea, select, span, p, div {
-    font-size: max(13px, 1rem); /* Fallback an toàn */
-}
-
-/* Override các class utility nhỏ của Tailwind */
-.text-xs { font-size: 13px !important; line-height: 1.5; }
-.text-\[10px\] { font-size: 13px !important; line-height: 1.5; }
-.text-\[9px\] { font-size: 13px !important; line-height: 1.5; }
-.text-\[8px\] { font-size: 13px !important; line-height: 1.5; }
-
-/* ... (Phần còn lại của globals.css giữ nguyên: Variables, Scrollbar, Utils) ... */
 :root {
-  --bg-primary: #000000;
-  --bg-secondary: #0A0A0A;
-  --bg-tertiary: #1A1A1A;
-  --text-primary: #ffffff;
-  --text-secondary: rgba(255, 255, 255, 0.6);
-  --accent: #C69C6D;
-  --scrollbar-track: #1a120f;
-  --scrollbar-thumb: #8B5E3C;
-  background-color: #000000;
+  --app-height: 100%;
+  --game-gold: #C69C6D;
+  --game-dark: #050505;
+  --game-glass: rgba(15, 15, 15, 0.85);
 }
 
-html {
-  height: 100vh; 
-  height: var(--app-height, 100dvh) !important;
-  width: 100vw;
-  background-color: #000000;
-  overflow: hidden; 
+html, body {
+  background-color: var(--game-dark);
+  color: #fff;
+  font-family: 'Inter', sans-serif; /* Đổi về font Inter cho dễ đọc */
 }
 
-body {
-  height: 100vh;
-  height: var(--app-height, 100dvh) !important;
-  width: 100vw;
-  overflow: hidden;
-  overscroll-behavior: none; 
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  font-weight: 400; 
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  display: flex;
-  flex-direction: column;
+/* 🟢 GAME UI UTILITIES */
+@layer utilities {
+  /* Hiệu ứng cắt góc (Angled Corners) */
+  .clip-game-card {
+    clip-path: polygon(
+      10px 0, 100% 0, 
+      100% calc(100% - 10px), calc(100% - 10px) 100%, 
+      0 100%, 0 10px
+    );
+  }
+  
+  .clip-game-btn {
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  }
+
+  /* Hiệu ứng phát sáng Neon */
+  .glow-text {
+    text-shadow: 0 0 10px rgba(198, 156, 109, 0.5);
+  }
+  
+  .glow-border {
+    box-shadow: 0 0 10px rgba(198, 156, 109, 0.2), inset 0 0 20px rgba(198, 156, 109, 0.05);
+  }
+
+  /* Scrollbar ẩn nhưng vẫn cuộn được */
+  .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+  }
+  .scrollbar-hide {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+  }
 }
 
-svg.lucide { width: 1.4em; height: 1.4em; vertical-align: middle; }
-
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: var(--scrollbar-track); }
-::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
-.scrollbar-hide::-webkit-scrollbar { display: none; }
+/* Animation Load */
+@keyframes hologram {
+  0% { opacity: 0; transform: scale(0.95) translateY(10px); filter: blur(5px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+}
+.animate-hologram { animation: hologram 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }

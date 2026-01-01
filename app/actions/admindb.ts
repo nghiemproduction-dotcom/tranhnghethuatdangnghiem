@@ -35,15 +35,16 @@ async function requireAdmin() {
     // Check email hoặc bảng nhan_su để xem có phải admin không
     const { data: nhanSu } = await supabase
         .from('nhan_su')
-        .select('vi_tri')
+        .select('vi_tri, vi_tri_normalized')
         .eq('email', user.email)
         .single();
     
-    // Chỉ cho phép Admin hoặc Quản lý cấp cao
-    const allowedRoles = ['admin', 'boss', 'quanly'];
-    const userRole = nhanSu?.vi_tri?.toLowerCase().replace(/\s/g, '') || '';
+    // Ưu tiên trường normalized để khớp RLS/routing; vẫn hỗ trợ legacy vi_tri
+    const allowedRoles = ['admin', 'quanly', 'boss'];
+    const userRoleNormalized = (nhanSu?.vi_tri_normalized || '').toLowerCase();
+    const userRoleLegacy = (nhanSu?.vi_tri || '').toLowerCase().replace(/\s/g, '');
     
-    const isAllowed = allowedRoles.some(r => userRole.includes(r));
+    const isAllowed = allowedRoles.includes(userRoleNormalized) || allowedRoles.some(r => userRoleLegacy.includes(r));
 
     if (!isAllowed) {
         throw new Error("Forbidden: Bạn không có quyền quản trị Database");
@@ -412,6 +413,21 @@ export async function getDistinctValuesAction(tableName: string, columnName: str
         `);
         
         return { success: true, data: Array.from(data).map(row => row[columnName]) };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+// --- 🟢 14. XÓA NHÂN SỰ ---
+export async function deleteNhanSuAction(id: string) {
+    try {
+        await requireAdmin(); // Chỉ Admin/Quản lý mới gọi được
+        validateIdentifier('nhan_su');
+
+        await sql.unsafe(`
+            DELETE FROM "nhan_su" WHERE id = $1
+        `, [id]);
+        
+        return { success: true };
     } catch (error: any) {
         return { success: false, error: error.message };
     }
