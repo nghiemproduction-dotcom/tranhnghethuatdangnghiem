@@ -107,7 +107,7 @@ export default function BackgroundManager({ onUpdate }: Props) {
   };
 
   return (
-    <div className="fixed bottom-44 left-6 z-[200] flex flex-col items-start gap-2">
+   <div className="fixed bottom-32 right-6 z-[200] flex flex-col items-end gap-2">
       <button 
         onClick={() => setIsOpen(!isOpen)}
         className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-[#C69C6D] flex items-center justify-center hover:bg-[#C69C6D] hover:text-black transition-all shadow-lg"

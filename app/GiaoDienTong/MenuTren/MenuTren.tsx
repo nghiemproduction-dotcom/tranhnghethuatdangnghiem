@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom'; // 🟢 Import Portal
-import { Bell, ShoppingCart, QrCode, UserCircle } from 'lucide-react'; // 🟢 Thêm icon UserCircle
+import { createPortal } from 'react-dom'; 
+import { ShoppingCart, QrCode, UserCircle } from 'lucide-react'; 
 import NhacNen from '@/app/Music/NhacNen';
 import NotificationCenter from './NotificationCenter';
 import { NotificationService } from './NotificationService';
@@ -9,7 +9,7 @@ import { Notification } from './NotificationTypes';
 import { useUser } from '@/app/ThuVien/UserContext';
 import { Z_INDEX } from '@/app/constants/zIndex';
 import { useAppSettings } from '@/app/ThuVien/AppSettingsContext';
-import ModalProfile from '@/app/GiaoDienTong/MenuTren/NutCaNhan/ModalProfile'; // 🟢 Import Modal Profile
+import ModalProfile from '@/app/GiaoDienTong/MenuTren/NutCaNhan/ModalProfile'; 
 
 export default function MenuTren({ nguoiDung: fallbackUser, loiChao }: { nguoiDung: any, loiChao: string }) {
     const { user: contextUser } = useUser();
@@ -22,32 +22,27 @@ export default function MenuTren({ nguoiDung: fallbackUser, loiChao }: { nguoiDu
         email: contextUser.email,
         role: contextUser.userType === 'nhan_su' ? contextUser.vi_tri_normalized : contextUser.phan_loai_normalized,
         permissions: contextUser.permissions,
-        // Mapping thêm các trường cho ModalProfile
         vi_tri: contextUser.vi_tri,
         userType: contextUser.userType,
         phan_loai: contextUser.phan_loai,
         so_dien_thoai: contextUser.so_dien_thoai,
-  
-      
     } : fallbackUser;
 
-    const isVisitor = nguoiDung?.userType === 'guest' || nguoiDung?.role === 'visitor';
+    // Check khách vãng lai
+    const isVisitor = !nguoiDung || nguoiDung?.userType === 'guest' || nguoiDung?.role === 'visitor';
     
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
     
-    // 🟢 State cho Modal Profile
     const [showProfile, setShowProfile] = useState(false);
     const [mounted, setMounted] = useState(false);
 
-    useEffect(() => {
-        setMounted(true); // Client-side check
-    }, []);
+    useEffect(() => { setMounted(true); }, []);
 
-    // Fetch notifications
+    // Fetch notifications (Chỉ chạy khi đã đăng nhập)
     useEffect(() => {
-        if (!nguoiDung?.id) return;
+        if (!nguoiDung?.id || isVisitor) return;
         
         const fetchNotifications = async () => {
             setIsLoading(true);
@@ -66,14 +61,12 @@ export default function MenuTren({ nguoiDung: fallbackUser, loiChao }: { nguoiDu
             nguoiDung.id,
             (newNotification) => {
                 setNotifications(prev => [newNotification, ...prev]);
-                if (!newNotification.is_read) {
-                    setUnreadCount(prev => prev + 1);
-                }
+                if (!newNotification.is_read) setUnreadCount(prev => prev + 1);
             }
         );
 
         return () => { subscription?.unsubscribe(); };
-    }, [nguoiDung?.id]);
+    }, [nguoiDung?.id, isVisitor]);
 
     const handleMarkAsRead = async (id: string) => {
         await NotificationService.markAsRead(id);
@@ -102,57 +95,57 @@ export default function MenuTren({ nguoiDung: fallbackUser, loiChao }: { nguoiDu
         if (!notification.is_read) handleMarkAsRead(notification.id);
     };
 
-    if (isVisitor) return null;
-
     return (
         <>
             <div className={`fixed top-0 left-0 right-0 h-[85px] px-4 md:px-6 flex justify-between items-center bg-transparent transition-all duration-300 pointer-events-none`} style={{ zIndex: Z_INDEX.menuTren }}>
                 
-                {/* Góc trái: Dòng chào mừng */}
+                {/* Góc trái: Dòng chào mừng (Luôn hiện để chào khách) */}
                 <div className="flex items-center gap-2 max-w-[60%] animate-slide-down pointer-events-auto">
                     <span className="text-xs md:text-sm font-medium italic text-gray-300 drop-shadow-md whitespace-nowrap hidden sm:inline-block">
-                        Xin chào,
+                        {isVisitor ? "Chào mừng," : "Xin chào,"}
                     </span>
                     <span className="font-black text-white uppercase tracking-wider drop-shadow-lg shadow-black truncate" 
                           style={{ fontSize: 'clamp(14px, 4vw, 20px)' }}>
-                        {nguoiDung?.ho_ten}
+                        {isVisitor ? "Quý Khách" : nguoiDung?.ho_ten}
                     </span>
                 </div>
 
-                {/* Góc phải: Các nút chức năng */}
-                <div className="flex gap-2 md:gap-3 animate-slide-down delay-100 shrink-0 pointer-events-auto items-center">
-                    {/* Nhạc Nền */}
-                    {nguoiDung?.id && <NhacNen />}
-                    
-                    {/* Notification Center */}
-                    {!isLoading && nguoiDung?.id && (
-                        <NotificationCenter
-                            notifications={notifications}
-                            unreadCount={unreadCount}
-                            onMarkAsRead={handleMarkAsRead}
-                            onMarkAllAsRead={handleMarkAllAsRead}
-                            onDelete={handleDelete}
-                            onNotificationClick={handleNotificationClick}
+                {/* Góc phải: Các nút chức năng - ẨN NẾU LÀ VISITOR */}
+                {!isVisitor && (
+                    <div className="flex gap-2 md:gap-3 animate-slide-down delay-100 shrink-0 pointer-events-auto items-center">
+                        {/* Nhạc Nền */}
+                        {nguoiDung?.id && <NhacNen />}
+                        
+                        {/* Notification Center */}
+                        {!isLoading && nguoiDung?.id && (
+                            <NotificationCenter
+                                notifications={notifications}
+                                unreadCount={unreadCount}
+                                onMarkAsRead={handleMarkAsRead}
+                                onMarkAllAsRead={handleMarkAllAsRead}
+                                onDelete={handleDelete}
+                                onNotificationClick={handleNotificationClick}
+                            />
+                        )}
+
+                        {/* Shopping Cart */}
+                        <NutVuong icon={ShoppingCart} />
+                        
+                        {/* QR Code */}
+                        <NutVuong icon={QrCode} />
+
+                        {/* NÚT TÀI KHOẢN */}
+                        <NutVuong 
+                            icon={UserCircle} 
+                            onClick={() => setShowProfile(true)}
+                            isActive={showProfile}
                         />
-                    )}
-
-                    {/* Shopping Cart */}
-                    <NutVuong icon={ShoppingCart} />
-                    
-                    {/* QR Code */}
-                    <NutVuong icon={QrCode} />
-
-                    {/* 🟢 NÚT TÀI KHOẢN MỚI */}
-                    <NutVuong 
-                        icon={UserCircle} 
-                        onClick={() => setShowProfile(true)}
-                        isActive={showProfile}
-                    />
-                </div>
+                    </div>
+                )}
             </div>
 
-            {/* 🟢 PORTAL MODAL PROFILE */}
-            {mounted && showProfile && nguoiDung && createPortal(
+            {/* Modal Profile */}
+            {mounted && showProfile && nguoiDung && !isVisitor && createPortal(
                 <ModalProfile
                     isOpen={true}
                     onClose={() => setShowProfile(false)}
@@ -164,7 +157,6 @@ export default function MenuTren({ nguoiDung: fallbackUser, loiChao }: { nguoiDu
     );
 }
 
-// 🟢 Cập nhật NutVuong để nhận onClick và isActive
 function NutVuong({ icon: Icon, badge, onClick, isActive }: any) {
     return (
         <button 

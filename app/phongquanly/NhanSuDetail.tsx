@@ -1,9 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { 
     X, User, Phone, Mail, MapPin, CreditCard, Edit3, 
-    ShieldCheck, Clock, Percent, Banknote, Hash 
+    ShieldCheck, Clock, Percent, Banknote, Hash, Trash2, Loader2 
 } from 'lucide-react';
 
 interface NhanSuDetailProps {
@@ -11,9 +11,21 @@ interface NhanSuDetailProps {
     isOpen: boolean;
     onClose: () => void;
     onEdit: () => void;
+    allowDelete?: boolean;
+    onDelete?: (id: string) => Promise<void>;
 }
 
-export default function NhanSuDetail({ data, isOpen, onClose, onEdit }: NhanSuDetailProps) {
+export default function NhanSuDetail({ data, isOpen, onClose, onEdit, allowDelete = false, onDelete }: NhanSuDetailProps) {
+    const [deleting, setDeleting] = useState(false);
+
+    const handleDelete = async () => {
+        if (!data || !onDelete) return;
+        if (!confirm(`Bạn có chắc muốn xóa nhân sự: ${data.ho_ten}?`)) return;
+        setDeleting(true);
+        await onDelete(data.id);
+        setDeleting(false);
+        onClose();
+    };
     if (!isOpen || !data) return null;
 
     // Helper format tiền
@@ -159,6 +171,15 @@ export default function NhanSuDetail({ data, isOpen, onClose, onEdit }: NhanSuDe
                         <Edit3 size={16} />
                         CHỈNH SỬA
                     </button>
+                    {allowDelete && (
+                        <button 
+                            onClick={handleDelete} 
+                            disabled={deleting}
+                            className="flex-1 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-black uppercase text-xs flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
+                        >
+                            {deleting ? <Loader2 size={16} className="animate-spin"/> : <Trash2 size={16}/>} XÓA
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

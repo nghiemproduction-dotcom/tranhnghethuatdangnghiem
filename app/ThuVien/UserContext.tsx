@@ -103,13 +103,33 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
+      // Xóa localStorage trước
+      localStorage.removeItem('USER_INFO');
+      localStorage.removeItem('USER_ROLE');
+      localStorage.removeItem('SAVED_EMAIL');
+      
+      // Xóa token Supabase
+      Object.keys(localStorage)
+        .filter(key => key.startsWith('sb-'))
+        .forEach(key => localStorage.removeItem(key));
+      
+      sessionStorage.clear();
+      
+      // Signout Supabase
       await AuthService.signOut();
+      
       setUser(null);
       setError(null);
-      localStorage.removeItem('USER_INFO');
+      
+      // Redirect về trang chủ
+      window.location.href = '/';
     } catch (err) {
       LoggerService.error('UserContext', 'Error signing out', err);
       setError(err instanceof Error ? err.message : 'Unknown error');
+      // Vẫn redirect dù lỗi
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.href = '/';
     }
   };
 

@@ -6,8 +6,9 @@ import {
     Image as ImageIcon, UploadCloud, Check
 } from 'lucide-react';
 import { useUser } from '@/app/ThuVien/UserContext';
-import { createNhanSuAction, updateNhanSuAction, getDistinctValuesAction } from '@/app/actions/admindb';
+import { createNhanSuAction, updateNhanSuAction, getDistinctValuesAction } from '@/app/actions/QuyenHanQuanLy';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
+import { compressImage } from '@/app/ThuVien/compressImage';
 
 // --- CẤU HÌNH ---
 const VN_BANKS = [
@@ -59,81 +60,6 @@ const normalizeFileName = (str: string) => {
         .replace(/[\u0300-\u036f]/g, "")  // Xóa dấu
         .replace(/[^a-z0-9]/g, "_")  // Chỉ giữ chữ cái, số và _
         .replace(/_+/g, "_");  // Gộp nhiều _ thành 1
-};
-
-// 🟢 HÀM NÉN ẢNH (SIMPLE + AGGRESSIVE)
-const simpleCompress = async (file: File): Promise<File> => {
-    return new Promise((resolve) => {
-        console.log(`[COMPRESS] 📁 Bắt đầu nén: ${(file.size / 1024).toFixed(2)} KB`);
-        
-        const reader = new FileReader();
-        
-        reader.onerror = () => {
-            console.error('[COMPRESS] ❌ FileReader error');
-            resolve(file);
-        };
-        
-        reader.onload = (e) => {
-            const img = new Image();
-            
-            img.onerror = () => {
-                console.error('[COMPRESS] ❌ Image load failed');
-                resolve(file);
-            };
-            
-            img.onload = () => {
-                try {
-                    const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 400;
-                    let w = img.width;
-                    let h = img.height;
-
-                    if (w > MAX_WIDTH) {
-                        h = (h * MAX_WIDTH) / w;
-                        w = MAX_WIDTH;
-                    }
-
-                    canvas.width = w;
-                    canvas.height = h;
-                    
-                    const ctx = canvas.getContext('2d');
-                    if (!ctx) {
-                        console.error('[COMPRESS] ❌ Canvas context failed');
-                        resolve(file);
-                        return;
-                    }
-                    
-                    ctx.drawImage(img, 0, 0, w, h);
-
-                    // Nén với quality 50% (aggressive)
-                    canvas.toBlob(
-                        (blob) => {
-                            if (!blob) {
-                                console.log('[COMPRESS] ⚠️  Blob is null, use original');
-                                resolve(file);
-                                return;
-                            }
-                            
-                            const compressedSize = blob.size / 1024;
-                            console.log(`[COMPRESS] ✅ Hoàn thành: ${(file.size / 1024).toFixed(2)} KB → ${compressedSize.toFixed(2)} KB`);
-                            
-                            const newFile = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
-                            resolve(newFile);
-                        },
-                        'image/jpeg',
-                        0.5  // Quality 50% - aggressive
-                    );
-                } catch (e) {
-                    console.error('[COMPRESS] ❌ Canvas error:', e);
-                    resolve(file);
-                }
-            };
-            
-            img.src = e.target?.result as string;
-        };
-        
-        reader.readAsDataURL(file);
-    });
 };
 
 interface FormNhanSuProps {
@@ -262,83 +188,55 @@ export default function FormNhanSu({ isOpen, onClose, onSuccess, initialData, zI
         }
     };
 
-    // 🟢 UPLOAD ẢNH (FIXED VERSION - Detailed debugging)
+    // 🟢 UPLOAD ẢNH (SIMPLIFIED + USING SHARED COMPRESS)
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        console.log('[UPLOAD] ⭐ FILE INPUT TRIGGERED - Bắt đầu xử lý file');
-        setError(null);
         const file = e.target.files?.[0];
-        if (!file) {
-            console.log('[UPLOAD] ❌ Không có file được chọn');
-            return;
-        }
-
-        console.log(`[UPLOAD START] 📁 File gốc: ${file.name} (${(file.size / 1024).toFixed(2)} KB), Type: ${file.type}`);
+        if (!file) return;
 
         if (!formData.ho_ten) {
-            console.warn('[UPLOAD] Chưa nhập họ tên');
             setError("Nhập họ tên trước khi tải ảnh!");
             if (fileInputRef.current) fileInputRef.current.value = '';
             return;
         }
 
         setUploading(true);
+        setError(null);
+        console.log('[UPLOAD NS] Bắt đầu upload:', file.name, file.size);
+
         try {
-            // 1. Nén ảnh
-            console.log('[UPLOAD STEP 1] Bắt đầu nén ảnh...');
-            const finalFile = await simpleCompress(file);
-            console.log(`[UPLOAD STEP 1] ✅ File đã nén: ${(finalFile.size / 1024).toFixed(2)} KB, Type: ${finalFile.type}`);
+            // 1. Nén ảnh sử dụng hàm chung
+            const compressed = await compressImage(file, 0.5, 400);
+            console.log('[UPLOAD NS] Đã nén:', compressed.size, 'bytes');
             
-            // 2. Chuẩn bị tên file
-            const fileExt = 'jpg';
-            const sanitizedName = normalizeFileName(formData.ho_ten);
-            const fileName = `${sanitizedName}_${Date.now()}.${fileExt}`;
-            console.log(`[UPLOAD STEP 2] Tên file chuẩn bị: ${fileName}`);
+            // 2. Tạo tên file
+            const fileName = `ns_${normalizeFileName(formData.ho_ten)}_${Date.now()}.jpg`;
+            console.log('[UPLOAD NS] Tên file:', fileName);
 
-            // 3. Kiểm tra Supabase client
-            console.log(`[UPLOAD STEP 3] Kiểm tra Supabase client...`);
-            if (!supabase) throw new Error('Supabase client không được khởi tạo');
-            if (!supabase.storage) throw new Error('Storage API không khả dụng');
-            console.log(`[UPLOAD STEP 3] ✅ Supabase client sẵn sàng`);
-
-            // 4. Upload vào bucket 'avatar'
-            console.log(`[UPLOAD STEP 4] Bắt đầu upload đến bucket 'avatar'...`);
+            // 3. Upload vào bucket 'avatar'
             const { data: uploadData, error: upErr } = await supabase.storage
                 .from('avatar')
-                .upload(fileName, finalFile, { 
+                .upload(fileName, compressed, { 
                     upsert: true, 
                     cacheControl: '3600',
                     contentType: 'image/jpeg'
                 });
 
             if (upErr) {
-                console.error(`[UPLOAD STEP 4] ❌ Lỗi upload:`, upErr);
-                throw new Error(`Upload thất bại: ${upErr.message}`);
+                console.error('[UPLOAD NS] Lỗi upload:', upErr);
+                throw new Error(upErr.message);
             }
 
-            console.log(`[UPLOAD STEP 4] ✅ Upload thành công:`, uploadData);
+            console.log('[UPLOAD NS] Upload thành công:', uploadData);
 
-            // 5. Lấy URL công khai
-            console.log(`[UPLOAD STEP 5] Lấy URL công khai...`);
+            // 4. Lấy URL công khai
             const { data: urlData } = supabase.storage.from('avatar').getPublicUrl(fileName);
-            const publicUrl = urlData?.publicUrl;
+            console.log('[UPLOAD NS] URL:', urlData.publicUrl);
             
-            if (!publicUrl) {
-                throw new Error('Không thể lấy URL công khai');
-            }
-
-            console.log(`[UPLOAD STEP 5] ✅ URL: ${publicUrl}`);
-            
-            // 6. Cập nhật form data
-            console.log(`[UPLOAD STEP 6] Cập nhật form...`);
-            handleChange('hinh_anh', publicUrl);
-            console.log(`[UPLOAD] ✅ THÀNH CÔNG! Ảnh đã được tải lên.`);
-            setError(null);
+            handleChange('hinh_anh', urlData.publicUrl);
 
         } catch (err: any) {
-            const errorMsg = err?.message || err?.error_description || String(err);
-            console.error(`[UPLOAD] ❌ EXCEPTION:`, errorMsg);
-            console.error('[UPLOAD] Full error object:', err);
-            setError(`Lỗi: ${errorMsg}`);
+            console.error('[UPLOAD NS] Exception:', err);
+            setError(`Lỗi upload: ${err.message}`);
         } finally {
             setUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = '';

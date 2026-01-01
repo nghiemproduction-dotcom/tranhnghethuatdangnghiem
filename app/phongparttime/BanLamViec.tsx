@@ -161,12 +161,12 @@ export default function BanLamViec() {
                         <Coffee className="w-6 h-6 text-[#C69C6D]" />
                     </div>
                     <div>
-                        <h1 className="text-3xl md:text-4xl font-serif font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#F5E6D3] to-[#C69C6D]">
-                            Bàn Làm Việc
-                        </h1>
-                        <p className="text-white/60 mt-1 font-light tracking-wide text-sm md:text-base">
-                            Quản lý ca làm việc và nhiệm vụ cá nhân của {user?.ho_ten}
-                        </p>
+                    <h1 className="text-3xl md:text-4xl font-serif font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#F5E6D3] to-[#C69C6D]">
+    Không Gian Sáng Tạo
+</h1>
+<p className="text-white/60 mt-1 font-light tracking-wide text-sm md:text-base italic">
+    "Nơi đam mê kết tinh thành tác phẩm" - Chào nghệ nhân {user?.ho_ten}
+</p>
                     </div>
                 </div>
             </div>
@@ -182,8 +182,7 @@ export default function BanLamViec() {
                 <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
                     <div className="text-center md:text-left">
                         <h2 className="text-2xl font-bold mb-2 text-[#F5E6D3] font-serif">
-                            {isCheckedIn ? 'Đang trong ca làm việc 💼' : 'Sẵn sàng làm việc? 🚀'}
-                        </h2>
+                       {isCheckedIn ? 'Đang trong phiên sáng tạo 🎨' : 'Khởi tạo nguồn cảm hứng ✨'}</h2>
                         <p className="text-white/70 text-xs md:text-sm">
                             {isCheckedIn 
                                 ? `Bắt đầu lúc: ${new Date(attendanceToday?.thoi_gian_vao).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})} - Đừng quên check-out!` 

@@ -3,55 +3,85 @@
 @tailwind utilities;
 
 :root {
+  /* MÀU SẮC CHỦ ĐẠO - DAY MODE (Sáng nhưng không chói - màu giấy Gạo) */
+  --gold-artisan: #C69C6D;       /* Vàng đồng chủ đạo */
+  --gold-hover: #B58B5D;         /* Vàng đồng đậm hơn khi hover */
+  --black-matte: #1a120f;        /* Đen pha nâu đất */
+  --void-black: #050505;         /* Đen sâu thẳm */
+  --paper-rice: #F5E6D3;         /* Trắng ngà giấy dó */
+  --red-seal: #8B0000;           /* Đỏ con triện */
+  
+  /* Cấu hình giao diện Light */
+  --bg-primary: #F5F5F5;
+  --bg-secondary: #EBEBEB;
+  --bg-card: #FFFFFF;
+  --text-primary: #1a120f;
+  --text-secondary: rgba(26, 18, 15, 0.6);
+  --border-color: rgba(198, 156, 109, 0.3);
+  
   --app-height: 100%;
-  --game-gold: #C69C6D;
-  --game-dark: #050505;
-  --game-glass: rgba(15, 15, 15, 0.85);
 }
 
-html, body {
-  background-color: var(--game-dark);
-  color: #fff;
-  font-family: 'Inter', sans-serif; /* Đổi về font Inter cho dễ đọc */
+.dark-theme {
+  /* Cấu hình giao diện Dark (Mặc định) */
+  --bg-primary: #050505;         /* Void Black */
+  --bg-secondary: #0A0A0A;
+  --bg-card: #1a120f;            /* Black Matte pha nâu */
+  --text-primary: #F5E6D3;       /* Paper Rice */
+  --text-secondary: rgba(245, 230, 211, 0.5);
+  --border-color: rgba(198, 156, 109, 0.2); /* Gold mờ */
 }
 
-/* 🟢 GAME UI UTILITIES */
+/* Áp dụng Theme */
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif; /* Hoặc font Serif nếu muốn nghệ hơn */
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* 🟢 ARTISAN UTILITIES */
+@layer components {
+  /* Nút bấm phong cách nghệ nhân */
+  .btn-artisan {
+    @apply px-6 py-3 rounded-xl font-bold uppercase tracking-widest transition-all duration-300;
+    background-color: var(--gold-artisan);
+    color: #000;
+    box-shadow: 0 4px 15px rgba(198, 156, 109, 0.3);
+  }
+  .btn-artisan:hover {
+    background-color: var(--gold-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(198, 156, 109, 0.4);
+  }
+  .btn-artisan:active {
+    transform: scale(0.98);
+  }
+
+  /* Khung chứa nội dung phong cách tranh lụa */
+  .artisan-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    backdrop-filter: blur(12px);
+  }
+}
+
 @layer utilities {
-  /* Hiệu ứng cắt góc (Angled Corners) */
-  .clip-game-card {
-    clip-path: polygon(
-      10px 0, 100% 0, 
-      100% calc(100% - 10px), calc(100% - 10px) 100%, 
-      0 100%, 0 10px
-    );
-  }
+  .text-gold { color: var(--gold-artisan); }
+  .bg-gold { background-color: var(--gold-artisan); }
+  .border-gold { border-color: var(--gold-artisan); }
   
-  .clip-game-btn {
-    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
-  }
-
-  /* Hiệu ứng phát sáng Neon */
-  .glow-text {
-    text-shadow: 0 0 10px rgba(198, 156, 109, 0.5);
-  }
+  .glow-text { text-shadow: 0 0 10px rgba(198, 156, 109, 0.5); }
   
-  .glow-border {
-    box-shadow: 0 0 10px rgba(198, 156, 109, 0.2), inset 0 0 20px rgba(198, 156, 109, 0.05);
-  }
-
-  /* Scrollbar ẩn nhưng vẫn cuộn được */
-  .scrollbar-hide::-webkit-scrollbar {
-      display: none;
-  }
-  .scrollbar-hide {
-      -ms-overflow-style: none;
-      scrollbar-width: none;
-  }
+  /* Ẩn scrollbar nhưng vẫn cuộn được */
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 }
 
-/* Animation Load */
+/* Animation Hologram */
 @keyframes hologram {
   0% { opacity: 0; transform: scale(0.95) translateY(10px); filter: blur(5px); }
   100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
 }
-.animate-hologram { animation: hologram 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+.animate-hologram { animation: hologram 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }

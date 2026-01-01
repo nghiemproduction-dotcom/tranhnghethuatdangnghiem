@@ -125,8 +125,14 @@ export default function TrangChaoMung() {
         handleMainAction();
     }, [nguoiDung]);
 
+    // 🟢 ĐÃ SỬA: Hàm xử lý khách vãng lai (Cấp cookie VISITOR_MODE + Redirect)
     const handleGuestVisit = () => {
-        window.location.reload(); 
+        // 1. Cấp vé vào cổng (Cookie) có hạn 1 ngày
+        document.cookie = "VISITOR_MODE=1; path=/; max-age=86400; SameSite=Lax";
+        
+        // 2. Đưa khách vào trang chủ ngay lập tức
+        console.log("🚀 Khách tham quan đang vào...");
+        router.push('/trangchu');
     };
 
     // 🟢 XỬ LÝ KHI NHẤP NÚT (FIX LỖI 404 VÀ LOOP)

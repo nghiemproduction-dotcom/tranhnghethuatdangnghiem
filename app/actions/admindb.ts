@@ -432,3 +432,211 @@ export async function deleteNhanSuAction(id: string) {
         return { success: false, error: error.message };
     }
 }
+
+// --- 🟢 14b. CẬP NHẬT HÀNG LOẠT NHÂN SỰ (BULK UPDATE) ---
+export async function bulkUpdateNhanSuAction(ids: string[], data: { vi_tri?: string; vi_tri_normalized?: string }) {
+    try {
+        await requireAdmin();
+        
+        if (!ids || ids.length === 0) {
+            return { success: false, error: 'Không có ID nào được chọn' };
+        }
+
+        const setClauses: string[] = [];
+        const params: any[] = [];
+        let paramCount = 1;
+
+        if (data.vi_tri !== undefined) {
+            setClauses.push(`vi_tri = $${paramCount}`);
+            params.push(data.vi_tri);
+            paramCount++;
+        }
+
+        if (data.vi_tri_normalized !== undefined) {
+            setClauses.push(`vi_tri_normalized = $${paramCount}`);
+            params.push(data.vi_tri_normalized);
+            paramCount++;
+        }
+
+        if (setClauses.length === 0) {
+            return { success: false, error: 'Không có dữ liệu để cập nhật' };
+        }
+
+        const idPlaceholders = ids.map((_, i) => `$${paramCount + i}`).join(', ');
+        params.push(...ids);
+
+        const query = `UPDATE "nhan_su" SET ${setClauses.join(', ')} WHERE id IN (${idPlaceholders})`;
+        
+        await sql.unsafe(query, params);
+        
+        return { success: true, updated: ids.length };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+// ... (Giữ nguyên các hàm cũ)
+
+// --- 🟢 15. LẤY DỮ LIỆU KHÁCH HÀNG (CÓ SEARCH & FILTER) ---
+export async function getKhachHangDataAction(page: number, pageSize: number, search: string, filterRole: string) {
+    try {
+        await requireAdmin();
+        
+        let query = `SELECT * FROM "khach_hang" WHERE 1=1`;
+        const params: any[] = [];
+        let paramCount = 1;
+
+        if (search) {
+            query += ` AND (ho_ten ILIKE $${paramCount} OR so_dien_thoai ILIKE $${paramCount} OR email ILIKE $${paramCount})`;
+            params.push(`%${search}%`);
+            paramCount++;
+        }
+
+        if (filterRole && filterRole !== 'all') {
+            query += ` AND phan_loai_normalized = $${paramCount}`;
+            params.push(filterRole);
+            paramCount++;
+        }
+
+        const countQuery = query.replace('SELECT *', 'SELECT count(*) as total');
+        const offset = (page - 1) * pageSize;
+        // Sắp xếp khách hàng mới nhất lên đầu
+        query += ` ORDER BY tao_luc DESC LIMIT ${pageSize} OFFSET ${offset}`;
+
+        const data = await sql.unsafe(query, params);
+        const [countResult] = await sql.unsafe(countQuery, params);
+
+        return { 
+            success: true, 
+            data: Array.from(data), 
+            total: Number(countResult.total) 
+        };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+// --- 🟢 16. TẠO MỚI KHÁCH HÀNG ---
+export async function createKhachHangAction(data: any) {
+    try {
+        await requireAdmin();
+        
+        // Đảm bảo normalized có giá trị
+        const phanLoaiNorm = data.phan_loai_normalized || 
+            (data.phan_loai ? data.phan_loai.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, "") : 'moi');
+
+        await sql.unsafe(`
+            INSERT INTO "khach_hang" (
+                ho_ten, so_dien_thoai, email, 
+                phan_loai, phan_loai_normalized, 
+                hinh_anh, dia_chi, tao_luc
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+        `, [
+            data.ho_ten, 
+            data.so_dien_thoai, 
+            data.email,
+            data.phan_loai,
+            phanLoaiNorm,
+            data.hinh_anh || null,
+            data.dia_chi || null
+        ]);
+        
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+// --- 🟢 17. CẬP NHẬT KHÁCH HÀNG ---
+export async function updateKhachHangAction(id: string, data: any) {
+    try {
+        await requireAdmin();
+
+         const phanLoaiNorm = data.phan_loai_normalized || 
+            (data.phan_loai ? data.phan_loai.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, "") : 'moi');
+        
+        await sql.unsafe(`
+            UPDATE "khach_hang"
+            SET ho_ten = $1,
+                so_dien_thoai = $2,
+                email = $3,
+                phan_loai = $4,
+                phan_loai_normalized = $5,
+                hinh_anh = $6,
+                dia_chi = $7
+            WHERE id = $8
+        `, [
+            data.ho_ten, 
+            data.so_dien_thoai, 
+            data.email,
+            data.phan_loai,
+            phanLoaiNorm,
+            data.hinh_anh || null,
+            data.dia_chi || null,
+            id
+        ]);
+        
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+// --- 🟢 18. XÓA KHÁCH HÀNG ---
+export async function deleteKhachHangAction(id: string) {
+    try {
+        await requireAdmin();
+        validateIdentifier('khach_hang');
+
+        await sql.unsafe(`DELETE FROM "khach_hang" WHERE id = $1`, [id]);
+        
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+// --- 🟢 19. CẬP NHẬT HÀNG LOẠT KHÁCH HÀNG (BULK UPDATE) ---
+export async function bulkUpdateKhachHangAction(ids: string[], data: { phan_loai?: string; phan_loai_normalized?: string }) {
+    try {
+        await requireAdmin();
+        
+        if (!ids || ids.length === 0) {
+            return { success: false, error: 'Không có ID nào được chọn' };
+        }
+
+        // Build SET clause dynamically
+        const setClauses: string[] = [];
+        const params: any[] = [];
+        let paramCount = 1;
+
+        if (data.phan_loai !== undefined) {
+            setClauses.push(`phan_loai = $${paramCount}`);
+            params.push(data.phan_loai);
+            paramCount++;
+        }
+
+        if (data.phan_loai_normalized !== undefined) {
+            setClauses.push(`phan_loai_normalized = $${paramCount}`);
+            params.push(data.phan_loai_normalized);
+            paramCount++;
+        }
+
+        if (setClauses.length === 0) {
+            return { success: false, error: 'Không có dữ liệu để cập nhật' };
+        }
+
+        // Create placeholders for IDs: $3, $4, $5, ...
+        const idPlaceholders = ids.map((_, i) => `$${paramCount + i}`).join(', ');
+        params.push(...ids);
+
+        const query = `UPDATE "khach_hang" SET ${setClauses.join(', ')} WHERE id IN (${idPlaceholders})`;
+        
+        await sql.unsafe(query, params);
+        
+        return { success: true, updated: ids.length };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}

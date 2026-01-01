@@ -5,8 +5,9 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
 // 🟢 CẬP NHẬT IMPORT
-import MenuDuoi from './MenuDuoi/MenuDuoi'; 
+ 
 import CongDangNhap from '../CongDangNhap/CongDangNhap'; 
+import StaffPresence from '../components/StaffPresence';
 
 export default function KhungGiaoDienTong({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -44,14 +45,14 @@ export default function KhungGiaoDienTong({ children }: { children: React.ReactN
           <Loader2 className="animate-spin text-[#C69C6D]" size={40}/>
       </div>
   );
-
+ 
   return (
     <div className="flex flex-col min-h-screen bg-[#0a0a0a] text-gray-200 font-sans relative">
         <main className="flex-1 w-full max-w-[1920px] mx-auto p-3 pb-20 md:p-6 md:pb-20">
             {children}
         </main>
-
-        <MenuDuoi currentUser={currentUser} />
+ <StaffPresence />
+ 
     </div>
   );
 }

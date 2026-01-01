@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css'; 
-
+import NutHoTro from '@/app/components/NutHoTro';
+import TuVanKhachHang from '@/app/components/TuVanKhachHang'; // 🟢 MỚI: Import nút của nhân viên
 import ForceFullScreen from '@/app/components/ForceFullScreen';
 // 🟢 IMPORT REACT QUERY PROVIDER
 import QueryProvider from '@/app/QueryProvider';
@@ -64,7 +65,14 @@ export default function RootLayout({
             <QueryProvider>
               <ErrorBoundary>
                 <ForceFullScreen />
-                {children}
+                {children}  
+                
+                {/* 🟢 NÚT HỖ TRỢ CHO KHÁCH HÀNG (Góc Trái) */}
+                <NutHoTro />
+
+                {/* 🟢 NÚT TƯ VẤN CHO NHÂN VIÊN (Tự ẩn nếu là khách) */}
+                <TuVanKhachHang />
+
               </ErrorBoundary>
             </QueryProvider>
           </AppSettingsProvider>

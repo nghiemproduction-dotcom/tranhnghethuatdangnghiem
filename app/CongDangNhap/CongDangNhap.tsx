@@ -320,7 +320,7 @@ export default function CongDangNhap({ isOpen, onClose, isGateKeeper = false }: 
             console.log('✅ LOGIN SUCCESS, waiting for session persist...');
             
             // ✅ CRITICAL: Wait for Supabase session to fully persist
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            await new Promise(resolve => setTimeout(resolve, 1000));
             
             // Verify session is persisted
             const { data: { session: verifySession } } = await supabase.auth.getSession();
@@ -329,17 +329,21 @@ export default function CongDangNhap({ isOpen, onClose, isGateKeeper = false }: 
                 throw new Error('Session không được lưu. Vui lòng thử lại.');
             }
             
-            console.log('✅ SESSION VERIFIED - Now closing modal');
+            console.log('✅ SESSION VERIFIED - Now redirecting to room');
             
-            // ✅ Only close modal AFTER session is verified
+            // 🟢 TÍNH TOÁN ĐƯỜNG DẪN PHÒNG TRỰC TIẾP
+            const userType = finalUser.userType || 'khach_hang';
+            const targetUrl = await getRedirectUrl(userType, finalRole);
+            console.log(`🎯 Đích đến: ${targetUrl}`);
+            
+            // ✅ Close modal trước nếu có
             if (isModal && onClose) {
-                console.log('✅ Modal closing, parent will detect session and redirect');
                 onClose();
-            } else {
-                // If not in modal, navigate to home
-                console.log('🔄 Non-modal mode: Navigating to home');
-                router.push('/');
             }
+            
+            // 🚀 CHUYỂN TRỰC TIẾP VỀ PHÒNG (không về trang chủ)
+            console.log(`🚀 Chuyển hướng đến: ${targetUrl}`);
+            router.push(targetUrl);
 
         } catch (err: any) { 
             const errorMsg = err?.message || 'Lỗi không xác định';

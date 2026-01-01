@@ -1,75 +1,84 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Download, Share, PlusSquare, Smartphone, Monitor, Maximize } from 'lucide-react';
+import { Download, Share, PlusSquare, Smartphone, Monitor } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
 export default function ForceFullScreen() {
   const pathname = usePathname();
   const [showPrompt, setShowPrompt] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
-  const [isMobile, setIsMobile] = useState(false); // Biến kiểm tra loại thiết bị
+  const [isMobile, setIsMobile] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
-  // 1. LOGIC TÍNH CHIỀU CAO "BẤT TỬ" (Giữ nguyên để fix lỗi hở trắng)
+  // 1. LOGIC TÍNH CHIỀU CAO "BẤT TỬ" (Fix lỗi hở trắng trên Safari/Chrome Mobile)
   useEffect(() => {
     const setAppHeight = () => {
-        const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-        document.documentElement.style.setProperty('--app-height', `${vh}px`);
+      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      document.documentElement.style.setProperty('--app-height', `${vh}px`);
     };
 
     setAppHeight();
 
     if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', setAppHeight);
-        window.visualViewport.addEventListener('scroll', setAppHeight);
+      window.visualViewport.addEventListener('resize', setAppHeight);
+      window.visualViewport.addEventListener('scroll', setAppHeight);
     } else {
-        window.addEventListener('resize', setAppHeight);
+      window.addEventListener('resize', setAppHeight);
     }
 
     return () => {
-        if (window.visualViewport) {
-            window.visualViewport.removeEventListener('resize', setAppHeight);
-            window.visualViewport.removeEventListener('scroll', setAppHeight);
-        } else {
-            window.removeEventListener('resize', setAppHeight);
-        }
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', setAppHeight);
+        window.visualViewport.removeEventListener('scroll', setAppHeight);
+      } else {
+        window.removeEventListener('resize', setAppHeight);
+      }
     };
   }, []);
 
   // 2. LOGIC KIỂM TRA & ÉP CÀI ĐẶT
+  // 🟢 Quan trọng: Đã thêm pathname vào dependency array để check lại mỗi khi đổi trang
   useEffect(() => {
-    // Bắt sự kiện cài đặt
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        setDeferredPrompt(e);
-    });
+    // Bắt sự kiện cài đặt (Android/Desktop)
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
 
     const checkDeviceAndMode = () => {
-        const userAgent = window.navigator.userAgent.toLowerCase();
-        
-        // Nhận diện thiết bị Mobile/Tablet
-        const mobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
-        setIsMobile(mobile);
-        setIsIOS(/iphone|ipad|ipod/.test(userAgent));
+      const userAgent = window.navigator.userAgent.toLowerCase();
+      
+      // Nhận diện thiết bị Mobile/Tablet
+      const mobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+      setIsMobile(mobile);
+      setIsIOS(/iphone|ipad|ipod/.test(userAgent));
 
-        const isStandalone = 
-            window.matchMedia('(display-mode: standalone)').matches || 
-            (window.navigator as any).standalone || 
-            document.referrer.includes('android-app://');
+      // Kiểm tra xem đã cài app chưa (Standalone mode)
+      const isStandalone = 
+        window.matchMedia('(display-mode: standalone)').matches || 
+        (window.navigator as any).standalone || 
+        document.referrer.includes('android-app://');
 
-        // 🟢 LOGIC MỚI:
-        // - Nếu là Mobile mà chưa cài App -> HIỆN THÔNG BÁO (Ép cài)
-        // - Nếu là Desktop -> KHÔNG HIỆN (Cho dùng luôn để đỡ phiền)
-        if (mobile && !isStandalone) {
-            setShowPrompt(true);
-        } else {
-            setShowPrompt(false);
-        }
+      // 🟢 LOGIC MỚI: Chỉ ép cài đặt nếu đang ở trong các trang nội bộ (Admin, Quản lý, Nhân viên)
+      // Các trang công khai như Trang chủ (/), Đặt hàng (/dathang) sẽ KHÔNG hiện.
+      const isInternalPage = 
+        pathname.startsWith('/phong') || 
+        pathname.startsWith('/dashboard') || 
+        pathname.startsWith('/admin');
+
+      if (mobile && !isStandalone && isInternalPage) {
+        setShowPrompt(true); // Chỉ hiện khi nhân viên vào làm việc
+      } else {
+        setShowPrompt(false); // Khách xem trang chủ thì tha cho họ
+      }
     };
 
     checkDeviceAndMode();
-  }, []);
+
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, [pathname]); // 👈 Mấu chốt ở đây: Chạy lại khi pathname thay đổi
 
   const handleInstallClick = async () => {
       if (deferredPrompt) {
@@ -80,7 +89,7 @@ export default function ForceFullScreen() {
               setShowPrompt(false);
           }
       } else {
-          // Fallback cho Desktop nếu lỡ lọt vào đây hoặc thiết bị lạ
+          // Fallback cho Desktop/iOS
           alert('Vui lòng tìm nút "Cài đặt" hoặc "Thêm vào màn hình chính" trên menu trình duyệt của bạn.');
       }
   };
@@ -95,12 +104,12 @@ export default function ForceFullScreen() {
             {isMobile ? <Smartphone className="text-white w-10 h-10" /> : <Monitor className="text-white w-10 h-10" />}
         </div>
         
-        <h2 className="text-2xl font-bold text-[#F5E6D3] mb-4 uppercase tracking-widest">
-            Cài Đặt Ứng Dụng
+        <h2 className="text-2xl font-bold text-[#F5E6D3] mb-4 uppercase tracking-widest font-serif">
+            Hệ Thống Nội Bộ
         </h2>
         
         <p className="text-gray-400 text-sm md:text-base max-w-md mb-8 leading-relaxed">
-            Để có trải nghiệm mượt mà và toàn màn hình, vui lòng cài đặt ứng dụng vào thiết bị của bạn.
+            Để đảm bảo hiệu năng và trải nghiệm làm việc tốt nhất, vui lòng cài đặt ứng dụng vào thiết bị.
         </p>
         
         {isIOS ? (
@@ -124,12 +133,11 @@ export default function ForceFullScreen() {
                     <Download size={20} strokeWidth={2.5} /> CÀI ĐẶT NGAY
                 </button>
                 
-                {/* Nút bỏ qua tạm thời (chỉ hiện nếu script nhận diện sai) */}
                 <button 
                     onClick={() => setShowPrompt(false)}
                     className="text-[10px] text-gray-500 hover:text-gray-300 mt-4 underline decoration-dotted"
                 >
-                    Tiếp tục sử dụng trình duyệt
+                    Chỉ dùng tạm thời (Không khuyến khích)
                 </button>
             </div>
         )}
