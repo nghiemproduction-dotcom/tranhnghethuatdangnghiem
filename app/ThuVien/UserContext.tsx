@@ -123,16 +123,31 @@ export function UserProvider({ children }: { children: ReactNode }) {
     await loadUser();
   };
 
-  // 🟢 LOGIC ĐĂNG XUẤT "HỦY DIỆT" (FIX ZOMBIE SESSION)
+  // 🟢 LOGIC ĐĂNG XUẤT "HỦY DIỆT" + "ĐUA TỐC ĐỘ" (FIX ZOMBIE SESSION & TREO)
   const signOut = async () => {
     try {
-      setLoading(true); // Bật loading để UI không bị nhảy
+      setLoading(true);
 
-      // 1. Xóa State React ngay lập tức
+      // 1. CHIẾN THUẬT: ĐUA TỐC ĐỘ (RACE)
+      // Tạo một cái đồng hồ đếm ngược 3 giây
+      const timeoutPromise = new Promise((resolve) =>
+        setTimeout(resolve, 3000)
+      );
+
+      // Gọi lệnh đăng xuất của Supabase
+      const supabaseLogoutPromise = AuthService.signOut();
+
+      // Cho 2 thằng đua nhau: Nếu Supabase xong trước -> Tốt.
+      // Nếu 3 giây trôi qua mà Supabase chưa xong -> Kệ nó, chạy tiếp lệnh bên dưới.
+      await Promise.race([supabaseLogoutPromise, timeoutPromise]);
+
+      // --- ĐOẠN DƯỚI NÀY SẼ LUÔN CHẠY SAU TỐI ĐA 3 GIÂY ---
+
+      // 2. Reset State React ngay lập tức
       setUser(null);
       setError(null);
 
-      // 2. Xóa sạch Storage trước khi gọi server
+      // 3. Xóa sạch Storage thủ công
       if (typeof window !== "undefined") {
         localStorage.clear();
         sessionStorage.clear();
@@ -147,15 +162,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
         });
       }
 
-      // 3. Gọi hàm Auth Service (để supabase clear session server side)
-      await AuthService.signOut();
-
       // 4. Redirect cứng với cờ hiệu logout
-      // Param ?logout=success báo hiệu cho trang chủ biết "Tao vừa logout đấy, cấm auto-login"
       window.location.href = `/?logout=success&t=${Date.now()}`;
     } catch (err) {
-      console.error("Logout error:", err);
+      console.error("Logout error (Force quit):", err);
       // Vẫn force logout dù lỗi
+      if (typeof window !== "undefined") localStorage.clear();
       window.location.href = `/?logout=force&t=${Date.now()}`;
     } finally {
       setLoading(false);

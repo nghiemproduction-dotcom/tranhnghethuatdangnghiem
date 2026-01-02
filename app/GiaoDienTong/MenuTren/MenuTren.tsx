@@ -16,9 +16,7 @@ const useNotificationSound = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => {
     if (typeof window !== "undefined") {
-      // Dùng âm thanh nhẹ nhàng
       audioRef.current = new Audio("/sounds/hover.mp3");
-      // Nếu bạn chưa có file này, hãy tạo folder public/sounds và bỏ file mp3 vào
     }
   }, []);
   return () => {
@@ -31,7 +29,6 @@ const useNotificationSound = () => {
 
 export default function MenuTren({
   nguoiDung: fallbackUser,
-  loiChao,
 }: {
   nguoiDung: any;
   loiChao: string;
@@ -62,10 +59,12 @@ export default function MenuTren({
     !nguoiDung ||
     nguoiDung?.userType === "guest" ||
     nguoiDung?.role === "visitor";
+  const isNhanSu = nguoiDung?.userType === "nhan_su";
 
+  // State
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  const [cartCount, setCartCount] = useState(0);
   const [showProfile, setShowProfile] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -73,19 +72,54 @@ export default function MenuTren({
     setMounted(true);
   }, []);
 
-  // 🟢 FETCH DATA & REALTIME SUBSCRIPTION (ĐÃ TỐI ƯU)
+  // 🟢 LOGIC LẤY TÊN HIỂN THỊ (RÚT GỌN CHO MOBILE)
+  const getDisplayName = () => {
+    if (isVisitor) return { full: "Quý Khách", short: "KHÁCH" };
+
+    const fullName = nguoiDung?.ho_ten || "";
+    const lastName = fullName.trim().split(" ").pop()?.toUpperCase() || "BẠN";
+
+    return {
+      full: fullName,
+      short: lastName,
+    };
+  };
+
+  const displayName = getDisplayName();
+
+  // 🟢 LOGIC GIỎ HÀNG
   useEffect(() => {
-    if (!nguoiDung?.id || isVisitor) {
-      setIsLoading(false);
-      return;
-    }
+    if (isNhanSu) return;
+
+    const checkCart = () => {
+      try {
+        const cartData = localStorage.getItem("cart_items");
+        const items = cartData ? JSON.parse(cartData) : [];
+        setCartCount(items.length || 0);
+      } catch {
+        setCartCount(0);
+      }
+    };
+
+    checkCart();
+    window.addEventListener("storage", checkCart);
+    window.addEventListener("cart_updated", checkCart);
+
+    return () => {
+      window.removeEventListener("storage", checkCart);
+      window.removeEventListener("cart_updated", checkCart);
+    };
+  }, [isNhanSu]);
+
+  // 🟢 NOTIFICATION LOGIC
+  useEffect(() => {
+    if (!nguoiDung?.id || isVisitor) return;
 
     let isMounted = true;
     let subscription: any = null;
 
     const initNotifications = async () => {
       try {
-        setIsLoading(true);
         const [notifs, count] = await Promise.all([
           NotificationService.getUserNotifications(nguoiDung.id),
           NotificationService.getUnreadCount(nguoiDung.id),
@@ -94,53 +128,39 @@ export default function MenuTren({
         if (isMounted) {
           setNotifications(notifs);
           setUnreadCount(count);
-          setIsLoading(false);
         }
 
-        // Đăng ký Realtime sau khi fetch xong
         subscription = NotificationService.subscribeToNotifications(
           nguoiDung.id,
           (newNotification) => {
             if (isMounted) {
-              // Chơi âm thanh "Ting"
               playSound();
-
               setNotifications((prev) => {
-                // Chặn duplicate nếu mạng lag bắn 2 lần
                 if (prev.some((n) => n.id === newNotification.id)) return prev;
                 return [newNotification, ...prev];
               });
-
-              if (!newNotification.is_read) {
-                setUnreadCount((prev) => prev + 1);
-              }
+              if (!newNotification.is_read) setUnreadCount((prev) => prev + 1);
             }
           }
         );
       } catch (error) {
-        console.error("Lỗi khởi tạo thông báo:", error);
-        if (isMounted) setIsLoading(false);
+        console.error("Lỗi thông báo:", error);
       }
     };
 
     initNotifications();
 
-    // Cleanup function chuẩn xác
     return () => {
       isMounted = false;
-      if (subscription && typeof subscription.unsubscribe === "function") {
-        subscription.unsubscribe();
-      }
+      if (subscription?.unsubscribe) subscription.unsubscribe();
     };
-  }, [nguoiDung?.id, isVisitor]); // Dependency chỉ là ID, ko thay đổi lung tung
+  }, [nguoiDung?.id, isVisitor]);
 
   const handleMarkAsRead = async (id: string) => {
-    // Optimistic UI update (Cập nhật giao diện trước khi gọi API cho mượt)
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
     );
     setUnreadCount((prev) => Math.max(0, prev - 1));
-
     await NotificationService.markAsRead(id);
   };
 
@@ -168,27 +188,54 @@ export default function MenuTren({
   return (
     <>
       <div
-        className={`fixed top-0 left-0 right-0 h-[85px] px-4 md:px-6 flex justify-between items-center bg-transparent transition-all duration-300 pointer-events-none`}
+        className={`fixed top-0 left-0 right-0 h-[65px] md:h-[85px] px-3 md:px-6 flex justify-between items-center bg-transparent transition-all duration-300 pointer-events-none`}
         style={{ zIndex: Z_INDEX.menuTren }}
       >
-        {/* Góc trái */}
-        <div className="flex items-center gap-2 max-w-[60%] animate-slide-down pointer-events-auto">
-          <span className="text-xs md:text-sm font-medium italic text-gray-300 drop-shadow-md whitespace-nowrap hidden sm:inline-block">
-            {isVisitor ? "Chào mừng," : "Xin chào,"}
-          </span>
-          <span
-            className="font-black text-white uppercase tracking-wider drop-shadow-lg shadow-black truncate"
-            style={{ fontSize: "clamp(14px, 4vw, 20px)" }}
-          >
-            {isVisitor ? "Quý Khách" : nguoiDung?.ho_ten}
-          </span>
+        {/* 🟢 GÓC TRÁI: TÊN HIỂN THỊ (CO GIÃN TỐT) */}
+        <div className="flex-1 min-w-0 flex items-center gap-2 animate-slide-down pointer-events-auto mr-2">
+          {/* Desktop: Hiện đầy đủ */}
+          <div className="hidden md:flex flex-col">
+            <span className="text-xs font-medium italic text-gray-300 drop-shadow-md">
+              {isVisitor ? "Chào mừng," : "Xin chào,"}
+            </span>
+            <span
+              className="font-black text-white uppercase tracking-wider drop-shadow-lg shadow-black truncate max-w-[200px] lg:max-w-none"
+              style={{ fontSize: "20px" }}
+            >
+              {displayName.full}
+            </span>
+          </div>
+
+          {/* Mobile: Hiện rút gọn */}
+          <div className="md:hidden flex items-baseline gap-1 overflow-hidden">
+            <span className="text-[10px] text-gray-300 italic whitespace-nowrap">
+              Chào
+            </span>
+            <span className="font-bold text-[#C69C6D] uppercase truncate text-sm drop-shadow-md">
+              {displayName.short}
+            </span>
+          </div>
         </div>
 
-        {/* Góc phải */}
+        {/* 🟢 GÓC PHẢI: CÁC NÚT (KHÔNG BAO GIỜ BỊ ĐẨY MẤT) */}
         {!isVisitor && (
-          <div className="flex gap-2 md:gap-3 animate-slide-down delay-100 shrink-0 pointer-events-auto items-center">
+          <div className="shrink-0 flex gap-1.5 md:gap-3 animate-slide-down delay-100 pointer-events-auto items-center">
+            {/* 1. Nhạc nền: Hiện mọi nơi */}
             {nguoiDung?.id && <NhacNen />}
 
+            {/* 2. Giỏ hàng: Chỉ hiện nếu là Khách hàng & có đồ */}
+            {!isNhanSu && cartCount > 0 && (
+              <NutVuong
+                icon={ShoppingCart}
+                badge={cartCount}
+                onClick={() => {
+                  /* Logic mở giỏ hàng */
+                }}
+                className="animate-bounce-slow"
+              />
+            )}
+
+            {/* 3. Thông báo */}
             {nguoiDung?.id && (
               <NotificationCenter
                 notifications={notifications}
@@ -200,9 +247,12 @@ export default function MenuTren({
               />
             )}
 
-            <NutVuong icon={ShoppingCart} />
-            <NutVuong icon={QrCode} />
+            {/* 4. QR Code: CHỈ HIỆN TRÊN DESKTOP (Mobile ẩn đi để tiết kiệm chỗ cho Nhạc) */}
+            <div className="hidden md:block">
+              <NutVuong icon={QrCode} />
+            </div>
 
+            {/* 5. Nút Cá Nhân: Luôn hiện */}
             <NutVuong
               icon={UserCircle}
               onClick={() => setShowProfile(true)}
@@ -228,16 +278,25 @@ export default function MenuTren({
   );
 }
 
-function NutVuong({ icon: Icon, badge, onClick, isActive }: any) {
+// Component Nút Vuông (Đã chỉnh padding nhỏ hơn cho Mobile)
+function NutVuong({
+  icon: Icon,
+  badge,
+  onClick,
+  isActive,
+  className = "",
+}: any) {
   return (
     <button
       onClick={onClick}
-      className={`w-9 h-9 md:w-10 md:h-10 rounded-lg flex items-center justify-center relative active:scale-95 transition-all backdrop-blur-sm shadow-sm group cursor-pointer
+      className={`
+                w-9 h-9 md:w-10 md:h-10 rounded-lg flex items-center justify-center relative active:scale-95 transition-all backdrop-blur-sm shadow-sm group cursor-pointer
                 ${
                   isActive
                     ? "bg-[#C69C6D] border border-[#C69C6D] text-black shadow-[0_0_15px_rgba(198,156,109,0.4)]"
                     : "bg-black/40 border border-white/10 hover:bg-white/10 text-white"
                 }
+                ${className}
             `}
     >
       <Icon
@@ -246,9 +305,10 @@ function NutVuong({ icon: Icon, badge, onClick, isActive }: any) {
           isActive ? "text-black" : "text-white group-hover:text-[#C69C6D]"
         }`}
       />
-      {badge && (
-        <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-600 text-white text-[8px] font-bold flex items-center justify-center rounded-full border border-black shadow-sm">
-          {badge}
+
+      {badge && badge > 0 && (
+        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-600 text-white text-[9px] font-bold flex items-center justify-center rounded-full border border-black shadow-sm z-10 animate-in zoom-in">
+          {badge > 99 ? "99+" : badge}
         </span>
       )}
     </button>
