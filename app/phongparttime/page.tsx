@@ -1,54 +1,57 @@
 'use client';
-
 import React, { useState, useEffect } from 'react';
+import { useUser } from '@/app/ThuVien/UserContext';
+import { Briefcase } from 'lucide-react';
 import KhungTrangChuan from '@/app/components/KhungTrangChuan';
-import BanLamViec from '@/app/phongparttime/BanLamViec'; // 🟢 Import component mới
+import ThanhPhongChucNang from '@/app/components/ThanhPhongChucNang';
 
-// 🟢 GIỮ INTERFACE CHO PROPS
-interface Props {
-    isChildComponent?: boolean;
-}
+// Import Modules
+import BanLamViec from '@/app/phongparttime/BanLamViec';
 
-export default function PhongPartTime({ isChildComponent = false }: Props) {
-    const [user, setUser] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+const PARTTIME_FUNCTIONS = [
+    { id: 'workspace', label: 'BÀN LÀM VIỆC', icon: Briefcase },
+];
 
-    useEffect(() => {
-        if (isChildComponent) {
-            setLoading(false);
-            setUser({ ho_ten: 'Nhân viên' }); 
-            return;
-        }
+export default function PhongPartTimePage() {
+    const { user: contextUser, loading: contextLoading } = useUser();
+    const [authLoading, setAuthLoading] = useState(true);
+    const [activeFunction, setActiveFunction] = useState<string>('workspace'); 
 
-        const userInfo = localStorage.getItem('USER_INFO');
-        if (userInfo) {
-            try {
-                const parsedUser = JSON.parse(userInfo);
-                setUser(parsedUser);
-                setLoading(false);
-            } catch (e) { setLoading(false); }
-        } else { setLoading(false); }
-    }, [isChildComponent]);
+    useEffect(() => { if (!contextLoading) setAuthLoading(false); }, [contextLoading]);
 
-    if (loading && !isChildComponent) {
-        return <div className="min-h-screen bg-black flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C69C6D]"></div></div>;
+    if (authLoading) return <div className="min-h-screen bg-black flex items-center justify-center"><div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin"></div></div>;
+    
+    let displayUser = contextUser;
+    if (!displayUser && typeof window !== 'undefined') {
+        try {
+            const stored = localStorage.getItem('USER_INFO');
+            displayUser = stored ? JSON.parse(stored) : null;
+        } catch (e) { displayUser = null; }
     }
-
-    // 🟢 RENDER NỘI DUNG GỌN GÀNG HƠN
-    if (isChildComponent) {
-        return (
-            <div className="w-full h-full overflow-y-auto custom-scrollbar p-6">
-                <BanLamViec />
-            </div>
-        );
-    }
-
-    if (!user) return null;
 
     return (
-        <KhungTrangChuan nguoiDung={user} loiChao={`Xin chào, ${user.ho_ten}`}>
-            <div className="w-full h-full overflow-y-auto custom-scrollbar">
-                <BanLamViec />
+        <KhungTrangChuan 
+            nguoiDung={displayUser} 
+            loiChao="PART-TIME WORKSPACE" 
+            contentClassName="flex flex-col h-screen pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
+        >
+            {/* Thanh Phòng + Chức Năng */}
+            <ThanhPhongChucNang 
+                tenPhong="PHÒNG PART-TIME"
+                functions={PARTTIME_FUNCTIONS}
+                activeFunction={activeFunction}
+                onFunctionChange={setActiveFunction}
+            />
+
+            {/* Content Area */}
+            <div className="flex-1 w-full relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-[#050505]">
+                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none"></div>
+                <div className="absolute inset-0 z-10">
+                    <div className="w-full h-full flex flex-col relative">
+                        {/* 🟢 Khu vực render các chức năng */}
+                        {activeFunction === 'workspace' && <BanLamViec />}
+                    </div>
+                </div>
             </div>
         </KhungTrangChuan>
     );

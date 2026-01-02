@@ -1,9 +1,10 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { useUser } from '../ThuVien/UserContext';
+import { useUser } from '@/app/ThuVien/UserContext';
 import { ZoomIn, Calendar, User, Loader2, Award } from 'lucide-react';
-import KhungTrangChuan from '../components/KhungTrangChuan';
-import { getFinishedArtworksAction } from '../actions/QuyenHanQuanLy'; 
+import KhungTrangChuan from '@/app/components/KhungTrangChuan';
+// 🟢 IMPORT FROM THE CORRECT FILE
+import { getFinishedArtworksAction } from '@/app/actions/QuyenHanQuanLy'; 
 
 export default function PhongTrungBay() {
     const { user } = useUser();

@@ -1,332 +1,368 @@
 'use client';
-import ConfirmDialog from '@/app/components/ConfirmDialog';
-import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Loader2, User, Phone, MoreHorizontal, Trash2, Star, Users, CheckSquare, Square, XCircle, Tag } from 'lucide-react';
-import { getKhachHangDataAction, deleteKhachHangAction, bulkUpdateKhachHangAction } from '@/app/actions/QuyenHanQuanLy';
-import FormKhachHang from './FormKhachHang';
+
+import { useState, useEffect, useMemo } from 'react';
+import { getKhachHangDataAction, deleteKhachHangAction, updateKhachHangAction } from '@/app/actions/QuyenHanQuanLy';
 import KhachHangDetail from './KhachHangDetail';
+import FormKhachHang from './FormKhachHang';
+import ConfirmDialog from '../components/ConfirmDialog';
 
-const toNonAccentVietnamese = (str: string) => {
-    if (!str) return '';
-    str = str.toLowerCase();
-    str = str.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a");
-    str = str.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e");
-    str = str.replace(/ì|í|ị|ỉ|ĩ/g, "i");
-    str = str.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, "o");
-    str = str.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, "u");
-    str = str.replace(/ỳ|ý|ỵ|ỷ|ỹ/g, "y");
-    str = str.replace(/đ/g, "d");
-    str = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    return str;
-};
-
-// Danh sách phân loại khách hàng
 const PHAN_LOAI_OPTIONS = [
-    { value: 'vip', label: 'VIP', normalized: 'vip' },
-    { value: 'Mới', label: 'MỚI', normalized: 'moi' },
-    { value: 'Đã mua hàng', label: 'ĐÃ MUA', normalized: 'damuahang' },
-    { value: 'Đối tác', label: 'ĐỐI TÁC', normalized: 'doitac' },
-    { value: 'KH Trọng tâm', label: 'TRỌNG TÂM', normalized: 'khtrongtam' },
+    { value: 'tiem_nang', label: 'Tiềm năng', color: 'bg-blue-500/20 text-blue-400' },
+    { value: 'moi', label: 'Mới', color: 'bg-green-500/20 text-green-400' },
+    { value: 'than_thiet', label: 'Thân thiết', color: 'bg-purple-500/20 text-purple-400' },
+    { value: 'vip', label: 'VIP', color: 'bg-yellow-500/20 text-yellow-400' },
+    { value: 'khong_hoat_dong', label: 'Không hoạt động', color: 'bg-gray-500/20 text-gray-400' },
 ];
 
-interface KhachHang {
-    id: string; ho_ten: string; phan_loai: string; phan_loai_normalized: string;
-    so_dien_thoai: string; email: string; hinh_anh?: string; dia_chi?: string;
+interface Props {
+    allowDelete?: boolean;
 }
 
-export default function KhachHangManager({ allowDelete = false }: { allowDelete?: boolean }) {
-    const [customers, setCustomers] = useState<KhachHang[]>([]);
+export default function KhachHangManager({ allowDelete = false }: Props) {
+    const [khachHangs, setKhachHangs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
+
     const [activeTab, setActiveTab] = useState('all');
-
-    // 🟢 STATE CHO HỘP THOẠI XÁC NHẬN
-    const [confirmConfig, setConfirmConfig] = useState<{
-        isOpen: boolean;
-        id: string | null;
-        title: string;
-        message: string;
-        action: (id: string) => Promise<void>;
-    }>({
-        isOpen: false,
-        id: null,
-        title: '',
-        message: '',
-        action: async () => {},
-    });
-
-    const [isFormOpen, setIsFormOpen] = useState(false);
-    const [isDetailOpen, setIsDetailOpen] = useState(false);
-    const [selectedCustomer, setSelectedCustomer] = useState<KhachHang | null>(null);
-
-    // 🟢 BULK ACTIONS STATE (chỉ dành cho admin - allowDelete=true)
-    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-    const [isBulkMode, setIsBulkMode] = useState(false);
-    const [bulkLoading, setBulkLoading] = useState(false);
-    const [showBulkMenu, setShowBulkMenu] = useState(false);
+    const [search, setSearch] = useState('');
+    const [showSearch, setShowSearch] = useState(false);
+    const [sortBy, setSortBy] = useState<'name' | 'date' | 'orders'>('name');
+    const [showSortMenu, setShowSortMenu] = useState(false);
+    const [bulkMode, setBulkMode] = useState(false);
+    const [selected, setSelected] = useState<string[]>([]);
+    
+    const [showDetail, setShowDetail] = useState(false);
+    const [showForm, setShowForm] = useState(false);
+    const [selectedKhachHang, setSelectedKhachHang] = useState<any>(null);
+    const [showCategoryMenu, setShowCategoryMenu] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState<{ show: boolean; ids: string[] }>({ show: false, ids: [] });
 
     useEffect(() => { fetchData(); }, []);
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            const res = await getKhachHangDataAction(1, 1000, '', ''); 
-            if (res.success && res.data) {
-                setCustomers(res.data as any);
-            } else if (res.error) {
-                console.error('[KhachHang] Lỗi từ server:', res.error);
-            }
-        } catch (e) { console.error('[KhachHang] Lỗi:', e); } finally { setLoading(false); }
+            const res = await getKhachHangDataAction(1, 1000, '', '');
+            if (res.success && res.data) setKhachHangs(res.data);
+        } catch (error) { console.error(error); } finally { setLoading(false); }
     };
 
+    // Tabs theo phân loại
     const tabs = useMemo(() => {
-        const counts: Record<string, number> = { all: customers.length };
-        customers.forEach(c => { const r = c.phan_loai_normalized || 'other'; counts[r] = (counts[r] || 0) + 1; });
+        const counts: Record<string, number> = { all: khachHangs.length };
+        PHAN_LOAI_OPTIONS.forEach(opt => {
+            counts[opt.value] = khachHangs.filter((k: any) => k.phan_loai === opt.value).length;
+        });
         return [
-            { id: 'all', label: 'TẤT CẢ' },
-            { id: 'vip', label: 'VIP' },
-            { id: 'moi', label: 'MỚI' },
-            { id: 'damuahang', label: 'ĐÃ MUA' },
-            { id: 'doitac', label: 'ĐỐI TÁC' },
-            { id: 'khtrongtam', label: 'TRỌNG TÂM' },
-        ].map(t => ({ ...t, count: counts[t.id] || 0 }));
-    }, [customers]);
+            { id: 'all', label: 'Tất cả', count: counts.all },
+            ...PHAN_LOAI_OPTIONS.map(opt => ({
+                id: opt.value,
+                label: opt.label,
+                count: counts[opt.value] || 0
+            }))
+        ];
+    }, [khachHangs]);
 
-    const filteredList = useMemo(() => {
-        const normSearch = toNonAccentVietnamese(searchTerm);
-        return customers.filter(c => {
-            const matchSearch = toNonAccentVietnamese(c.ho_ten).includes(normSearch) || (c.so_dien_thoai || '').includes(normSearch);
-            const matchTab = activeTab === 'all' || c.phan_loai_normalized === activeTab;
-            return matchSearch && matchTab;
-        });
-    }, [customers, searchTerm, activeTab]);
-
-    const handleAddNew = () => { setSelectedCustomer(null); setIsFormOpen(true); };
-    
-    const handleCardClick = (c: KhachHang) => { 
-        if (isBulkMode) {
-            toggleSelect(c.id);
-        } else {
-            setSelectedCustomer(c); 
-            setIsDetailOpen(true); 
+    // Lọc danh sách
+    const filtered = useMemo(() => {
+        let result = khachHangs;
+        if (activeTab !== 'all') {
+            result = result.filter((k: any) => k.phan_loai === activeTab);
         }
-    };
-
-    const openDeleteDialog = (e: any, id: string, name: string) => {
-        if(e && e.stopPropagation) e.stopPropagation();
-        setConfirmConfig({
-            isOpen: true,
-            id: id,
-            title: 'Xóa Hồ Sơ?',
-            message: `Bạn có chắc muốn xóa khách hàng "${name}" khỏi hệ thống? Dữ liệu không thể phục hồi.`,
-            action: executeDelete 
-        });
-    };
-
-    const executeDelete = async (id: string) => {
-        const res = await deleteKhachHangAction(id);
-        if (res.success) {
-            fetchData(); 
-            setConfirmConfig(prev => ({ ...prev, isOpen: false }));
-            setIsDetailOpen(false);
-        } else {
-            alert(res.error);
-            setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        if (search) {
+            const s = search.toLowerCase();
+            result = result.filter((k: any) =>
+                k.ho_ten?.toLowerCase().includes(s) ||
+                k.so_dien_thoai?.includes(s) ||
+                k.email?.toLowerCase().includes(s)
+            );
         }
-    };
+        // Sort
+        return [...result].sort((a: any, b: any) => {
+            if (sortBy === 'name') return (a.ho_ten || '').localeCompare(b.ho_ten || '');
+            if (sortBy === 'date') return new Date(b.tao_luc || 0).getTime() - new Date(a.tao_luc || 0).getTime();
+            if (sortBy === 'orders') return (b.tong_don_hang || 0) - (a.tong_don_hang || 0);
+            return 0;
+        });
+    }, [khachHangs, activeTab, search, sortBy]);
 
-    // 🟢 BULK ACTIONS FUNCTIONS
+    // Bulk actions
     const toggleSelect = (id: string) => {
-        setSelectedIds(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(id)) newSet.delete(id);
-            else newSet.add(id);
-            return newSet;
-        });
+        setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    };
+    const selectAll = () => setSelected(filtered.map((k: any) => k.id));
+    const clearSelection = () => setSelected([]);
+
+    const handleBulkDelete = () => {
+        if (selected.length === 0) return;
+        setConfirmDelete({ show: true, ids: selected });
     };
 
-    const selectAll = () => {
-        const allIds = filteredList.map(c => c.id);
-        setSelectedIds(new Set(allIds));
-    };
-
-    const clearSelection = () => {
-        setSelectedIds(new Set());
-        setIsBulkMode(false);
-        setShowBulkMenu(false);
-    };
-
-    const handleBulkDelete = async () => {
-        if (selectedIds.size === 0) return;
-        if (!confirm(`Xóa ${selectedIds.size} khách hàng đã chọn?`)) return;
-        
-        setBulkLoading(true);
-        let successCount = 0;
-        for (const id of selectedIds) {
-            const res = await deleteKhachHangAction(id);
-            if (res.success) successCount++;
+    const handleBulkUpdateCategory = async (phanLoai: string) => {
+        for (const id of selected) {
+            await updateKhachHangAction(id, { phan_loai: phanLoai });
         }
-        setBulkLoading(false);
-        alert(`Đã xóa ${successCount}/${selectedIds.size} khách hàng`);
-        clearSelection();
         fetchData();
+        setSelected([]);
+        setShowCategoryMenu(false);
     };
 
-    const handleBulkUpdateCategory = async (phanLoai: string, phanLoaiNormalized: string) => {
-        if (selectedIds.size === 0) return;
-        
-        setBulkLoading(true);
-        const res = await bulkUpdateKhachHangAction(Array.from(selectedIds), { phan_loai: phanLoai, phan_loai_normalized: phanLoaiNormalized });
-        setBulkLoading(false);
-        
-        if (res.success) {
-            alert(`Đã cập nhật ${selectedIds.size} khách hàng thành "${phanLoai}"`);
-            clearSelection();
-            fetchData();
-        } else {
-            alert('Lỗi: ' + res.error);
+    const confirmDeleteAction = async () => {
+        for (const id of confirmDelete.ids) {
+            await deleteKhachHangAction(id);
         }
-        setShowBulkMenu(false);
+        fetchData();
+        setConfirmDelete({ show: false, ids: [] });
+        setSelected([]);
     };
+
+    // Mở detail
+    const openDetail = (kh: any) => {
+        setSelectedKhachHang(kh);
+        setShowDetail(true);
+    };
+
+    // Mở form
+    const openForm = (kh: any = null) => {
+        setSelectedKhachHang(kh);
+        setShowForm(true);
+    };
+
+    // Đóng detail
+    const closeDetail = () => {
+        setShowDetail(false);
+        setSelectedKhachHang(null);
+    };
+
+    // Đóng form
+    const closeForm = () => {
+        setShowForm(false);
+        setSelectedKhachHang(null);
+    };
+
+    const getPhanLoaiStyle = (phanLoai: string) => {
+        return PHAN_LOAI_OPTIONS.find(o => o.value === phanLoai)?.color || 'bg-gray-500/20 text-gray-400';
+    };
+
+    if (loading) {
+        return <div className="flex-1 flex items-center justify-center text-white/50">Đang tải...</div>;
+    }
 
     return (
-        <div className="w-full h-full flex flex-col bg-[#050505] overflow-hidden">
-            {/* Toolbar */}
-            <div className="shrink-0 p-4 flex gap-3 justify-between bg-[#0a0a0a] border-b border-white/5">
-                <div className="relative group w-full md:w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={16} />
-                    <input type="text" placeholder="Tìm tên, sđt..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-3 py-2 text-xs text-white outline-none focus:border-[#C69C6D] font-bold uppercase"/>
-                </div>
-                <div className="flex gap-2">
-                    {allowDelete && (
-                        <button 
-                            onClick={() => { setIsBulkMode(!isBulkMode); if (isBulkMode) clearSelection(); }}
-                            className={`flex items-center gap-2 px-3 py-2 text-xs font-bold rounded-lg transition-all ${isBulkMode ? 'bg-[#C69C6D] text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            {/* Tab bar - cố định */}
+            <div className="shrink-0 h-[40px] flex items-center border-b border-white/5 bg-[#0a0a0a]">
+                {/* Tabs - cuộn được */}
+                <div className="flex-1 flex items-center gap-1 px-2 overflow-x-auto min-w-0 scrollbar-hide">
+                    {tabs.map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`shrink-0 px-3 h-[28px] rounded text-[12px] font-medium transition-all ${
+                                activeTab === tab.id
+                                    ? 'bg-[#C69C6D] text-black'
+                                    : 'bg-white/5 text-white/60 hover:bg-white/10'
+                            }`}
                         >
-                            <CheckSquare size={16} /> <span className="hidden sm:inline">CHỌN</span>
+                            {tab.label} ({tab.count})
+                        </button>
+                    ))}
+                </div>
+
+                {/* Actions - cố định phải */}
+                <div className="shrink-0 flex items-center gap-1 px-2 border-l border-white/5 bg-[#0a0a0a]">
+                    {/* Search */}
+                    {showSearch ? (
+                        <div className="flex items-center gap-1 bg-white/5 rounded px-2 h-[28px]">
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Tìm..."
+                                className="w-[120px] bg-transparent text-[12px] text-white outline-none"
+                                autoFocus
+                            />
+                            <button onClick={() => { setShowSearch(false); setSearch(''); }} className="text-white/40 hover:text-white">
+                                <svg className="w-[14px] h-[14px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                    ) : (
+                        <button onClick={() => setShowSearch(true)} className="w-[28px] h-[28px] flex items-center justify-center rounded bg-white/5 text-white/60 hover:bg-white/10">
+                            <svg className="w-[14px] h-[14px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
                         </button>
                     )}
-                    <button onClick={handleAddNew} className="flex items-center gap-2 px-4 py-2 bg-[#C69C6D] text-black text-xs font-black rounded-lg shadow-lg active:scale-95 uppercase">
-                        <Plus size={16} strokeWidth={3} /> <span className="hidden sm:inline">Thêm Mới</span>
-                    </button>
-                </div>
-            </div>
 
-            {/* Bulk Action Bar */}
-            {isBulkMode && selectedIds.size > 0 && (
-                <div className="shrink-0 px-4 py-3 bg-[#C69C6D]/10 border-b border-[#C69C6D]/30 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <span className="text-[#C69C6D] font-bold text-sm">Đã chọn: {selectedIds.size}</span>
-                        <button onClick={selectAll} className="text-xs text-white/60 hover:text-white underline">Chọn tất cả ({filteredList.length})</button>
-                        <button onClick={clearSelection} className="text-xs text-white/60 hover:text-red-400 flex items-center gap-1"><XCircle size={12}/> Hủy</button>
-                    </div>
-                    <div className="flex items-center gap-2 relative">
-                        <div className="relative">
-                            <button 
-                                onClick={() => setShowBulkMenu(!showBulkMenu)}
-                                disabled={bulkLoading}
-                                className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg disabled:opacity-50"
-                            >
-                                <Tag size={14}/> ĐỔI PHÂN LOẠI
-                            </button>
-                            {showBulkMenu && (
-                                <div className="absolute top-full mt-1 right-0 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl z-50 min-w-[160px] overflow-hidden">
-                                    {PHAN_LOAI_OPTIONS.map(opt => (
-                                        <button 
-                                            key={opt.value}
-                                            onClick={() => handleBulkUpdateCategory(opt.value, opt.normalized)}
-                                            className="w-full text-left px-4 py-2 text-xs text-white hover:bg-white/10 font-bold uppercase border-b border-white/5 last:border-0"
-                                        >
-                                            {opt.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                        <button 
-                            onClick={handleBulkDelete}
-                            disabled={bulkLoading}
-                            className="flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg disabled:opacity-50"
-                        >
-                            {bulkLoading ? <Loader2 size={14} className="animate-spin"/> : <Trash2 size={14}/>} XÓA
+                    {/* Sort */}
+                    <div className="relative">
+                        <button onClick={() => setShowSortMenu(!showSortMenu)} className="w-[28px] h-[28px] flex items-center justify-center rounded bg-white/5 text-white/60 hover:bg-white/10">
+                            <svg className="w-[14px] h-[14px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                            </svg>
                         </button>
+                        {showSortMenu && (
+                            <div className="absolute right-0 top-full mt-1 bg-[#1a1a1a] border border-white/10 rounded shadow-2xl py-1 z-[100]">
+                                {[
+                                    { id: 'name', label: 'Theo tên' },
+                                    { id: 'date', label: 'Mới nhất' },
+                                    { id: 'orders', label: 'Đơn hàng' },
+                                ].map(opt => (
+                                    <button
+                                        key={opt.id}
+                                        onClick={() => { setSortBy(opt.id as typeof sortBy); setShowSortMenu(false); }}
+                                        className={`w-full px-3 py-1 text-left text-[12px] hover:bg-white/5 whitespace-nowrap ${sortBy === opt.id ? 'text-[#C69C6D]' : 'text-white/70'}`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
+
+                    {/* Bulk mode */}
+                    <button
+                        onClick={() => { setBulkMode(!bulkMode); setSelected([]); }}
+                        className={`w-[28px] h-[28px] flex items-center justify-center rounded ${bulkMode ? 'bg-[#C69C6D] text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
+                    >
+                        <svg className="w-[14px] h-[14px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                    </button>
+
+                    {/* Add */}
+                    <button onClick={() => openForm(null)} className="w-[28px] h-[28px] flex items-center justify-center rounded bg-[#C69C6D] text-black hover:bg-[#b8956a]">
+                        <svg className="w-[14px] h-[14px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            {/* Bulk actions bar */}
+            {bulkMode && selected.length > 0 && (
+                <div className="shrink-0 h-[36px] flex items-center gap-2 px-3 bg-[#C69C6D]/10 border-b border-[#C69C6D]/20">
+                    <span className="text-[12px] text-[#C69C6D]">Đã chọn {selected.length}</span>
+                    <button onClick={selectAll} className="text-[11px] text-white/60 hover:text-white">Chọn tất cả</button>
+                    <button onClick={clearSelection} className="text-[11px] text-white/60 hover:text-white">Bỏ chọn</button>
+                    <div className="flex-1" />
+                    {/* Category update */}
+                    <div className="relative">
+                        <button onClick={() => setShowCategoryMenu(!showCategoryMenu)} className="px-2 py-1 text-[11px] bg-white/10 rounded text-white/70 hover:bg-white/20">
+                            Đổi phân loại
+                        </button>
+                        {showCategoryMenu && (
+                            <div className="absolute right-0 top-full mt-1 bg-[#1a1a1a] border border-white/10 rounded shadow-2xl py-1 z-[100]">
+                                {PHAN_LOAI_OPTIONS.map(opt => (
+                                    <button
+                                        key={opt.value}
+                                        onClick={() => handleBulkUpdateCategory(opt.value)}
+                                        className="w-full px-3 py-1 text-left text-[12px] text-white/70 hover:bg-white/5"
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    {allowDelete && (
+                        <button onClick={handleBulkDelete} className="px-2 py-1 text-[11px] bg-red-500/20 rounded text-red-400 hover:bg-red-500/30">
+                            Xóa
+                        </button>
+                    )}
                 </div>
             )}
 
-            {/* Tabs */}
-            <div className="shrink-0 px-4 pt-2 flex gap-4 overflow-x-auto scrollbar-hide border-b border-white/5">
-                <style jsx>{` .scrollbar-hide::-webkit-scrollbar { display: none; } `}</style>
-                {tabs.map(t => (
-                    <button key={t.id} onClick={() => setActiveTab(t.id)} className={`pb-3 text-[11px] font-bold uppercase tracking-wider border-b-2 transition-all flex items-center gap-2 ${activeTab === t.id ? 'text-[#C69C6D] border-[#C69C6D]' : 'text-gray-500 border-transparent hover:text-white'}`}>
-                        {t.label} <span className={`px-1.5 py-0.5 rounded text-[9px] ${activeTab === t.id ? 'bg-[#C69C6D] text-black' : 'bg-white/10 text-gray-400'}`}>{t.count}</span>
-                    </button>
-                ))}
+            {/* Content - full height còn lại */}
+            <div className="flex-1 min-h-0 overflow-hidden">
+                {showDetail && selectedKhachHang ? (
+                    /* Detail - full width khi mở */
+                    <div className="h-full overflow-y-auto">
+                        <KhachHangDetail
+                            data={selectedKhachHang}
+                            isOpen={true}
+                            onClose={closeDetail}
+                            onEdit={() => { closeDetail(); openForm(selectedKhachHang); }}
+                            allowDelete={allowDelete}
+                            onDelete={(id: string) => {
+                                setConfirmDelete({ show: true, ids: [id] });
+                            }}
+                        />
+                    </div>
+                ) : (
+                    /* Cards grid - ẩn khi mở detail */
+                    <div className="h-full overflow-y-auto p-3">
+                        {filtered.length === 0 ? (
+                            <div className="text-center text-white/40 py-8">Không có khách hàng nào</div>
+                        ) : (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+                                {filtered.map((kh: any) => (
+                                    <div
+                                        key={kh.id}
+                                        onClick={() => bulkMode ? toggleSelect(kh.id) : openDetail(kh)}
+                                        className={`relative bg-white/5 rounded-lg p-3 cursor-pointer hover:bg-white/10 transition-all ${
+                                            bulkMode && selected.includes(kh.id) ? 'ring-2 ring-[#C69C6D]' : ''
+                                        }`}
+                                    >
+                                        {/* Checkbox khi bulk mode */}
+                                        {bulkMode && (
+                                            <div className={`absolute top-2 right-2 w-4 h-4 rounded border ${
+                                                selected.includes(kh.id) ? 'bg-[#C69C6D] border-[#C69C6D]' : 'border-white/30'
+                                            } flex items-center justify-center`}>
+                                                {selected.includes(kh.id) && (
+                                                    <svg className="w-3 h-3 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* VIP badge */}
+                                        {kh.phan_loai === 'vip' && (
+                                            <div className="absolute top-2 left-2">
+                                                <span className="text-yellow-400 text-[10px]">⭐ VIP</span>
+                                            </div>
+                                        )}
+
+                                        {/* Avatar */}
+                                        <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-gradient-to-br from-[#C69C6D] to-[#8B6914] flex items-center justify-center text-white font-bold text-lg">
+                                            {kh.ho_ten?.charAt(0) || '?'}
+                                        </div>
+
+                                        {/* Info */}
+                                        <div className="text-center">
+                                            <div className="text-[13px] font-medium text-white truncate">{kh.ho_ten || 'Chưa có tên'}</div>
+                                            <div className="text-[11px] text-white/50 truncate">{kh.so_dien_thoai || 'Chưa có SĐT'}</div>
+                                            <div className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] ${getPhanLoaiStyle(kh.phan_loai || '')}`}>
+                                                {PHAN_LOAI_OPTIONS.find(o => o.value === kh.phan_loai)?.label || 'Chưa phân loại'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
-            {/* Grid */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
-                <style jsx>{` .scrollbar-hide::-webkit-scrollbar { display: none; } .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; } `}</style>
-                {loading ? <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-[#C69C6D]"/></div> : 
-                filteredList.length === 0 ? <div className="h-full flex items-center justify-center text-white/20 font-bold text-xs uppercase">Không tìm thấy dữ liệu</div> : 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
-                    {filteredList.map((c, idx) => {
-                        const isSelected = selectedIds.has(c.id);
-                        return (
-                        <div key={c.id} onClick={() => handleCardClick(c)} className={`group relative bg-[#0f0f0f] border rounded-xl p-4 transition-all cursor-pointer flex items-center gap-4 ${isSelected ? 'border-[#C69C6D] bg-[#C69C6D]/10' : 'border-white/5 hover:border-[#C69C6D]/50 hover:-translate-y-1'}`}>
-                            {isBulkMode && (
-                                <div className="shrink-0" onClick={(e) => { e.stopPropagation(); toggleSelect(c.id); }}>
-                                    {isSelected ? <CheckSquare size={20} className="text-[#C69C6D]"/> : <Square size={20} className="text-white/30"/>}
-                                </div>
-                            )}
-                            <div className="relative shrink-0 w-14 h-14 rounded-full border border-white/10 p-0.5 bg-black overflow-hidden group-hover:border-[#C69C6D]">
-                                {c.hinh_anh ? <img src={c.hinh_anh} className="w-full h-full object-cover rounded-full"/> : <div className="w-full h-full flex items-center justify-center text-white/20"><User size={20}/></div>}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <h3 className="text-white font-bold text-sm truncate uppercase group-hover:text-[#C69C6D] flex items-center gap-1">
-                                    {c.ho_ten} {c.phan_loai_normalized === 'vip' && <Star size={10} className="text-yellow-500 fill-yellow-500"/>}
-                                </h3>
-                                <span className={`text-[9px] px-1.5 py-0.5 rounded border uppercase font-bold mb-1 inline-block ${c.phan_loai_normalized === 'vip' ? 'text-yellow-500 border-yellow-900/50 bg-yellow-900/20' : 'text-[#C69C6D] border-[#C69C6D]/30'}`}>{c.phan_loai}</span>
-                                <div className="flex items-center gap-2 text-[10px] text-white/40 font-mono"><Phone size={10}/><span>{c.so_dien_thoai}</span></div>
-                            </div>
-                            {!isBulkMode && <div className="text-white/10 group-hover:text-[#C69C6D]"><MoreHorizontal size={16}/></div>}
-                        </div>
-                    )})}
-                </div>}
-            </div>
-
-            {/* 👇 CÁC MODAL - HIỂN THỊ CÓ ĐIỀU KIỆN ĐỂ TRÁNH LỖI HOOK */}
-            {isFormOpen && (
-                <FormKhachHang 
-                    isOpen={isFormOpen} 
-                    onClose={() => setIsFormOpen(false)} 
-                    initialData={selectedCustomer} 
-                    onSuccess={() => { fetchData(); setIsFormOpen(false); }} 
-                />
-            )}
-            
-            {isDetailOpen && selectedCustomer && (
-                <KhachHangDetail 
-                    isOpen={isDetailOpen} 
-                    data={selectedCustomer} 
-                    onClose={() => setIsDetailOpen(false)} 
-                    onEdit={() => { setIsDetailOpen(false); setIsFormOpen(true); }} 
-                    allowDelete={allowDelete}
-                    onDelete={(id) => {
-                        openDeleteDialog(null, id, selectedCustomer.ho_ten);
-                    }}
+            {/* Form modal */}
+            {showForm && (
+                <FormKhachHang
+                    isOpen={showForm}
+                    onClose={closeForm}
+                    initialData={selectedKhachHang}
+                    onSuccess={() => { fetchData(); closeForm(); }}
                 />
             )}
 
-            {/* Confirm Dialog */}
-            <ConfirmDialog 
-                isOpen={confirmConfig.isOpen}
-                title={confirmConfig.title}
-                message={confirmConfig.message}
-                onConfirm={() => {
-                    if (confirmConfig.id) confirmConfig.action(confirmConfig.id);
-                }}
-                onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+            {/* Confirm delete dialog */}
+            <ConfirmDialog
+                isOpen={confirmDelete.show}
+                title="Xác nhận xóa"
+                message={`Bạn có chắc muốn xóa ${confirmDelete.ids.length} khách hàng?`}
+                onConfirm={confirmDeleteAction}
+                onCancel={() => setConfirmDelete({ show: false, ids: [] })}
             />
         </div>
     );

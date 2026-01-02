@@ -79,6 +79,15 @@ body {
   .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 }
 
+/* 🟢 ẨN SCROLLBAR TOÀN BỘ APP - Vẫn cuộn được bằng vuốt/chuột */
+*::-webkit-scrollbar {
+  display: none;
+}
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Animation Hologram */
 @keyframes hologram {
   0% { opacity: 0; transform: scale(0.95) translateY(10px); filter: blur(5px); }

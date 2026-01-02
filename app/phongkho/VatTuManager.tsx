@@ -1,6 +1,6 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Loader2, Package, MoreHorizontal, LayoutGrid, Box } from 'lucide-react';
+
+import { useState, useEffect, useMemo } from 'react';
 import { getVatTuDataAction, deleteVatTuAction } from '@/app/actions/QuyenHanKho';
 import FormVatTu from './FormVatTu';
 import VatTuDetail from './VatTuDetail';
@@ -35,11 +35,14 @@ interface VatTu {
 export default function VatTuManager() {
     const [items, setItems] = useState<VatTu[]>([]);
     const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [search, setSearch] = useState('');
+    const [showSearch, setShowSearch] = useState(false);
     const [activeTab, setActiveTab] = useState('all');
+    const [sortBy, setSortBy] = useState<'name' | 'stock' | 'price'>('name');
+    const [showSortMenu, setShowSortMenu] = useState(false);
 
-    const [isFormOpen, setIsFormOpen] = useState(false);
-    const [isDetailOpen, setIsDetailOpen] = useState(false);
+    const [showDetail, setShowDetail] = useState(false);
+    const [showForm, setShowForm] = useState(false);
     const [selectedItem, setSelectedItem] = useState<VatTu | null>(null);
 
     useEffect(() => { fetchData(); }, []);
@@ -47,7 +50,7 @@ export default function VatTuManager() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const res = await getVatTuDataAction(1, 1000, '', ''); 
+            const res = await getVatTuDataAction(1, 1000, '', '');
             if (res.success && res.data) {
                 setItems(res.data as unknown as VatTu[]);
             }
@@ -61,90 +64,200 @@ export default function VatTuManager() {
             counts[type] = (counts[type] || 0) + 1;
         });
         return [
-            { id: 'all', label: 'TẤT CẢ' },
-            { id: 'nguyen_lieu', label: 'NGUYÊN LIỆU' },
-            { id: 'thanh_pham', label: 'THÀNH PHẨM' },
-            { id: 'dich_vu', label: 'DỊCH VỤ' },
-        ].map(t => ({ ...t, count: counts[t.id] || 0 }));
+            { id: 'all', label: 'Tất cả', count: counts.all || 0 },
+            { id: 'nguyen_lieu', label: 'Nguyên liệu', count: counts.nguyen_lieu || 0 },
+            { id: 'thanh_pham', label: 'Thành phẩm', count: counts.thanh_pham || 0 },
+            { id: 'dich_vu', label: 'Dịch vụ', count: counts.dich_vu || 0 },
+        ];
     }, [items]);
 
-    const filteredList = useMemo(() => {
-        const normalizedSearch = toNonAccentVietnamese(searchTerm);
-        return items.filter(item => {
+    const filtered = useMemo(() => {
+        const normalizedSearch = toNonAccentVietnamese(search);
+        let result = items.filter(item => {
             const name = toNonAccentVietnamese(item.ten_vat_tu);
             const sku = (item.ma_sku || '').toLowerCase();
             const matchSearch = name.includes(normalizedSearch) || sku.includes(normalizedSearch);
             const matchTab = activeTab === 'all' || item.loai_vat_tu === activeTab;
             return matchSearch && matchTab;
         });
-    }, [items, searchTerm, activeTab]);
+        // Sort
+        return [...result].sort((a, b) => {
+            if (sortBy === 'name') return (a.ten_vat_tu || '').localeCompare(b.ten_vat_tu || '');
+            if (sortBy === 'stock') return b.ton_kho - a.ton_kho;
+            if (sortBy === 'price') return (b.gia_ban || 0) - (a.gia_ban || 0);
+            return 0;
+        });
+    }, [items, search, activeTab, sortBy]);
 
-    const handleAddNew = () => { setSelectedItem(null); setIsFormOpen(true); };
-    const handleCardClick = (item: VatTu) => { setSelectedItem(item); setIsDetailOpen(true); };
-    const handleSaveSuccess = () => { fetchData(); setIsFormOpen(false); };
+    const openDetail = (item: VatTu) => { setSelectedItem(item); setShowDetail(true); };
+    const closeDetail = () => { setShowDetail(false); setSelectedItem(null); };
+    const openForm = (item: VatTu | null = null) => { setSelectedItem(item); setShowForm(true); };
+    const closeForm = () => { setShowForm(false); setSelectedItem(null); };
+
+    if (loading) {
+        return <div className="flex-1 flex items-center justify-center text-white/50">Đang tải...</div>;
+    }
 
     return (
-        <div className="w-full h-full flex flex-col bg-[#050505] overflow-hidden relative">
-            {/* TOOLBAR */}
-            <div className="shrink-0 p-4 flex gap-3 items-center justify-between bg-[#0a0a0a] border-b border-white/5">
-                <div className="relative group w-full md:w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-[#C69C6D] transition-colors" size={16} />
-                    <input type="text" placeholder="Tìm tên, mã SKU..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-[#C69C6D] font-bold uppercase transition-all" />
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            {/* Tab bar - cố định */}
+            <div className="shrink-0 h-[40px] flex items-center border-b border-white/5 bg-[#0a0a0a]">
+                {/* Tabs - cuộn được */}
+                <div className="flex-1 flex items-center gap-1 px-2 overflow-x-auto min-w-0 scrollbar-hide">
+                    {tabs.map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`shrink-0 px-3 h-[28px] rounded text-[12px] font-medium transition-all ${
+                                activeTab === tab.id
+                                    ? 'bg-[#C69C6D] text-black'
+                                    : 'bg-white/5 text-white/60 hover:bg-white/10'
+                            }`}
+                        >
+                            {tab.label} ({tab.count})
+                        </button>
+                    ))}
                 </div>
-                <button onClick={handleAddNew} className="flex items-center gap-2 px-4 py-2 bg-[#C69C6D] hover:bg-white text-black text-xs font-black rounded-lg shadow-lg active:scale-95 uppercase tracking-wider">
-                    <Plus size={16} strokeWidth={3} /> <span className="hidden sm:inline">Thêm Mới</span>
-                </button>
-            </div>
 
-            {/* TAB LIST */}
-            <div className="shrink-0 px-4 pt-2 pb-0 flex gap-4 overflow-x-auto scrollbar-hide border-b border-white/5 bg-[#050505]">
-                <style jsx>{` .scrollbar-hide::-webkit-scrollbar { display: none; } `}</style>
-                {tabs.map(tab => (
-                    <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`pb-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap border-b-2 transition-all flex items-center gap-2 ${activeTab === tab.id ? 'text-[#C69C6D] border-[#C69C6D]' : 'text-gray-500 border-transparent hover:text-white'}`}>
-                        {tab.label} <span className={`px-1.5 py-0.5 rounded text-[9px] ${activeTab === tab.id ? 'bg-[#C69C6D] text-black' : 'bg-white/10 text-gray-400'}`}>{tab.count}</span>
-                    </button>
-                ))}
-            </div>
+                {/* Actions - cố định phải */}
+                <div className="shrink-0 flex items-center gap-1 px-2 border-l border-white/5 bg-[#0a0a0a]">
+                    {/* Search */}
+                    {showSearch ? (
+                        <div className="flex items-center gap-1 bg-white/5 rounded px-2 h-[28px]">
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Tìm..."
+                                className="w-[120px] bg-transparent text-[12px] text-white outline-none"
+                                autoFocus
+                            />
+                            <button onClick={() => { setShowSearch(false); setSearch(''); }} className="text-white/40 hover:text-white">
+                                <svg className="w-[14px] h-[14px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                    ) : (
+                        <button onClick={() => setShowSearch(true)} className="w-[28px] h-[28px] flex items-center justify-center rounded bg-white/5 text-white/60 hover:bg-white/10">
+                            <svg className="w-[14px] h-[14px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </button>
+                    )}
 
-            {/* CARD GRID */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#050505] scrollbar-hide">
-                {loading ? (
-                    <div className="h-full flex items-center justify-center flex-col"><Loader2 className="animate-spin text-[#C69C6D] mb-4" size={32} /><p className="text-[#C69C6D]/50 text-xs uppercase tracking-[0.2em] animate-pulse">ĐANG TẢI...</p></div>
-                ) : filteredList.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-white/20"><Package size={48} className="mb-4 opacity-20" /><p className="text-xs uppercase tracking-widest font-bold">KHÔNG TÌM THẤY DỮ LIỆU</p></div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-20">
-                        {filteredList.map((item, idx) => (
-                            <div key={item.id} onClick={() => handleCardClick(item)} className="group relative bg-[#0f0f0f] border border-white/5 rounded-xl p-4 transition-all cursor-pointer hover:border-[#C69C6D]/50 hover:-translate-y-1 flex flex-col gap-3">
-                                <div className="relative w-full aspect-square rounded-lg border border-white/10 bg-black overflow-hidden group-hover:border-[#C69C6D]">
-                                    {item.hinh_anh ? <img src={item.hinh_anh} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-white/20"><Package size={32} /></div>}
-                                    {item.ton_kho <= item.canh_bao_toi_thieu && (
-                                        <div className="absolute top-2 right-2 bg-red-600 text-white text-[9px] font-bold px-2 py-1 rounded animate-pulse shadow-lg">SẮP HẾT</div>
-                                    )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-[10px] text-[#C69C6D] font-mono mb-1">{item.ma_sku || 'NO SKU'}</p>
-                                    <h3 className="text-white font-bold text-sm truncate uppercase group-hover:text-[#C69C6D] transition-colors mb-1">{item.ten_vat_tu}</h3>
-                                    <div className="flex justify-between items-center text-xs">
-                                        <span className="text-gray-400">Tồn: <b className="text-white">{item.ton_kho}</b> {item.don_vi_tinh}</span>
-                                        <span className="font-mono text-[#C69C6D]">{item.gia_ban?.toLocaleString('vi-VN')}₫</span>
-                                    </div>
-                                </div>
+                    {/* Sort */}
+                    <div className="relative">
+                        <button onClick={() => setShowSortMenu(!showSortMenu)} className="w-[28px] h-[28px] flex items-center justify-center rounded bg-white/5 text-white/60 hover:bg-white/10">
+                            <svg className="w-[14px] h-[14px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                            </svg>
+                        </button>
+                        {showSortMenu && (
+                            <div className="absolute right-0 top-full mt-1 bg-[#1a1a1a] border border-white/10 rounded shadow-2xl py-1 z-[100]">
+                                {[
+                                    { id: 'name', label: 'Theo tên' },
+                                    { id: 'stock', label: 'Tồn kho' },
+                                    { id: 'price', label: 'Giá bán' },
+                                ].map(opt => (
+                                    <button
+                                        key={opt.id}
+                                        onClick={() => { setSortBy(opt.id as typeof sortBy); setShowSortMenu(false); }}
+                                        className={`w-full px-3 py-1 text-left text-[12px] hover:bg-white/5 whitespace-nowrap ${sortBy === opt.id ? 'text-[#C69C6D]' : 'text-white/70'}`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
                             </div>
-                        ))}
+                        )}
+                    </div>
+
+                    {/* Refresh */}
+                    <button onClick={fetchData} className="w-[28px] h-[28px] flex items-center justify-center rounded bg-white/5 text-white/60 hover:bg-white/10">
+                        <svg className={`w-[14px] h-[14px] ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </button>
+
+                    {/* Add */}
+                    <button onClick={() => openForm()} className="w-[28px] h-[28px] flex items-center justify-center rounded bg-[#C69C6D] text-black hover:bg-[#b8956a]">
+                        <svg className="w-[14px] h-[14px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            {/* Content - full height còn lại */}
+            <div className="flex-1 min-h-0 overflow-hidden">
+                {showDetail && selectedItem ? (
+                    /* Detail - full width khi mở */
+                    <div className="h-full overflow-y-auto">
+                        <VatTuDetail
+                            isOpen={true}
+                            data={selectedItem}
+                            onClose={closeDetail}
+                            onEdit={() => { closeDetail(); openForm(selectedItem); }}
+                            onDelete={async (id: string) => {
+                                const res = await deleteVatTuAction(id);
+                                if (res.success) { fetchData(); closeDetail(); }
+                                else alert(res.error);
+                            }}
+                        />
+                    </div>
+                ) : (
+                    /* Cards grid - ẩn khi mở detail */
+                    <div className="h-full overflow-y-auto p-3">
+                        {filtered.length === 0 ? (
+                            <div className="text-center text-white/40 py-8">Không có vật tư nào</div>
+                        ) : (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+                                {filtered.map(item => (
+                                    <div
+                                        key={item.id}
+                                        onClick={() => openDetail(item)}
+                                        className="bg-white/5 rounded-lg p-2 cursor-pointer hover:bg-white/10 transition-all"
+                                    >
+                                        {/* Image */}
+                                        <div className="relative aspect-square rounded bg-black/50 mb-2 overflow-hidden">
+                                            {item.hinh_anh ? (
+                                                <img src={item.hinh_anh} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-white/20">
+                                                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                                    </svg>
+                                                </div>
+                                            )}
+                                            {item.ton_kho <= item.canh_bao_toi_thieu && (
+                                                <div className="absolute top-1 right-1 bg-red-500 text-white text-[8px] font-bold px-1 rounded">
+                                                    SẮP HẾT
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Info */}
+                                        <div className="text-[10px] text-[#C69C6D] font-mono mb-0.5">{item.ma_sku || 'NO SKU'}</div>
+                                        <div className="text-[12px] font-medium text-white truncate">{item.ten_vat_tu}</div>
+                                        <div className="flex justify-between items-center mt-1">
+                                            <span className="text-[10px] text-white/50">Tồn: {item.ton_kho}</span>
+                                            <span className="text-[11px] text-[#C69C6D] font-bold">{item.gia_ban?.toLocaleString('vi-VN')}₫</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
 
-            {/* MODALS */}
-            {isFormOpen && <FormVatTu isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} initialData={selectedItem} onSuccess={handleSaveSuccess} />}
-            {isDetailOpen && selectedItem && (
-                <VatTuDetail 
-                    isOpen={isDetailOpen} 
-                    data={selectedItem} 
-                    onClose={() => setIsDetailOpen(false)} 
-                    onEdit={() => { setIsDetailOpen(false); setIsFormOpen(true); }} 
-                    onDelete={async (id: string) => { const res = await deleteVatTuAction(id); if(res.success) fetchData(); else alert(res.error); }}
+            {/* Form modal */}
+            {showForm && (
+                <FormVatTu
+                    isOpen={showForm}
+                    onClose={closeForm}
+                    initialData={selectedItem}
+                    onSuccess={() => { fetchData(); closeForm(); }}
                 />
             )}
         </div>
