@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, Suspense } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { PlayCircle, Star, ArrowRight, LogIn } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { PlayCircle, Star, ArrowRight, UserPlus, LogIn } from "lucide-react";
 
 // Import các component hệ thống
 import MenuTren from "@/app/GiaoDienTong/MenuTren/MenuTren";
@@ -15,6 +15,7 @@ import BackgroundManager from "./BackgroundManager";
 import { useUser } from "@/app/ThuVien/UserContext";
 import { getRedirectUrl } from "@/app/CongDangNhap/RoleRedirectService";
 import { useAppSettings } from "@/app/ThuVien/AppSettingsContext";
+import CongDangNhap from "@/app/CongDangNhap/CongDangNhap"; // Import Popup
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const BASE_IMG_URL = `${SUPABASE_URL}/storage/v1/object/public/hinh-nen`;
@@ -39,6 +40,10 @@ function TrangChuContent() {
   const [bgVersion, setBgVersion] = useState(Date.now());
   const [showHero, setShowHero] = useState(true);
   const [hasScrolled, setHasScrolled] = useState(false);
+
+  // 🟢 STATE ĐIỀU KHIỂN POPUP AUTH
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
 
   // Smooth Scroll
   const smoothScrollTo = useCallback((targetY: number, duration = 1200) => {
@@ -65,16 +70,20 @@ function TrangChuContent() {
   // 🟢 LOGIC KIỂM TRA USER
   // ============================================================
   useEffect(() => {
-    // 1. Nếu có param ?login=1 thì reset user để hiện nút đăng nhập
+    // 1. Nếu có param ?login=1 -> Mở popup đăng nhập ngay
     const shouldShowLogin = searchParams.get("login") === "1";
     if (shouldShowLogin) {
       setDaKiemTraLogin(true);
       setNguoiDung(null);
       window.history.replaceState({}, "", "/trangchu");
+
+      // Mở Modal Login
+      setAuthMode("login");
+      setShowAuthModal(true);
       return;
     }
 
-    // 2. TIMEOUT FALLBACK (Phòng khi mạng lag)
+    // 2. TIMEOUT FALLBACK
     const timeoutId = setTimeout(() => {
       if (!daKiemTraLogin) {
         setDaKiemTraLogin(true);
@@ -84,7 +93,6 @@ function TrangChuContent() {
             setNguoiDung(JSON.parse(storedUser));
           } catch {}
         } else {
-          // Không có user -> TỰ ĐỘNG LÀ KHÁCH (Không redirect nữa)
           setNguoiDung({ userType: "guest", role: "visitor" });
         }
       }
@@ -95,10 +103,7 @@ function TrangChuContent() {
 
     try {
       if (contextUser) {
-        // --- CÓ USER ĐĂNG NHẬP ---
         const userType = contextUser.userType;
-
-        // Nếu là Nhân sự -> Đuổi về phòng làm việc
         if (userType === "nhan_su") {
           const role = (contextUser as any)?.vi_tri_normalized;
           getRedirectUrl(userType, role).then((targetRoute: string) => {
@@ -106,15 +111,10 @@ function TrangChuContent() {
           });
           return;
         }
-
-        // Nếu là Khách hàng/User thường -> OK
         setNguoiDung(contextUser);
       } else {
-        // --- KHÔNG CÓ USER (GUEST) ---
         const storedUser = localStorage.getItem("USER_INFO");
-
         if (storedUser) {
-          // Có lưu trong LocalStorage
           try {
             const parsed = JSON.parse(storedUser);
             if (parsed.userType === "nhan_su") {
@@ -127,11 +127,9 @@ function TrangChuContent() {
             }
             setNguoiDung(parsed);
           } catch {
-            // Lỗi parse -> Set là khách
             setNguoiDung({ userType: "guest", role: "visitor" });
           }
         } else {
-          // Hoàn toàn không có gì -> SET LÀ KHÁCH (Cho phép xem trang chủ)
           setNguoiDung({ userType: "guest", role: "visitor" });
         }
       }
@@ -160,7 +158,6 @@ function TrangChuContent() {
       setShowGreeting(false);
       setShowScrollHint(true);
     }, 5000);
-
     const finishTimer = setTimeout(() => {
       setHasGreetingFinished(true);
       setShowScrollHint(false);
@@ -236,12 +233,11 @@ function TrangChuContent() {
   const isVisitor =
     nguoiDung?.userType === "guest" || nguoiDung?.role === "visitor";
 
-  const handleGoToLogin = useCallback(() => {
-    document.cookie = "VISITOR_MODE=; Path=/; Max-Age=0; SameSite=Lax";
-    localStorage.removeItem("USER_INFO");
-    localStorage.removeItem("USER_ROLE");
-    router.push("/?login=1");
-  }, [router]);
+  // 🟢 HÀM MỞ FORM ĐĂNG KÝ
+  const handleOpenRegister = useCallback(() => {
+    setAuthMode("register");
+    setShowAuthModal(true);
+  }, []);
 
   const hienThiNoiDung = activeOverlays.size === 0;
 
@@ -307,6 +303,13 @@ function TrangChuContent() {
 
   return (
     <div className="relative w-full min-h-screen bg-[#050505] text-[#F5F5F5] font-sans selection:bg-[#C69C6D] selection:text-black overflow-x-hidden">
+      {/* 🟢 COMPONENT AUTH MODAL */}
+      <CongDangNhap
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        initialMode={authMode} // Truyền chế độ (login/register)
+      />
+
       {/* LAYER 0: HÌNH NỀN */}
       <div className="fixed inset-0 w-full h-full z-0 pointer-events-none select-none bg-black">
         <img
@@ -485,17 +488,17 @@ function TrangChuContent() {
         <BackgroundManager onUpdate={handleUpdateBackground} />
       </div>
 
+      {/* 🟢 NÚT ĐĂNG KÝ (ĐÃ CẬP NHẬT: NHỎ GỌN, TRONG SUỐT, GÓC PHẢI) */}
       {isVisitor && (
         <button
-          onClick={handleGoToLogin}
-          className="fixed bottom-6 right-4 sm:bottom-8 sm:right-6 z-[5002] flex items-center gap-2 sm:gap-2.5 px-4 sm:px-5 py-3 sm:py-3.5 rounded-full
-                        bg-gradient-to-r from-[#C69C6D] via-[#F2D3A0] to-[#C69C6D]
-                        text-black font-semibold text-sm sm:text-base tracking-wide
-                        shadow-[0_10px_30px_rgba(0,0,0,0.35)] border border-white/20
-                        backdrop-blur-md hover:scale-[1.02] active:scale-95 transition-transform duration-200"
+          onClick={handleOpenRegister}
+          className="fixed bottom-6 right-4 sm:bottom-8 sm:right-6 z-[5002] flex items-center gap-2 px-4 py-2 rounded-full
+                        bg-black/30 backdrop-blur-md border border-white/10 hover:bg-black/50 hover:border-[#C69C6D]/50
+                        text-white/70 hover:text-[#C69C6D] text-xs font-bold uppercase tracking-wider
+                        transition-all duration-300 transform hover:scale-105 active:scale-95 group"
         >
-          <LogIn size={18} className="opacity-80" />
-          <span className="whitespace-nowrap">{t("auth.loginRegister")}</span>
+          <UserPlus size={14} className="opacity-70 group-hover:opacity-100" />
+          <span className="whitespace-nowrap">ĐĂNG KÝ</span>
         </button>
       )}
 
@@ -510,12 +513,10 @@ function TrangChuContent() {
           overflow-x: hidden;
           width: 100%;
         }
-        /* 🟢 CẬP NHẬT: Xóa font-family cứng để dùng Tailwind config */
         .text-stroke-title {
           -webkit-text-stroke: 1px #f5f5f5;
           color: transparent;
           text-shadow: 0 0 15px rgba(198, 156, 109, 0.3);
-          /* font-family: "Playfair Display", Georgia, serif; <-- ĐÃ XÓA DÒNG NÀY */
         }
         @keyframes fade-in-up {
           0% {
