@@ -2,11 +2,11 @@
 
 /**
  * ============================================================
- * KHUNG DANH SÁCH (FINAL VERSION)
+ * KHUNG DANH SÁCH
  * ============================================================
- * * - Logic: Giữ nguyên 100% Props & Types từ code cũ.
- * - Giao diện: Tách làm 2 hàng (Header Info & Tabs).
- * - UI: Tối ưu Logo, Search, và Nút Chức Năng (Grid) ở cuối.
+ *
+ * Khung giao diện chuẩn cho trang danh sách.
+ * Style: Tab bar ngang + Actions góc phải (giống GenericManager)
  */
 
 import React, { useState, ReactNode } from "react";
@@ -17,18 +17,10 @@ import {
   ArrowUpDown,
   CheckSquare,
   Trash2,
-  Layers,
-  Shield,
-  Users,
-  Briefcase,
-  Package,
-  Settings,
-  Grid,
-  Filter,
 } from "lucide-react";
 
 // ============================================================
-// TYPES (GIỮ NGUYÊN)
+// TYPES
 // ============================================================
 
 export interface TabItem {
@@ -51,10 +43,6 @@ export interface BulkAction {
 }
 
 export interface KhungDanhSachProps {
-  // Header Info (Mới thêm để hiển thị Logo/Tên phòng)
-  title?: string;
-  onToggleMenu?: () => void; // Nút Grid Menu
-
   // Tabs
   tabs?: TabItem[];
   activeTab?: string;
@@ -91,36 +79,10 @@ export interface KhungDanhSachProps {
 }
 
 // ============================================================
-// HELPER: XỬ LÝ LOGO PHÒNG
-// ============================================================
-const getRoomInfo = (title: string = "") => {
-  const upperTitle = title.toUpperCase();
-  let shortTitle = upperTitle
-    .replace("PHÒNG ", "")
-    .replace("QUẢN LÝ ", "")
-    .replace("DANH SÁCH ", "");
-
-  let Icon = Layers;
-
-  if (upperTitle.includes("ADMIN") || upperTitle.includes("QUẢN TRỊ"))
-    Icon = Shield;
-  else if (upperTitle.includes("NHÂN SỰ")) Icon = Users;
-  else if (upperTitle.includes("SALES") || upperTitle.includes("KINH DOANH"))
-    Icon = Briefcase;
-  else if (upperTitle.includes("KHO") || upperTitle.includes("VẬT TƯ"))
-    Icon = Package;
-  else if (upperTitle.includes("CẤU HÌNH")) Icon = Settings;
-
-  return { Icon, shortTitle };
-};
-
-// ============================================================
 // COMPONENT
 // ============================================================
 
 export default function KhungDanhSach({
-  title = "DANH SÁCH",
-  onToggleMenu,
   tabs = [],
   activeTab = "all",
   onTabChange,
@@ -140,104 +102,29 @@ export default function KhungDanhSach({
   children,
   className = "",
 }: KhungDanhSachProps) {
+  const [showSearch, setShowSearch] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const { Icon, shortTitle } = getRoomInfo(title);
+  const [showSortMenu, setShowSortMenu] = useState(false);
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
     onSearch?.(value);
   };
 
+  const clearSearch = () => {
+    setSearchTerm("");
+    onSearch?.("");
+    setShowSearch(false);
+  };
+
   return (
     <div
       className={`w-full h-full flex flex-col bg-[#050505] overflow-hidden ${className}`}
     >
-      {/* ====== HÀNG 1: HEADER INFO + SEARCH + ACTIONS ====== */}
-      <div className="shrink-0 h-[60px] flex items-center gap-3 px-3 border-b border-white/10 bg-[#0a0a0a] z-10">
-        {/* A. LOGO + TÊN RÚT GỌN */}
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="w-8 h-8 rounded-lg bg-[#C69C6D]/10 flex items-center justify-center text-[#C69C6D] border border-[#C69C6D]/20">
-            <Icon size={18} />
-          </div>
-          {/* Ẩn chữ trên mobile nhỏ, hiện trên tablet trở lên */}
-          <span className="font-black text-sm md:text-base tracking-wider text-white hidden sm:block">
-            {shortTitle}
-          </span>
-        </div>
-
-        <div className="w-[1px] h-6 bg-white/10 mx-1 hidden sm:block"></div>
-
-        {/* B. SEARCH BAR (Co giãn flex-1) */}
-        <div className="flex-1 min-w-0 max-w-md relative group">
-          {onSearch && (
-            <>
-              <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-[#C69C6D] transition-colors"
-                size={14}
-              />
-              <input
-                type="text"
-                placeholder="Tìm kiếm..."
-                value={searchTerm}
-                onChange={(e) => handleSearch(e.target.value)}
-                className="w-full bg-[#151515] border border-white/10 rounded-lg pl-9 pr-8 py-2 text-xs md:text-sm text-white focus:outline-none focus:border-[#C69C6D]/50 transition-all placeholder:text-white/20"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => handleSearch("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
-                >
-                  <X size={12} />
-                </button>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* C. CÁC NÚT THAO TÁC (Dồn về bên phải) */}
-        <div className="flex items-center gap-2 shrink-0 ml-auto">
-          {/* Nút chọn nhiều (Bulk) */}
-          {onBulkModeToggle && (
-            <button
-              onClick={onBulkModeToggle}
-              className={`w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-lg transition-all border ${
-                bulkMode
-                  ? "bg-[#C69C6D] text-black border-[#C69C6D]"
-                  : "bg-white/5 border-white/10 text-gray-400 hover:text-white"
-              }`}
-              title="Chọn nhiều"
-            >
-              <CheckSquare size={16} />
-            </button>
-          )}
-
-          {/* Nút Thêm Mới */}
-          {showAddButton && onAdd && !bulkMode && (
-            <button
-              onClick={onAdd}
-              className="h-8 md:h-9 px-3 bg-[#C69C6D] hover:bg-white text-black text-xs font-bold uppercase rounded-lg transition-all flex items-center gap-2 shadow-lg shadow-[#C69C6D]/20 active:scale-95 whitespace-nowrap"
-            >
-              <Plus size={16} strokeWidth={3} />
-              <span className="hidden sm:inline">THÊM</span>
-            </button>
-          )}
-
-          {/* 🛑 NÚT MENU CHỨC NĂNG (CHỐT CHẶN CUỐI CÙNG) */}
-          <div className="w-[1px] h-6 bg-white/10 mx-1"></div>
-          <button
-            onClick={onToggleMenu}
-            className="w-8 h-8 md:w-9 md:h-9 rounded-lg bg-[#1a1a1a] border border-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:border-white/30 transition-all active:scale-95"
-            title="Menu Chức Năng"
-          >
-            <Grid size={18} />
-          </button>
-        </div>
-      </div>
-
-      {/* ====== HÀNG 2: TABS + SORT ====== */}
-      <div className="shrink-0 h-[40px] flex items-center justify-between border-b border-white/5 bg-[#0f0f0f] px-3">
-        {/* Tabs (Scrollable) */}
-        <div className="flex-1 flex items-center gap-4 overflow-x-auto scrollbar-hide h-full min-w-0 mr-4">
+      {/* ====== TAB BAR - Style giống GenericManager ====== */}
+      <div className="shrink-0 h-[40px] flex items-center border-b border-white/5 bg-[#0a0a0a]">
+        {/* Tabs - cuộn được */}
+        <div className="flex-1 flex items-center gap-1 px-2 overflow-x-auto min-w-0 scrollbar-hide">
           <style jsx>{`
             .scrollbar-hide::-webkit-scrollbar {
               display: none;
@@ -251,91 +138,159 @@ export default function KhungDanhSach({
             <button
               key={tab.id}
               onClick={() => onTabChange?.(tab.id)}
-              className={`relative h-full flex items-center gap-2 px-1 text-[10px] md:text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
+              className={`flex items-center gap-1 px-2 py-1 text-[10px] font-bold uppercase whitespace-nowrap rounded transition-all shrink-0 ${
                 activeTab === tab.id
-                  ? "text-[#C69C6D]"
-                  : "text-gray-500 hover:text-gray-300"
+                  ? "text-[#C69C6D] bg-[#C69C6D]/10"
+                  : "text-gray-500 hover:text-white hover:bg-white/5"
               }`}
             >
               {tab.label}
               {tab.count !== undefined && (
                 <span
-                  className={`px-1.5 py-0.5 rounded text-[8px] ${
+                  className={`px-1 py-0.5 rounded text-[8px] ${
                     activeTab === tab.id
-                      ? "bg-[#C69C6D]/20 text-[#C69C6D]"
-                      : "bg-white/10 text-gray-500"
+                      ? "bg-[#C69C6D] text-black"
+                      : "bg-white/10 text-gray-400"
                   }`}
                 >
                   {tab.count}
                 </span>
               )}
-              {activeTab === tab.id && (
-                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#C69C6D]" />
-              )}
             </button>
           ))}
         </div>
 
-        {/* Sort Dropdown (Cố định phải) */}
-        {sortOptions.length > 0 && (
-          <div className="shrink-0 flex items-center gap-2 pl-3 border-l border-white/5 h-full">
-            <Filter size={12} className="text-gray-500" />
-            <select
-              value={activeSort}
-              onChange={(e) => onSortChange?.(e.target.value)}
-              className="bg-transparent text-[10px] md:text-xs font-bold text-gray-400 uppercase focus:outline-none cursor-pointer hover:text-white appearance-none py-1"
-            >
-              {sortOptions.map((opt) => (
-                <option
-                  key={opt.key}
-                  value={opt.key}
-                  className="bg-[#1a1a1a] text-gray-300"
+        {/* Actions - cố định phải */}
+        <div className="shrink-0 flex items-center gap-1 px-2 border-l border-white/5 bg-[#0a0a0a]">
+          {/* Search */}
+          {onSearch && (
+            <div className="relative flex items-center">
+              {showSearch ? (
+                <div className="flex items-center gap-1 animate-in slide-in-from-right-2">
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="Tìm..."
+                    value={searchTerm}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    className="w-28 bg-white/5 border border-white/10 rounded pl-2 pr-6 py-1 text-[10px] text-white placeholder:text-white/20 focus:outline-none focus:border-[#C69C6D]"
+                  />
+                  <button
+                    onClick={clearSearch}
+                    className="absolute right-1 p-0.5 text-white/40 hover:text-white"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowSearch(true)}
+                  className="p-1.5 bg-white/5 hover:bg-white/10 text-white/60 rounded transition-all"
                 >
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+                  <Search size={14} />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Sort */}
+          {sortOptions.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setShowSortMenu(!showSortMenu)}
+                className="p-1.5 bg-white/5 hover:bg-white/10 text-white/60 rounded transition-all"
+              >
+                <ArrowUpDown size={14} />
+              </button>
+              {showSortMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowSortMenu(false)}
+                  />
+                  <div className="absolute top-full mt-1 right-0 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-2xl z-[100] min-w-[90px] overflow-hidden">
+                    {sortOptions.map((opt) => (
+                      <button
+                        key={opt.key}
+                        onClick={() => {
+                          onSortChange?.(opt.key);
+                          setShowSortMenu(false);
+                        }}
+                        className={`w-full text-left px-3 py-1.5 text-[10px] font-bold ${
+                          activeSort === opt.key
+                            ? "text-[#C69C6D] bg-[#C69C6D]/10"
+                            : "text-white hover:bg-white/10"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Bulk Mode Toggle */}
+          {onBulkModeToggle && (
+            <button
+              onClick={onBulkModeToggle}
+              className={`p-1.5 rounded transition-all ${
+                bulkMode
+                  ? "bg-[#C69C6D] text-black"
+                  : "bg-white/5 text-white/60 hover:bg-white/10"
+              }`}
+            >
+              <CheckSquare size={14} />
+            </button>
+          )}
+
+          {/* Add */}
+          {showAddButton && onAdd && (
+            <button
+              onClick={onAdd}
+              className="p-1.5 bg-[#C69C6D] hover:bg-white text-black rounded transition-all active:scale-95"
+            >
+              <Plus size={14} strokeWidth={3} />
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* ====== HÀNG 3: BULK ACTION BAR (Chỉ hiện khi bulkMode) ====== */}
+      {/* ====== BULK BAR ====== */}
       {bulkMode && selectedCount > 0 && (
-        <div className="shrink-0 px-3 py-2 bg-[#C69C6D]/10 border-b border-[#C69C6D]/30 flex items-center justify-between gap-2 animate-in slide-in-from-top-2">
-          <div className="flex items-center gap-3">
+        <div className="shrink-0 px-3 py-1.5 bg-[#C69C6D]/10 border-b border-[#C69C6D]/30 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
             <span className="text-[#C69C6D] font-bold text-[10px]">
               Đã chọn: {selectedCount}
             </span>
-            <div className="h-3 w-[1px] bg-[#C69C6D]/30"></div>
             <button
               onClick={onSelectAll}
-              className="text-[10px] text-white/60 hover:text-white hover:underline"
+              className="text-[10px] text-white/60 hover:text-white underline"
             >
               Tất cả
             </button>
             <button
               onClick={onClearSelection}
-              className="text-[10px] text-white/60 hover:text-white hover:underline"
+              className="text-[10px] text-white/60 hover:text-white underline"
             >
               Bỏ chọn
             </button>
           </div>
-
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             {bulkActions.map((action) => {
-              const ActionIcon = action.icon;
+              const Icon = action.icon;
               return (
                 <button
                   key={action.id}
                   onClick={() => action.onClick([])}
-                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-[10px] font-bold uppercase transition-all ${
-                    action.color === "danger" || action.id === "delete"
-                      ? "bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white"
-                      : "bg-white/10 text-white hover:bg-white/20"
+                  className={`p-1.5 rounded transition-all ${
+                    action.color === "danger"
+                      ? "bg-red-600 hover:bg-red-700 text-white"
+                      : "bg-white/5 text-white/60 hover:bg-white/10"
                   }`}
                 >
-                  {ActionIcon && <ActionIcon size={12} />}
-                  <span className="hidden xs:inline">{action.label}</span>
+                  {Icon && <Icon size={14} />}
                 </button>
               );
             })}
@@ -343,10 +298,10 @@ export default function KhungDanhSach({
         </div>
       )}
 
-      {/* ====== HÀNG 4: CONTENT AREA ====== */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+      {/* ====== CONTENT AREA ====== */}
+      <div className="flex-1 overflow-y-auto">
         {loading ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+          <div className="h-full flex items-center justify-center">
             <div className="w-8 h-8 border-2 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (

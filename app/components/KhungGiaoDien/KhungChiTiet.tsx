@@ -2,10 +2,12 @@
 
 /**
  * ============================================================
- * KHUNG CHI TIẾT (FINAL VERSION)
+ * KHUNG CHI TIẾT (COMPACT & CLEAN TABS)
  * ============================================================
- * * - Logic: Giữ nguyên 100% từ mã gốc (Swipe, Search, Sort...).
- * - UI: Tách Header thành 2 dòng (Info line & Tab line) để thoáng hơn.
+ * * Update UI:
+ * - Row 1 Height: 45px (Compact Header)
+ * - Row 2 Height: 40px (Compact Tabs)
+ * - Tabs Style: Text-only (No background buttons), simple underline.
  */
 
 import React, { ReactNode, useState } from "react";
@@ -20,7 +22,7 @@ import {
 } from "lucide-react";
 
 // ============================================================
-// TYPES (GIỮ NGUYÊN)
+// TYPES
 // ============================================================
 
 export interface TabItem {
@@ -35,39 +37,26 @@ export interface TabItem {
 }
 
 export interface KhungChiTietProps {
-  // Data
   data: any;
   onClose: () => void;
-
-  // Header
   avatar?: string;
   avatarFallback?: ReactNode;
   title?: string;
-
-  // Tabs
   tabs?: TabItem[];
   activeTab?: string;
   onTabChange?: (tabId: string) => void;
   tabCounts?: Record<string, number>;
-
-  // Tab actions
   searchTerm?: string;
   onSearch?: (term: string) => void;
   sortBy?: string;
   onSortChange?: (sortKey: string) => void;
   onAddInTab?: () => void;
-
-  // Actions
   showEditButton?: boolean;
   showDeleteButton?: boolean;
   onEdit?: () => void;
   onDelete?: () => void;
   deleting?: boolean;
-
-  // Content
   children: ReactNode;
-
-  // Style
   className?: string;
 }
 
@@ -109,11 +98,10 @@ export default function KhungChiTiet({
 
   if (!data) return null;
 
-  // Get current tab config
   const currentTabConfig = tabs.find((t) => t.id === activeTab);
   const TAB_IDS = tabs.map((t) => t.id);
 
-  // Swipe handlers (Logic giữ nguyên)
+  // Swipe handlers
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchEndX(null);
     setTouchStartX(e.targetTouches[0].clientX);
@@ -125,11 +113,9 @@ export default function KhungChiTiet({
 
   const handleTouchEnd = () => {
     if (!touchStartX || !touchEndX || !onTabChange) return;
-
     const distance = touchStartX - touchEndX;
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
-
     const currentIndex = TAB_IDS.indexOf(activeTab || "");
 
     if (isLeftSwipe && currentIndex < TAB_IDS.length - 1) {
@@ -137,7 +123,6 @@ export default function KhungChiTiet({
     } else if (isRightSwipe && currentIndex > 0) {
       onTabChange(TAB_IDS[currentIndex - 1]);
     }
-
     setTouchStartX(null);
     setTouchEndX(null);
   };
@@ -151,21 +136,14 @@ export default function KhungChiTiet({
     <div
       className={`w-full h-full flex flex-col bg-[#050505] overflow-hidden ${className}`}
     >
-      {/* ====== HEADER SECTION (TÁCH LÀM 2 DÒNG) ====== */}
-      <div className="shrink-0 bg-[#0a0a0a] border-b border-white/5 z-20 shadow-sm">
-        {/* --- DÒNG 1: INFO + GLOBAL ACTIONS --- */}
-        <div className="flex items-center justify-between p-3 pb-1">
-          {/* Left: Avatar + Title */}
-          <div className="flex items-center gap-3">
-            {/* Nút đóng (Move here for better UX on mobile) */}
-            <button
-              onClick={onClose}
-              className="md:hidden p-1.5 text-white/40 hover:text-white rounded"
-            >
-              <X size={18} />
-            </button>
-
-            <div className="w-9 h-9 md:w-10 md:h-10 rounded-full border border-[#C69C6D]/30 overflow-hidden bg-[#1a1a1a] shrink-0 p-0.5">
+      {/* ====== HEADER CONTAINER ====== */}
+      <div className="shrink-0 flex flex-col bg-[#0a0a0a] border-b border-white/5 z-20 shadow-sm">
+        {/* --- ROW 1: INFO & ACTIONS (Height reduced to 45px) --- */}
+        <div className="flex items-center justify-between px-4 h-[45px] border-b border-white/5">
+          {/* LEFT: Avatar + Title */}
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Avatar nhỏ hơn chút (w-8 h-8) để hợp với thanh h-45 */}
+            <div className="w-8 h-8 rounded-full border border-[#C69C6D]/30 overflow-hidden bg-[#1a1a1a] shrink-0 p-0.5 shadow-lg shadow-[#C69C6D]/5">
               {avatar ? (
                 <img
                   src={avatar}
@@ -175,38 +153,35 @@ export default function KhungChiTiet({
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-[#151515] rounded-full">
                   {avatarFallback || (
-                    <User size={16} className="text-[#C69C6D]/50" />
+                    <User size={14} className="text-[#C69C6D]/50" />
                   )}
                 </div>
               )}
             </div>
-            <div>
-              <h2 className="text-sm md:text-base font-black text-white uppercase tracking-wide max-w-[200px] truncate leading-tight">
+            <div className="min-w-0">
+              <h2 className="text-sm font-black text-white uppercase tracking-wide truncate leading-tight">
                 {title || "---"}
               </h2>
-              {/* Có thể thêm subtitle nếu cần */}
             </div>
           </div>
 
-          {/* Right: Actions (Edit/Delete/Close) */}
-          <div className="flex items-center gap-1 md:gap-2">
-            {/* Nút SỬA */}
+          {/* RIGHT: Global Actions */}
+          <div className="flex items-center gap-1 shrink-0 ml-4">
             {showEditButton && onEdit && (
               <button
                 onClick={onEdit}
-                className="p-2 bg-[#C69C6D]/10 hover:bg-[#C69C6D] text-[#C69C6D] hover:text-black rounded-lg transition-all"
-                title="Sửa"
+                className="p-1.5 hover:text-[#C69C6D] text-gray-400 transition-all"
+                title="Chỉnh sửa"
               >
                 <Edit3 size={16} />
               </button>
             )}
 
-            {/* Nút XÓA */}
             {showDeleteButton && onDelete && (
               <button
                 onClick={onDelete}
                 disabled={deleting}
-                className="p-2 bg-red-500/10 hover:bg-red-600 text-red-500 hover:text-white rounded-lg disabled:opacity-50 transition-all"
+                className="p-1.5 hover:text-red-500 text-gray-400 disabled:opacity-50 transition-all"
                 title="Xóa"
               >
                 {deleting ? (
@@ -217,25 +192,24 @@ export default function KhungChiTiet({
               </button>
             )}
 
-            <div className="w-[1px] h-6 bg-white/10 mx-1 hidden md:block"></div>
+            <div className="w-[1px] h-4 bg-white/10 mx-1"></div>
 
-            {/* Nút Đóng (Desktop) */}
             <button
               onClick={onClose}
-              className="hidden md:flex p-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-all"
+              className="p-1.5 hover:text-white text-gray-400 transition-all"
             >
               <X size={18} />
             </button>
           </div>
         </div>
 
-        {/* --- DÒNG 2: TABS (CÂN GIỮA) + TAB ACTIONS (SEARCH/SORT) --- */}
-        <div className="flex items-center justify-between px-2 md:px-4 h-[44px]">
-          {/* Placeholder bên trái để cân bằng layout (nếu cần) */}
-          <div className="w-[80px] hidden md:block"></div>
+        {/* --- ROW 2: CLEAN TABS (Height reduced to 40px) --- */}
+        <div className="flex items-center justify-between h-[40px] px-2 relative">
+          {/* Spacer Left */}
+          <div className="w-[60px] shrink-0 hidden md:block"></div>
 
-          {/* CENTER: TABS */}
-          <div className="flex-1 flex items-center justify-center gap-4 overflow-x-auto scrollbar-hide h-full">
+          {/* CENTER: Simple Text Tabs */}
+          <div className="flex-1 flex items-center justify-center gap-6 h-full overflow-x-auto scrollbar-hide">
             <style jsx>{`
               .scrollbar-hide::-webkit-scrollbar {
                 display: none;
@@ -249,37 +223,38 @@ export default function KhungChiTiet({
               <button
                 key={tab.id}
                 onClick={() => onTabChange?.(tab.id)}
-                className={`relative h-full flex items-center gap-2 px-2 text-[11px] md:text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap
-                                    ${
-                                      activeTab === tab.id
-                                        ? "text-[#C69C6D]"
-                                        : "text-gray-500 hover:text-gray-300"
-                                    }
-                                `}
+                className={`relative h-full flex items-center gap-2 px-1 text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap group
+                  ${
+                    activeTab === tab.id
+                      ? "text-[#C69C6D]"
+                      : "text-gray-500 hover:text-white"
+                  }
+                `}
               >
                 {tab.label}
                 {(tabCounts[tab.id] !== undefined ||
                   tab.count !== undefined) && (
                   <span
-                    className={`px-1.5 py-0.5 rounded text-[9px] ${
+                    className={`text-[9px] ${
                       activeTab === tab.id
-                        ? "bg-[#C69C6D]/20 text-[#C69C6D]"
-                        : "bg-white/10 text-gray-500"
+                        ? "text-[#C69C6D]"
+                        : "text-gray-600 group-hover:text-gray-400"
                     }`}
                   >
-                    {tabCounts[tab.id] ?? tab.count ?? 0}
+                    ({tabCounts[tab.id] ?? tab.count ?? 0})
                   </span>
                 )}
+
+                {/* Active Indicator Line (Simple Underline) */}
                 {activeTab === tab.id && (
-                  <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#C69C6D] rounded-t-full" />
+                  <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#C69C6D] shadow-[0_0_8px_#C69C6D]" />
                 )}
               </button>
             ))}
           </div>
 
-          {/* RIGHT: SEARCH & SORT (Tab specific) */}
-          <div className="w-[80px] flex items-center justify-end gap-1">
-            {/* Search */}
+          {/* RIGHT: Search & Sort Tools */}
+          <div className="w-[60px] shrink-0 flex items-center justify-end gap-1">
             {currentTabConfig?.searchable && onSearch && (
               <div className="relative flex items-center">
                 {showSearch ? (
@@ -290,7 +265,7 @@ export default function KhungChiTiet({
                       placeholder="Tìm..."
                       value={localSearchTerm}
                       onChange={(e) => handleSearch(e.target.value)}
-                      className="w-32 bg-transparent pl-2 pr-6 py-1.5 text-[11px] text-white placeholder:text-white/20 focus:outline-none"
+                      className="w-24 bg-transparent pl-2 pr-5 py-1 text-[10px] text-white placeholder:text-white/20 focus:outline-none"
                     />
                     <button
                       onClick={() => {
@@ -299,30 +274,29 @@ export default function KhungChiTiet({
                       }}
                       className="absolute right-1 p-0.5 text-white/40 hover:text-white"
                     >
-                      <X size={12} />
+                      <X size={10} />
                     </button>
                   </div>
                 ) : (
                   <button
                     onClick={() => setShowSearch(true)}
-                    className="p-1.5 text-gray-400 hover:text-white rounded transition-all"
+                    className="p-1.5 text-gray-500 hover:text-white transition-all"
                   >
-                    <Search size={16} />
+                    <Search size={14} />
                   </button>
                 )}
               </div>
             )}
 
-            {/* Sort */}
             {currentTabConfig?.sortable &&
               currentTabConfig.sortOptions &&
               onSortChange && (
                 <div className="relative">
                   <button
                     onClick={() => setShowSortMenu(!showSortMenu)}
-                    className="p-1.5 text-gray-400 hover:text-white rounded transition-all"
+                    className="p-1.5 text-gray-500 hover:text-white transition-all"
                   >
-                    <ArrowUpDown size={16} />
+                    <ArrowUpDown size={14} />
                   </button>
                   {showSortMenu && (
                     <>
@@ -330,7 +304,7 @@ export default function KhungChiTiet({
                         className="fixed inset-0 z-40"
                         onClick={() => setShowSortMenu(false)}
                       />
-                      <div className="absolute top-full mt-1 right-0 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-2xl z-[100] min-w-[110px] overflow-hidden">
+                      <div className="absolute top-full mt-1 right-0 bg-[#1a1a1a] border border-white/10 rounded shadow-xl z-[100] min-w-[100px] overflow-hidden">
                         {currentTabConfig.sortOptions.map((opt) => (
                           <button
                             key={opt.key}
@@ -338,10 +312,10 @@ export default function KhungChiTiet({
                               onSortChange(opt.key);
                               setShowSortMenu(false);
                             }}
-                            className={`w-full text-left px-3 py-2 text-[10px] font-bold ${
+                            className={`w-full text-left px-3 py-2 text-[9px] font-bold border-b border-white/5 last:border-0 ${
                               sortBy === opt.key
-                                ? "text-[#C69C6D] bg-[#C69C6D]/10"
-                                : "text-white hover:bg-white/10"
+                                ? "text-[#C69C6D]"
+                                : "text-gray-400 hover:text-white hover:bg-white/5"
                             }`}
                           >
                             {opt.label}
@@ -356,7 +330,7 @@ export default function KhungChiTiet({
         </div>
       </div>
 
-      {/* ====== CONTENT AREA (SWIPE SUPPORT) ====== */}
+      {/* ====== CONTENT AREA ====== */}
       <div
         className="flex-1 overflow-y-auto custom-scrollbar bg-[#050505]"
         onTouchStart={handleTouchStart}
