@@ -1,9 +1,15 @@
-'use client';
+"use client";
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { AuthService, type UserInfo } from '@/app/CongDangNhap/AuthService';
-import { supabase } from '@/app/ThuVien/ketNoiSupabase';
-import { LoggerService } from '@/app/ThuVien/LoggerService';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react";
+import { AuthService, type UserInfo } from "@/app/CongDangNhap/AuthService";
+import { supabase } from "@/app/ThuVien/ketNoiSupabase";
+import { LoggerService } from "@/app/ThuVien/LoggerService";
 
 interface UserContextType {
   user: UserInfo | null;
@@ -27,36 +33,50 @@ export function UserProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // ✅ SESSION PERSISTENCE - Check Supabase session first
     const initSession = async () => {
+      // 🛡️ CHẶN NGAY NẾU VỪA LOGOUT (Tránh load lại user cũ từ cache)
+      if (typeof window !== "undefined") {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get("logout")) {
+          console.log(
+            "🛑 [UserContext] Phát hiện vừa đăng xuất. Bỏ qua init session."
+          );
+          setLoading(false);
+          return;
+        }
+      }
+
       try {
         setLoading(true);
-        
+
         // Check if user has active Supabase session
-        const { data: { session } } = await supabase.auth.getSession();
-        
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
         if (session?.user) {
           // Has active session - load user data
           const currentUser = await AuthService.getCurrentUser();
           setUser(currentUser);
-          
+
           // Save to localStorage as backup
           if (currentUser) {
-            localStorage.setItem('USER_INFO', JSON.stringify(currentUser));
+            localStorage.setItem("USER_INFO", JSON.stringify(currentUser));
           }
         } else {
           // No active session - check localStorage as fallback
-          const savedUser = localStorage.getItem('USER_INFO');
+          const savedUser = localStorage.getItem("USER_INFO");
           if (savedUser) {
             try {
               setUser(JSON.parse(savedUser));
             } catch (e) {
-              LoggerService.error('UserContext', 'Error parsing saved user', e);
-              localStorage.removeItem('USER_INFO');
+              LoggerService.error("UserContext", "Error parsing saved user", e);
+              localStorage.removeItem("USER_INFO");
             }
           }
         }
       } catch (err) {
-        LoggerService.error('UserContext', 'Error loading user', err);
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        LoggerService.error("UserContext", "Error loading user", err);
+        setError(err instanceof Error ? err.message : "Unknown error");
       } finally {
         setLoading(false);
       }
@@ -65,18 +85,20 @@ export function UserProvider({ children }: { children: ReactNode }) {
     initSession();
 
     // ✅ Listen for auth state changes (login/logout)
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        const currentUser = await AuthService.getCurrentUser();
-        setUser(currentUser);
-        if (currentUser) {
-          localStorage.setItem('USER_INFO', JSON.stringify(currentUser));
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === "SIGNED_IN" && session) {
+          const currentUser = await AuthService.getCurrentUser();
+          setUser(currentUser);
+          if (currentUser) {
+            localStorage.setItem("USER_INFO", JSON.stringify(currentUser));
+          }
+        } else if (event === "SIGNED_OUT") {
+          setUser(null);
+          localStorage.removeItem("USER_INFO");
         }
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-        localStorage.removeItem('USER_INFO');
       }
-    });
+    );
 
     return () => {
       authListener.subscription.unsubscribe();
@@ -90,7 +112,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       const currentUser = await AuthService.getCurrentUser();
       setUser(currentUser);
     } catch (err: any) {
-      console.error('Error loading user:', err);
+      console.error("Error loading user:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -101,40 +123,49 @@ export function UserProvider({ children }: { children: ReactNode }) {
     await loadUser();
   };
 
+  // 🟢 LOGIC ĐĂNG XUẤT "HỦY DIỆT" (FIX ZOMBIE SESSION)
   const signOut = async () => {
     try {
-      // Xóa localStorage trước
-      localStorage.removeItem('USER_INFO');
-      localStorage.removeItem('USER_ROLE');
-      localStorage.removeItem('SAVED_EMAIL');
-      
-      // Xóa token Supabase
-      Object.keys(localStorage)
-        .filter(key => key.startsWith('sb-'))
-        .forEach(key => localStorage.removeItem(key));
-      
-      sessionStorage.clear();
-      
-      // Signout Supabase
-      await AuthService.signOut();
-      
+      setLoading(true); // Bật loading để UI không bị nhảy
+
+      // 1. Xóa State React ngay lập tức
       setUser(null);
       setError(null);
-      
-      // Redirect về trang chủ
-      window.location.href = '/';
+
+      // 2. Xóa sạch Storage trước khi gọi server
+      if (typeof window !== "undefined") {
+        localStorage.clear();
+        sessionStorage.clear();
+        // Xóa cookie visitor
+        document.cookie = "VISITOR_MODE=; Path=/; Max-Age=0; SameSite=Lax";
+
+        // Xóa token Supabase thủ công
+        Object.keys(localStorage).forEach((key) => {
+          if (key.startsWith("sb-") || key.includes("supabase")) {
+            localStorage.removeItem(key);
+          }
+        });
+      }
+
+      // 3. Gọi hàm Auth Service (để supabase clear session server side)
+      await AuthService.signOut();
+
+      // 4. Redirect cứng với cờ hiệu logout
+      // Param ?logout=success báo hiệu cho trang chủ biết "Tao vừa logout đấy, cấm auto-login"
+      window.location.href = `/?logout=success&t=${Date.now()}`;
     } catch (err) {
-      LoggerService.error('UserContext', 'Error signing out', err);
-      setError(err instanceof Error ? err.message : 'Unknown error');
-      // Vẫn redirect dù lỗi
-      localStorage.clear();
-      sessionStorage.clear();
-      window.location.href = '/';
+      console.error("Logout error:", err);
+      // Vẫn force logout dù lỗi
+      window.location.href = `/?logout=force&t=${Date.now()}`;
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <UserContext.Provider value={{ user, loading, error, refreshUser, signOut }}>
+    <UserContext.Provider
+      value={{ user, loading, error, refreshUser, signOut }}
+    >
       {children}
     </UserContext.Provider>
   );
@@ -147,7 +178,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
 export function useUser() {
   const context = useContext(UserContext);
   if (context === undefined) {
-    throw new Error('useUser must be used within UserProvider');
+    throw new Error("useUser must be used within UserProvider");
   }
   return context;
 }

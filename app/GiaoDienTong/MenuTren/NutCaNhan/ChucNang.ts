@@ -1,51 +1,55 @@
-import { supabase } from '@/app/ThuVien/ketNoiSupabase';
-import { LoggerService } from '@/app/ThuVien/LoggerService';
+import { supabase } from "@/app/ThuVien/ketNoiSupabase";
+import { LoggerService } from "@/app/ThuVien/LoggerService";
 
-const logger = LoggerService.createScoped('xuLyDangXuat');
+const logger = LoggerService.createScoped("xuLyDangXuat");
 
 export const xuLyDangXuat = async () => {
-    try {
-        logger.info('🚪 Bắt đầu quá trình đăng xuất...');
-        
-        // 1. Xóa NGAY TẤT CẢ dữ liệu user trong localStorage
-        localStorage.removeItem('USER_INFO');
-        localStorage.removeItem('USER_ROLE');
-        localStorage.removeItem('user_role');
-        localStorage.removeItem('LA_ADMIN_CUNG');
-        localStorage.removeItem('SAVED_EMAIL');
-        
-        // Xóa tất cả token Supabase (bắt đầu bằng 'sb-')
-        Object.keys(localStorage)
-            .filter(key => key.startsWith('sb-'))
-            .forEach(key => localStorage.removeItem(key));
-        
-        // Xóa sessionStorage
-        sessionStorage.clear();
-        
-        // Xóa cookie visitor nếu có
-        document.cookie = 'VISITOR_MODE=; Path=/; Max-Age=0; SameSite=Lax';
-        
-        logger.info('✅ Đã xóa sạch localStorage và sessionStorage');
-        
-        // 2. Logout Supabase (scope: global để logout tất cả devices)
-        try {
-            await supabase.auth.signOut({ scope: 'global' });
-            logger.info('✅ Supabase signOut thành công');
-        } catch (err) {
-            logger.error('Supabase signOut error (ignored)', err);
+  try {
+    logger.info("🚪 Bắt đầu quá trình đăng xuất...");
+
+    // 1. XÓA THỦ CÔNG TOÀN BỘ LOCALSTORAGE
+    if (typeof window !== "undefined") {
+      // Xóa các key của App
+      localStorage.removeItem("USER_INFO");
+      localStorage.removeItem("USER_ROLE");
+      localStorage.removeItem("user_role");
+      localStorage.removeItem("LA_ADMIN_CUNG");
+      localStorage.removeItem("SAVED_EMAIL");
+
+      // QUAN TRỌNG: Xóa token của Supabase (thường có dạng sb-xxxx-auth-token)
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith("sb-") || key.includes("supabase")) {
+          localStorage.removeItem(key);
         }
-        
-        logger.info('🏃 Chuyển hướng về trang chủ để đăng nhập lại...');
-        
-        // 3. Redirect về trang chủ (bắt buộc đăng nhập lại)
-        // Dùng window.location.href thay vì replace để đảm bảo refresh hoàn toàn
-        window.location.href = '/';
-        
-    } catch (error) {
-        logger.error('❌ Lỗi đăng xuất', error);
-        // Vẫn clear và redirect nếu lỗi
-        localStorage.clear();
-        sessionStorage.clear();
-        window.location.href = '/';
+      });
+
+      // Xóa sessionStorage
+      sessionStorage.clear();
     }
+
+    // 2. XÓA COOKIE THỦ CÔNG (Để Middleware không bắt lại được)
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c
+        .replace(/^ +/, "")
+        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+
+    // 3. GỌI SUPABASE SIGN OUT (Cho chắc ăn phía server)
+    try {
+      await supabase.auth.signOut({ scope: "global" });
+    } catch (err) {
+      console.warn("Supabase signOut warning:", err);
+    }
+
+    logger.info("✅ Đã dọn dẹp sạch sẽ session");
+
+    // 4. FORCE REDIRECT VỀ TRANG CHỦ VỚI PARAM ĐẶC BIỆT
+    // Thêm timestamp để trình duyệt không cache
+    // Param ?logout=success báo hiệu cho trang chủ biết "Tao vừa logout đấy, đừng có auto-login lại"
+    window.location.href = `/?logout=success&t=${Date.now()}`;
+  } catch (error) {
+    logger.error("❌ Lỗi đăng xuất nghiêm trọng", error);
+    // Fallback cuối cùng: Force reload trang gốc
+    window.location.href = `/?logout=force&t=${Date.now()}`;
+  }
 };

@@ -34,27 +34,30 @@ export default function NhacNen() {
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [isUserAuthenticated, setIsUserAuthenticated] = useState(false);
     const [playlistLoaded, setPlaylistLoaded] = useState(false);
+    const [hasAutoPlayed, setHasAutoPlayed] = useState(false); // Flag để chỉ auto-play 1 lần
     
     const uploadInputRef = useRef<HTMLInputElement>(null);
     const audioRef = useRef<HTMLAudioElement>(null);
     const controlsRef = useRef<HTMLDivElement>(null);
 
-    // 🎵 AUTO-PLAY: Phát nhạc khi user login thành công
+    // 🎵 AUTO-PLAY: Phát nhạc khi user login thành công - CHỈ 1 LẦN
     useEffect(() => {
-        if (isUserAuthenticated && playlistLoaded && danhSachNhac.length > 0 && !isPlaying && audioRef.current) {
+        console.log('🎵 Auto-play check:', { isUserAuthenticated, playlistLoaded, songsCount: danhSachNhac.length, hasAutoPlayed });
+        if (isUserAuthenticated && playlistLoaded && danhSachNhac.length > 0 && !hasAutoPlayed && audioRef.current) {
             // Delay một chút để đảm bảo audio element sẵn sàng
             const timer = setTimeout(() => {
+                setHasAutoPlayed(true); // Đánh dấu TRƯỚC khi play để tránh race condition
                 audioRef.current?.play().then(() => {
                     setIsPlaying(true);
-                    console.log('🎵 Auto-play nhạc khi login');
+                    console.log('🎵 Auto-play nhạc thành công');
                 }).catch(err => {
                     console.warn('Auto-play failed (có thể do browser policy):', err);
-                    // Auto-play có thể bị chặn bởi browser, đó là bình thường
+                    // Không set isPlaying = true nếu play thất bại
                 });
             }, 500);
             return () => clearTimeout(timer);
         }
-    }, [isUserAuthenticated, playlistLoaded, danhSachNhac.length, isPlaying]);
+    }, [isUserAuthenticated, playlistLoaded, danhSachNhac.length, hasAutoPlayed]);
 
     useEffect(() => {
         setMounted(true);
@@ -312,7 +315,7 @@ export default function NhacNen() {
                             <div className="flex items-center justify-center gap-3">
                                 {/* Play */}
                                 <button
-                                    onMouseDown={(e) => {
+                                    onClick={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
                                         if (audioRef.current?.paused) {
@@ -328,7 +331,7 @@ export default function NhacNen() {
                                 
                                 {/* Stop */}
                                 <button
-                                    onMouseDown={(e) => {
+                                    onClick={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
                                         if (audioRef.current) {
