@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+// ... (Giữ nguyên imports)
 import {
   MessageCircle,
   Phone,
@@ -19,7 +20,7 @@ import { useUser } from "@/app/ThuVien/UserContext";
 import { useRouter } from "next/navigation";
 import { compressImage } from "@/app/ThuVien/compressImage";
 
-// Hook âm thanh (Click Effect)
+// ... (Giữ nguyên hook useSoundEffect)
 const useSoundEffect = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => {
@@ -42,27 +43,26 @@ export default function NutHoTro() {
   const router = useRouter();
   const playClick = useSoundEffect();
 
-  // UI State
+  // ... (Giữ nguyên State và Refs)
   const [isOpen, setIsOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"form_guest" | "chat">("form_guest");
   const [isSending, setIsSending] = useState(false);
 
-  // Data State
   const [guestInfo, setGuestInfo] = useState({ name: "", phone: "" });
   const [messages, setMessages] = useState<any[]>([]);
   const [inputMsg, setInputMsg] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [onlineStaffCount, setOnlineStaffCount] = useState(0);
 
-  // Refs
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ... (Giữ nguyên các useEffect 1, 2, 3 và logic showUrgentCall)
 
   // 1. KIỂM TRA TRẠNG THÁI NGƯỜI DÙNG KHI MỞ
   useEffect(() => {
     if (isOpen) {
       if (user) {
-        // Đã đăng nhập -> Vào thẳng chat
         setViewMode("chat");
         initChatSession(
           user.id,
@@ -70,7 +70,6 @@ export default function NutHoTro() {
           user.so_dien_thoai
         );
       } else {
-        // Khách vãng lai -> Check localStorage
         const savedGuest = localStorage.getItem("guest_chat_info");
         if (savedGuest) {
           const parsed = JSON.parse(savedGuest);
@@ -84,7 +83,6 @@ export default function NutHoTro() {
     }
   }, [isOpen, user]);
 
-  // 2. REALTIME STAFF COUNT
   useEffect(() => {
     const channel = supabase.channel("online-users-counter");
     channel
@@ -98,41 +96,34 @@ export default function NutHoTro() {
     };
   }, []);
 
-  // 3. AUTO SCROLL
   useEffect(() => {
     if (scrollRef.current)
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, viewMode, isOpen]); // Thêm dependencies để scroll nhạy hơn
+  }, [messages, viewMode, isOpen]);
 
-  // Logic kiểm tra 3 câu chưa trả lời
   const showUrgentCall = React.useMemo(() => {
     if (messages.length < 3) return false;
     const last3 = messages.slice(-3);
-    // Nếu 3 tin cuối đều là của khách (la_nhan_vien = false) -> Hiện cảnh báo
     return last3.every((m) => !m.la_nhan_vien);
   }, [messages]);
 
-  // 4. HÀM KHỞI TẠO PHIÊN CHAT (QUAN TRỌNG: ĐÃ SỬA BUG MẤT SESSION)
+  // ... (Giữ nguyên initChatSession và subscribeToChat)
   const initChatSession = async (
     userId: string | null,
     name: string,
     phone: string | null
   ) => {
-    // 🟢 FIX: Tìm phiên chat chưa kết thúc (bao gồm cả 'cho_tu_van' và 'dang_tu_van')
     let query = supabase
       .from("tu_van_sessions")
       .select("id")
-      .neq("trang_thai", "ket_thuc"); // Không lấy phiên đã đóng
+      .neq("trang_thai", "ket_thuc");
 
     if (userId) {
       query = query.eq("khach_hang_id", userId);
     } else {
-      // Với khách vãng lai, tìm theo SĐT hoặc LocalStorage ID
-      // Ưu tiên SĐT vì nó định danh tốt hơn
       query = query.eq("sdt_lien_he", phone);
     }
 
-    // Lấy phiên mới nhất
     const { data: existingList } = await query
       .order("cap_nhat_luc", { ascending: false })
       .limit(1);
@@ -149,7 +140,6 @@ export default function NutHoTro() {
   };
 
   const subscribeToChat = async (sId: string) => {
-    // Lấy tin nhắn cũ
     const { data } = await supabase
       .from("tu_van_messages")
       .select("*")
@@ -157,7 +147,6 @@ export default function NutHoTro() {
       .order("tao_luc", { ascending: true });
     if (data) setMessages(data);
 
-    // Lắng nghe tin nhắn mới
     const channel = supabase
       .channel(`guest_chat_${sId}`)
       .on(
@@ -170,7 +159,6 @@ export default function NutHoTro() {
         },
         (payload) => {
           setMessages((prev) => [...prev, payload.new]);
-          // Scroll xuống khi có tin mới
           if (scrollRef.current)
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
@@ -182,7 +170,7 @@ export default function NutHoTro() {
     };
   };
 
-  // 5. XỬ LÝ GỬI TIN
+  // 5. XỬ LÝ GỬI TIN - 🟢 ĐÃ CẬP NHẬT ĐỂ GỬI PUSH NOTIFICATION
   const handleSend = async (file?: File) => {
     if (!inputMsg.trim() && !file) return;
 
@@ -194,8 +182,8 @@ export default function NutHoTro() {
     try {
       let activeSessionId = sessionId;
       let imageUrl = null;
+      let isNewSession = false; // Flag để check session mới
 
-      // Upload ảnh nếu có
       if (file) {
         try {
           const compressed = await compressImage(file, 0.7, 1200);
@@ -218,12 +206,11 @@ export default function NutHoTro() {
         }
       }
 
-      // Tạo session nếu chưa có
       if (!activeSessionId) {
         const { data: newSession, error } = await supabase
           .from("tu_van_sessions")
           .insert({
-            khach_hang_id: user?.id || null, // Nếu đã login
+            khach_hang_id: user?.id || null,
             khach_vang_lai_id: !user ? `guest_${Date.now()}` : null,
             ten_hien_thi: user?.ho_ten || guestInfo.name,
             sdt_lien_he: user?.so_dien_thoai || guestInfo.phone,
@@ -238,8 +225,8 @@ export default function NutHoTro() {
         activeSessionId = newSession.id;
         setSessionId(newSession.id);
         subscribeToChat(newSession.id);
+        isNewSession = true; // Đánh dấu là session mới
       } else {
-        // Update tin nhắn cuối
         await supabase
           .from("tu_van_sessions")
           .update({
@@ -253,7 +240,6 @@ export default function NutHoTro() {
           .eq("id", activeSessionId);
       }
 
-      // Insert tin nhắn
       await supabase.from("tu_van_messages").insert({
         session_id: activeSessionId,
         nguoi_gui_id: user?.id || "guest",
@@ -261,6 +247,19 @@ export default function NutHoTro() {
         noi_dung: text,
         hinh_anh: imageUrl,
       });
+
+      // 🟢 GỌI API BẮN NOTIFICATION CHO NHÂN VIÊN
+      // Chỉ bắn nếu là session mới hoặc tin nhắn quan trọng, ở đây ta bắn luôn để nhân viên biết
+      // Có thể tối ưu chỉ bắn nếu session chưa có người phụ trách
+      fetch("/api/push/notify-staff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: `Khách mới: ${user?.ho_ten || guestInfo.name}`,
+          body: text || (imageUrl ? "Đã gửi một ảnh" : "Cần hỗ trợ tư vấn"),
+          url: isNewSession ? "/phongsales" : undefined, // Link về phòng sales
+        }),
+      }).catch((err) => console.error("Push notify error:", err));
     } catch (err) {
       console.error(err);
     } finally {
@@ -269,7 +268,7 @@ export default function NutHoTro() {
     }
   };
 
-  // 6. SUBMIT FORM
+  // ... (Giữ nguyên phần còn lại handleGuestSubmit, handleGoToLogin, Render)
   const handleGuestSubmit = () => {
     playClick();
     if (!guestInfo.name.trim() || !guestInfo.phone.trim()) {
@@ -287,7 +286,6 @@ export default function NutHoTro() {
     router.push("/?login=1");
   };
 
-  // 🟢 CHECK ADMIN - Nếu là nhân sự thì KHÔNG hiện nút này (dùng TuVanKhachHang.tsx thay thế)
   if (user?.userType === "nhan_su") return null;
 
   return (
@@ -330,6 +328,7 @@ export default function NutHoTro() {
       <div className="fixed bottom-6 left-6 z-[9000] font-sans flex flex-col items-start gap-4">
         {isOpen && (
           <div className="cyber-panel w-[320px] h-[480px] flex flex-col animate-in slide-in-from-bottom-5 duration-300 backdrop-blur-xl">
+            {/* Header */}
             <div className="flex justify-between items-center p-4 border-b border-[#C69C6D]/30 bg-black/40">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="text-[#C69C6D]" size={18} />
@@ -478,7 +477,6 @@ export default function NutHoTro() {
                 </div>
 
                 <div className="p-3 bg-[#111] border-t border-white/10 flex gap-2 items-center">
-                  {/* 🟢 Nút chọn ảnh */}
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isSending}

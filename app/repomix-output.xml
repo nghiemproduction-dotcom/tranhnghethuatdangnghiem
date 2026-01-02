@@ -62,6 +62,12 @@ components/cacchucnang/index.ts
 components/cacchucnang/khachhang/config.ts
 components/cacchucnang/khachhang/index.ts
 components/cacchucnang/khachhang/KhachHangChucNang.tsx
+components/cacchucnang/mauthietke/config.ts
+components/cacchucnang/mauthietke/index.ts
+components/cacchucnang/mauthietke/MauThietKeChucNang.tsx
+components/cacchucnang/mauthietke/MauThietKeDetail.tsx
+components/cacchucnang/mauthietke/MauThietKeForm.tsx
+components/cacchucnang/mauthietke/MauThietKeList.tsx
 components/cacchucnang/nhansu/config.ts
 components/cacchucnang/nhansu/index.ts
 components/cacchucnang/nhansu/NhanSuChucNang.tsx
@@ -2194,76 +2200,247 @@ export async function getMySalaryToday() {
 </file>
 
 <file path="actions/QuyenHanThietKe.ts">
-'use server';
-import postgres from 'postgres';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+"use server";
+import postgres from "postgres";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 
-const sql = postgres(process.env.DATABASE_URL!, { ssl: 'require' });
+const sql = postgres(process.env.DATABASE_URL!, {
+  ssl: "require",
+  max: 10,
+  idle_timeout: 20,
+});
 
 async function requireAuth() {
-    const cookieStore = cookies();
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        { cookies: { get(name: string) { return cookieStore.get(name)?.value }, set() {}, remove() {} } }
-    );
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Unauthorized");
-    return user;
+  const cookieStore = cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set() {},
+        remove() {},
+      },
+    }
+  );
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || !user.email) throw new Error("Unauthorized: Vui lòng đăng nhập");
+  return user;
 }
 
-// 1. LẤY DANH SÁCH MẪU THIẾT KẾ
-export async function getDesignDataAction(page: number, pageSize: number, search: string, filterStatus: string) {
-    try {
-        await requireAuth();
-        // Lấy dữ liệu từ bảng quy_trinh_mau (đại diện cho mẫu) hoặc bảng riêng nếu Boss muốn tách
-        // Ở đây em dùng bảng 'vat_tu' loại 'thanh_pham' làm mẫu thiết kế để đồng bộ
-        let query = `SELECT * FROM "vat_tu" WHERE loai_vat_tu = 'thanh_pham'`;
-        const params: any[] = [];
-        let paramCount = 1;
+// 🛡️ HÀM KIỂM TRA QUYỀN SỞ HỮU (CORE LOGIC)
+// Trả về: true nếu được phép, throw Error nếu không
+async function checkOwnershipOrAdmin(
+  userEmail: string,
+  resourceId?: string,
+  action: "update" | "delete" = "update"
+) {
+  // 1. Lấy thông tin nhân sự đang thao tác
+  const [nhanSu] = await sql`
+        SELECT id, vi_tri_normalized 
+        FROM nhan_su 
+        WHERE email = ${userEmail}
+    `;
 
-        if (search) {
-            query += ` AND (ten_vat_tu ILIKE $${paramCount} OR ma_sku ILIKE $${paramCount})`;
-            params.push(`%${search}%`);
-            paramCount++;
-        }
-        
-        // Filter theo bộ sưu tập
-        if (filterStatus && filterStatus !== 'all') {
-            query += ` AND bo_suu_tap = $${paramCount}`;
-            params.push(filterStatus);
-            paramCount++;
-        }
+  if (!nhanSu) throw new Error("Không tìm thấy thông tin nhân sự của bạn.");
 
-        const countQuery = query.replace('SELECT *', 'SELECT count(*) as total');
-        const offset = (page - 1) * pageSize;
-        query += ` ORDER BY ten_vat_tu ASC LIMIT ${pageSize} OFFSET ${offset}`;
+  const role = nhanSu.vi_tri_normalized || "";
+  // Danh sách các vai trò được coi là Admin
+  const isAdmin = ["admin", "quanly", "boss"].includes(role);
 
-        const data = await sql.unsafe(query, params);
-        const [countResult] = await sql.unsafe(countQuery, params);
+  // 2. Nếu là Admin -> Cho phép hết
+  if (isAdmin) return true;
 
-        return { success: true, data: Array.from(data), total: Number(countResult.total) };
-    } catch (error: any) { return { success: false, error: error.message }; }
+  // 3. Nếu là Xóa -> CHẶN NGAY nếu không phải Admin
+  if (action === "delete") {
+    throw new Error("⛔ Bạn không có quyền xóa (Chỉ Admin mới được xóa).");
+  }
+
+  // 4. Nếu là Sửa -> Kiểm tra "Chính chủ"
+  if (resourceId) {
+    const [mau] = await sql`
+            SELECT nguoi_tao FROM mau_thiet_ke WHERE id = ${resourceId}
+        `;
+
+    if (!mau) throw new Error("Mẫu thiết kế không tồn tại.");
+
+    // So sánh ID người tạo với ID nhân sự đang login
+    if (mau.nguoi_tao !== nhanSu.id) {
+      throw new Error("⛔ Bạn chỉ được phép sửa mẫu do chính mình tạo ra.");
+    }
+  }
+
+  return true;
 }
 
-// 2. CẬP NHẬT FILE THIẾT KẾ (Lưu link file vào metadata)
-export async function updateDesignFileAction(id: string, fileUrl: string, note: string) {
-    try {
-        await requireAuth();
-        // Lưu link file gốc vào cột metadata json
-        await sql.unsafe(`
-            UPDATE "vat_tu"
-            SET metadata = jsonb_set(
-                COALESCE(metadata, '{}'::jsonb), 
-                '{file_thiet_ke}', 
-                $1::jsonb
+// --- CÁC HÀM XỬ LÝ CHÍNH ---
+
+// 1. LẤY DANH SÁCH (ĐÃ UPDATE LỌC HAS_FILE)
+export async function getMauThietKeDataAction(
+  page: number,
+  pageSize: number,
+  search: string,
+  filterCategory: string
+) {
+  try {
+    await requireAuth();
+    let query = `
+            SELECT m.*, n.ho_ten as ten_nguoi_tao 
+            FROM "mau_thiet_ke" m
+            LEFT JOIN "nhan_su" n ON m.nguoi_tao = n.id
+            WHERE 1=1
+        `;
+    const params: any[] = [];
+    let paramCount = 1;
+
+    // Tìm kiếm
+    if (search) {
+      query += ` AND (m.mo_ta ILIKE $${paramCount})`;
+      params.push(`%${search}%`);
+      paramCount++;
+    }
+
+    // Lọc theo Tab (Phân loại hoặc Has File)
+    if (filterCategory && filterCategory !== "all") {
+      // 🟢 FIX: Xử lý trường hợp lọc "Đã có file"
+      if (filterCategory === "has_file") {
+        // Kiểm tra file_thiet_ke khác null, khác chuỗi rỗng và khác mảng rỗng '[]'
+        query += ` AND m.file_thiet_ke IS NOT NULL AND m.file_thiet_ke::text != '[]' AND m.file_thiet_ke::text != '' `;
+      } else {
+        // Lọc phân loại bình thường
+        query += ` AND m.phan_loai_normalized = $${paramCount}`;
+        params.push(filterCategory);
+        paramCount++;
+      }
+    }
+
+    const countQuery = `SELECT count(*) as total FROM (${query}) as sub`;
+    const offset = (page - 1) * pageSize;
+    query += ` ORDER BY m.tao_luc DESC LIMIT ${pageSize} OFFSET ${offset}`;
+
+    const data = await sql.unsafe(query, params);
+    const [countResult] = await sql.unsafe(countQuery, params);
+
+    return {
+      success: true,
+      data: Array.from(data),
+      total: Number(countResult.total),
+    };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// 2. TẠO MỚI MẪU
+export async function createMauThietKeAction(data: any) {
+  try {
+    const user = await requireAuth();
+    const [nhanSu] = await sql`SELECT id FROM nhan_su WHERE email = ${
+      user.email || ""
+    }`;
+
+    if (!nhanSu) throw new Error("Không xác định được danh tính nhân sự.");
+
+    const phanLoaiNorm =
+      data.phan_loai_normalized ||
+      (data.phan_loai
+        ? data.phan_loai
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/\s+/g, "")
+            .toLowerCase()
+        : "");
+
+    // Chuẩn bị file thiết kế (đảm bảo là JSON string)
+    const fileThietKeJson = JSON.stringify(data.file_thiet_ke || []);
+
+    await sql.unsafe(
+      `
+            INSERT INTO "mau_thiet_ke" (
+                mo_ta, phan_loai, phan_loai_normalized, hinh_anh, 
+                file_thiet_ke, nguoi_tao, tao_luc
             )
-            WHERE id = $2
-        `, [JSON.stringify({ url: fileUrl, note: note, updated_at: new Date().toISOString() }), id]);
-        
-        return { success: true };
-    } catch (error: any) { return { success: false, error: error.message }; }
+            VALUES ($1, $2, $3, $4, $5, $6, now())
+        `,
+      [
+        data.mo_ta,
+        data.phan_loai,
+        phanLoaiNorm,
+        data.hinh_anh,
+        fileThietKeJson,
+        nhanSu.id,
+      ]
+    );
+
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// 3. CẬP NHẬT MẪU (Có check quyền)
+export async function updateMauThietKeAction(id: string, data: any) {
+  try {
+    const user = await requireAuth();
+    // Check: Admin hoặc Chính chủ mới được sửa
+    await checkOwnershipOrAdmin(user.email || "", id, "update");
+
+    const phanLoaiNorm =
+      data.phan_loai_normalized ||
+      (data.phan_loai
+        ? data.phan_loai
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/\s+/g, "")
+            .toLowerCase()
+        : "");
+
+    const fileThietKeJson = JSON.stringify(data.file_thiet_ke || []);
+
+    await sql.unsafe(
+      `
+            UPDATE "mau_thiet_ke"
+            SET mo_ta = $1,
+                phan_loai = $2,
+                phan_loai_normalized = $3,
+                hinh_anh = $4,
+                file_thiet_ke = $5
+            WHERE id = $6
+        `,
+      [
+        data.mo_ta,
+        data.phan_loai,
+        phanLoaiNorm,
+        data.hinh_anh,
+        fileThietKeJson,
+        id,
+      ]
+    );
+
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// 4. XÓA (Chỉ Admin)
+export async function deleteMauThietKeAction(id: string) {
+  try {
+    const user = await requireAuth();
+
+    // Check: Chỉ Admin mới được xóa
+    await checkOwnershipOrAdmin(user.email || "", id, "delete");
+
+    await sql.unsafe(`DELETE FROM "mau_thiet_ke" WHERE id = $1`, [id]);
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
 }
 </file>
 
@@ -2659,10 +2836,10 @@ export async function POST(req: Request) {
  * ============================================================
  * CÁC CHỨC NĂNG - PHÒNG CHUẨN
  * ============================================================
- * 
+ *
  * Thư mục chứa tất cả các chức năng dùng chung.
  * Mỗi chức năng nằm trong 1 folder riêng.
- * 
+ *
  * CẤU TRÚC:
  * cacchucnang/
  * ├── nhansu/          - Quản lý nhân sự
@@ -2670,19 +2847,25 @@ export async function POST(req: Request) {
  * ├── donhang/         - Quản lý đơn hàng (TODO)
  * ├── vattu/           - Quản lý vật tư kho (TODO)
  * └── thuchi/          - Quản lý thu chi (TODO)
- * 
+ *
  * CÁCH SỬ DỤNG:
  * import { NhanSuChucNang } from '@/app/components/cacchucnang';
  */
 
 // Nhân sự
-export { NhanSuChucNang, createNhanSuConfig, type NhanSu, type NhanSuPermissions } from './nhansu';
+export {
+  NhanSuChucNang,
+  createNhanSuConfig,
+  type NhanSu,
+  type NhanSuPermissions,
+} from "./nhansu";
 
 // TODO: Thêm các chức năng khác
 // export { KhachHangChucNang } from './khachhang';
 // export { DonHangChucNang } from './donhang';
 // export { VatTuChucNang } from './vattu';
 // export { ThuChiChucNang } from './thuchi';
+export { MauThietKeChucNang } from "./mauthietke";
 </file>
 
 <file path="components/cacchucnang/khachhang/config.ts">
@@ -3523,6 +3706,1025 @@ function FormField({
         {label} {required && <span className="text-red-400">*</span>}
       </label>
       {children}
+    </div>
+  );
+}
+</file>
+
+<file path="components/cacchucnang/mauthietke/config.ts">
+import { Palette, Image as ImageIcon, Tag, User } from "lucide-react";
+import {
+  ManagerConfig,
+  FieldConfig,
+  FilterTabConfig,
+  TabConfig,
+} from "../types";
+import {
+  getMauThietKeDataAction,
+  createMauThietKeAction,
+  updateMauThietKeAction,
+  deleteMauThietKeAction,
+} from "@/app/actions/QuyenHanThietKe";
+
+// 1. CẬP NHẬT INTERFACE (Thêm file_thiet_ke)
+export interface MauThietKe {
+  id: string;
+  mo_ta: string;
+  phan_loai: string;
+  phan_loai_normalized: string;
+  hinh_anh: string;
+  // Thêm trường này để lưu danh sách link
+  file_thiet_ke?: string[];
+  nguoi_tao: string;
+  ten_nguoi_tao?: string;
+  tao_luc: string;
+}
+
+export interface MauThietKePermissions {
+  allowView?: boolean;
+  allowEdit?: boolean;
+  allowDelete?: boolean;
+  allowBulk?: boolean;
+}
+
+// Các loại phân loại chuẩn hóa
+const PHAN_LOAI_OPTIONS = [
+  "Tranh chân dung gạo In UV + Vẽ mặt",
+  "Tranh phong cảnh Gạo - Tấm - Cám",
+  "Đĩa Tranh Gạo",
+  "Tranh gạo In UV",
+  "Tranh In Để Bàn",
+  "Nón lá gạo",
+  "Tranh gạo in UV có đồng hồ",
+  "Tranh chân dung thủ công 100%",
+];
+
+const fields: FieldConfig[] = [
+  {
+    key: "hinh_anh",
+    label: "Hình ảnh mẫu",
+    type: "image",
+    showInForm: true,
+    showInDetail: false,
+    showInCard: true,
+  },
+  {
+    key: "mo_ta",
+    label: "Mô tả / Tên mẫu",
+    type: "text",
+    placeholder: "Nhập tên mẫu thiết kế...",
+    required: true,
+    icon: Palette,
+  },
+  {
+    key: "phan_loai",
+    label: "Phân loại",
+    type: "select",
+    options: PHAN_LOAI_OPTIONS,
+    required: true,
+    icon: Tag,
+  },
+  {
+    key: "ten_nguoi_tao",
+    label: "Người thiết kế",
+    type: "readonly",
+    icon: User,
+    showInForm: false,
+  },
+];
+
+// 2. CẬP NHẬT BỘ LỌC (Thêm tab lọc File Thiết Kế)
+const filterTabs: FilterTabConfig[] = [
+  // Tab mới: Lọc những mẫu đã có file
+  {
+    id: "has_file",
+    label: "ĐÃ CÓ FILE",
+    filterField: "file_thiet_ke", // Trường này sẽ được xử lý logic riêng ở Controller
+  },
+  {
+    id: "tranhchandunggaoinuv+vemat",
+    label: "CHÂN DUNG UV",
+    filterField: "phan_loai_normalized",
+  },
+  {
+    id: "tranhphongcanhgao-tam-cam",
+    label: "PHONG CẢNH",
+    filterField: "phan_loai_normalized",
+  },
+  { id: "tranhgaoinuv", label: "IN UV", filterField: "phan_loai_normalized" },
+  {
+    id: "diatranhgao",
+    label: "ĐĨA TRANH",
+    filterField: "phan_loai_normalized",
+  },
+  { id: "tranhindeban", label: "ĐỂ BÀN", filterField: "phan_loai_normalized" },
+];
+
+const detailTabs: TabConfig[] = [{ id: "thongtin", label: "CHI TIẾT" }];
+
+const dataSource = {
+  fetchList: async (
+    page: number,
+    limit: number,
+    search: string,
+    filter: string
+  ) => {
+    const res = await getMauThietKeDataAction(page, limit, search, filter);
+    return {
+      success: res.success,
+      data: res.data as MauThietKe[] | undefined,
+      error: res.error,
+    };
+  },
+  create: async (data: Partial<MauThietKe>) => {
+    const res = await createMauThietKeAction(data);
+    return { success: res.success, data: (res as any)?.data, error: res.error };
+  },
+  update: async (id: string, data: Partial<MauThietKe>) => {
+    const res = await updateMauThietKeAction(id, data);
+    return { success: res.success, data: (res as any)?.data, error: res.error };
+  },
+  delete: async (id: string) => {
+    const res = await deleteMauThietKeAction(id);
+    return { success: res.success, error: res.error };
+  },
+};
+
+export function createMauThietKeConfig(
+  permissions: MauThietKePermissions = {}
+): ManagerConfig<MauThietKe> {
+  const {
+    allowView = true,
+    allowEdit = true,
+    allowDelete = false,
+    allowBulk = false,
+  } = permissions;
+
+  return {
+    entityName: "mẫu thiết kế",
+    entityNamePlural: "mẫu thiết kế",
+    idField: "id",
+    fields,
+    cardConfig: {
+      avatarField: "hinh_anh",
+      titleField: "mo_ta",
+      subtitleField: "phan_loai",
+      infoFields: [{ field: "ten_nguoi_tao", icon: User }],
+    },
+    filterTabs,
+    detailTabs,
+    actions: {
+      allowView,
+      allowEdit,
+      allowDelete,
+      allowBulkSelect: allowBulk,
+      allowBulkDelete: allowBulk && allowDelete,
+    },
+    dataSource,
+    searchFields: ["mo_ta"],
+    sortOptions: [
+      {
+        key: "newest",
+        label: "MỚI NHẤT",
+        sortFn: (a: MauThietKe, b: MauThietKe) =>
+          new Date(b.tao_luc).getTime() - new Date(a.tao_luc).getTime(),
+      },
+      {
+        key: "name",
+        label: "TÊN A-Z",
+        sortFn: (a: MauThietKe, b: MauThietKe) =>
+          a.mo_ta.localeCompare(b.mo_ta),
+      },
+    ],
+    defaultSort: "newest",
+    uploadConfig: { bucket: "images", fileNamePrefix: "mau" }, // Đã chuẩn hóa về 'images'
+  };
+}
+</file>
+
+<file path="components/cacchucnang/mauthietke/index.ts">
+export { default as MauThietKeChucNang } from "./MauThietKeChucNang";
+export { createMauThietKeConfig } from "./config";
+export type { MauThietKe, MauThietKePermissions } from "./config";
+</file>
+
+<file path="components/cacchucnang/mauthietke/MauThietKeChucNang.tsx">
+"use client";
+
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { Trash2 } from "lucide-react";
+import { KhungDanhSach } from "@/app/components/KhungGiaoDien";
+import ConfirmDialog from "@/app/components/ConfirmDialog";
+import {
+  MauThietKe,
+  MauThietKePermissions,
+  createMauThietKeConfig,
+} from "./config";
+
+// IMPORT 3 THÀNH PHẦN ĐÃ TÁCH
+import MauThietKeList from "./MauThietKeList";
+import MauThietKeForm from "./MauThietKeForm";
+import MauThietKeDetail from "./MauThietKeDetail";
+
+interface Props {
+  permissions?: MauThietKePermissions;
+  className?: string;
+}
+
+const toNonAccent = (str: string) =>
+  str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "")
+    .toLowerCase();
+
+export default function MauThietKeChucNang({
+  permissions = {},
+  className = "",
+}: Props) {
+  const config = createMauThietKeConfig(permissions);
+  const {
+    allowEdit = true,
+    allowDelete = false,
+    allowBulk = false,
+  } = permissions;
+
+  // --- STATE QUẢN LÝ ---
+  const [items, setItems] = useState<MauThietKe[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState("all");
+  const [sortBy, setSortBy] = useState("newest");
+
+  // View State
+  const [viewMode, setViewMode] = useState<"list" | "detail" | "form">("list");
+  const [selectedItem, setSelectedItem] = useState<MauThietKe | null>(null);
+
+  // Action State
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmDelete, setConfirmDelete] = useState<{
+    show: boolean;
+    ids: string[];
+  }>({ show: false, ids: [] });
+  const [saving, setSaving] = useState(false);
+
+  // --- FETCH DATA ---
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      if (config.dataSource?.fetchList) {
+        const res = await config.dataSource.fetchList(1, 100, "", "");
+        if (res.success && res.data) setItems(res.data);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, [config.dataSource]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // --- FILTER & SORT LOGIC ---
+  const filteredList = useMemo(() => {
+    let result = items;
+
+    // 1. LOGIC LỌC MỚI (Xử lý tab 'ĐÃ CÓ FILE')
+    if (activeTab === "has_file") {
+      result = result.filter((i) => {
+        // Kiểm tra xem có file thiết kế không (Array hoặc JSON string)
+        const files = i.file_thiet_ke;
+        if (Array.isArray(files) && files.length > 0) return true;
+        if (typeof files === "string") {
+          try {
+            const parsed = JSON.parse(files);
+            return Array.isArray(parsed) && parsed.length > 0;
+          } catch {
+            return false;
+          }
+        }
+        return false;
+      });
+    }
+    // Lọc theo phân loại thông thường
+    else if (activeTab !== "all") {
+      result = result.filter((i) => i.phan_loai_normalized === activeTab);
+    }
+
+    // Tìm kiếm
+    if (searchTerm) {
+      const term = toNonAccent(searchTerm);
+      result = result.filter((i) => toNonAccent(i.mo_ta).includes(term));
+    }
+
+    // Sắp xếp
+    const sortOpt = config.sortOptions?.find((s) => s.key === sortBy);
+    if (sortOpt?.sortFn) {
+      result = [...result].sort(sortOpt.sortFn);
+    }
+    return result;
+  }, [items, activeTab, searchTerm, sortBy, config.sortOptions]);
+
+  const tabs = useMemo(() => {
+    const counts: Record<string, number> = { all: items.length };
+
+    config.filterTabs?.forEach((tab) => {
+      // 2. LOGIC ĐẾM SỐ LƯỢNG MỚI CHO TAB 'HAS_FILE'
+      if (tab.id === "has_file") {
+        counts[tab.id] = items.filter((i) => {
+          const files = i.file_thiet_ke;
+          if (Array.isArray(files) && files.length > 0) return true;
+          if (typeof files === "string") {
+            try {
+              const parsed = JSON.parse(files);
+              return Array.isArray(parsed) && parsed.length > 0;
+            } catch {
+              return false;
+            }
+          }
+          return false;
+        }).length;
+      }
+      // Đếm cho các tab phân loại bình thường
+      else if (tab.id && tab.filterField) {
+        counts[tab.id] = items.filter(
+          (i) => (i as any)[tab.filterField!] === tab.id
+        ).length;
+      }
+    });
+
+    const dynamicTabs =
+      config.filterTabs?.map((t) => ({
+        id: t.id || "",
+        label: t.label,
+        count: t.id ? counts[t.id] || 0 : 0,
+      })) || [];
+    return [{ id: "all", label: "TẤT CẢ", count: counts.all }, ...dynamicTabs];
+  }, [items, config.filterTabs]);
+
+  // --- ACTION HANDLERS ---
+  const handleOpenDetail = (item: MauThietKe) => {
+    setSelectedItem(item);
+    setViewMode("detail");
+  };
+
+  const handleOpenForm = (item?: MauThietKe) => {
+    setSelectedItem(item || null);
+    setViewMode("form");
+  };
+
+  const handleSave = async (formData: any) => {
+    setSaving(true);
+    try {
+      if (selectedItem?.id) {
+        if (config.dataSource?.update)
+          await config.dataSource.update(selectedItem.id, formData);
+      } else {
+        if (config.dataSource?.create) await config.dataSource.create(formData);
+      }
+      await fetchData();
+      setViewMode("list");
+      setSelectedItem(null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (ids: string[]) => {
+    if (config.dataSource?.delete) {
+      for (const id of ids) await config.dataSource.delete(id);
+      await fetchData();
+      setSelectedIds(new Set());
+      setConfirmDelete({ show: false, ids: [] });
+      setViewMode("list");
+    }
+  };
+
+  const handleBulkSelect = (id: string) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setSelectedIds(newSet);
+  };
+
+  // --- RENDER ---
+  return (
+    <div className={`h-full ${className}`}>
+      {/* 1. LIST VIEW */}
+      {viewMode === "list" && (
+        <KhungDanhSach
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          onSearch={setSearchTerm}
+          sortOptions={
+            config.sortOptions?.map((s) => ({ key: s.key, label: s.label })) ||
+            []
+          }
+          activeSort={sortBy}
+          onSortChange={setSortBy}
+          showAddButton={allowEdit}
+          onAdd={() => handleOpenForm()}
+          bulkMode={bulkMode}
+          onBulkModeToggle={
+            allowBulk ? () => setBulkMode(!bulkMode) : undefined
+          }
+          selectedCount={selectedIds.size}
+          onSelectAll={() =>
+            setSelectedIds(new Set(filteredList.map((i) => i.id)))
+          }
+          onClearSelection={() => setSelectedIds(new Set())}
+          bulkActions={
+            allowDelete
+              ? [
+                  {
+                    id: "delete",
+                    label: "XÓA",
+                    icon: Trash2,
+                    color: "danger",
+                    onClick: () =>
+                      setConfirmDelete({
+                        show: true,
+                        ids: Array.from(selectedIds),
+                      }),
+                  },
+                ]
+              : []
+          }
+          loading={loading}
+        >
+          <MauThietKeList
+            items={filteredList}
+            bulkMode={bulkMode}
+            selectedIds={selectedIds}
+            onToggleSelect={handleBulkSelect}
+            onClickItem={handleOpenDetail}
+          />
+        </KhungDanhSach>
+      )}
+
+      {/* 2. FORM VIEW */}
+      {viewMode === "form" && (
+        <MauThietKeForm
+          data={selectedItem}
+          onClose={() => {
+            setViewMode("list");
+            setSelectedItem(null);
+          }}
+          onSubmit={handleSave}
+          loading={saving}
+        />
+      )}
+
+      {/* 3. DETAIL VIEW */}
+      {viewMode === "detail" && selectedItem && (
+        <MauThietKeDetail
+          data={selectedItem}
+          onClose={() => {
+            setViewMode("list");
+            setSelectedItem(null);
+          }}
+          allowEdit={allowEdit}
+          allowDelete={allowDelete}
+          onEdit={() => handleOpenForm(selectedItem)}
+          onDelete={() =>
+            setConfirmDelete({ show: true, ids: [selectedItem.id] })
+          }
+        />
+      )}
+
+      <ConfirmDialog
+        isOpen={confirmDelete.show}
+        title="XÁC NHẬN XÓA"
+        message={`Bạn có chắc muốn xóa ${confirmDelete.ids.length} mẫu thiết kế?`}
+        onConfirm={() => handleDelete(confirmDelete.ids)}
+        onCancel={() => setConfirmDelete({ show: false, ids: [] })}
+      />
+    </div>
+  );
+}
+</file>
+
+<file path="components/cacchucnang/mauthietke/MauThietKeDetail.tsx">
+"use client";
+
+import React, { useState } from "react";
+import {
+  Tag,
+  User,
+  Calendar,
+  Link as LinkIcon,
+  Palette,
+  Download,
+  ExternalLink,
+} from "lucide-react";
+import { KhungChiTiet } from "@/app/components/KhungGiaoDien";
+import { MauThietKe, createMauThietKeConfig } from "./config";
+
+interface Props {
+  data: MauThietKe;
+  onClose: () => void;
+  allowEdit: boolean;
+  allowDelete: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}
+
+export default function MauThietKeDetail({
+  data,
+  onClose,
+  allowEdit,
+  allowDelete,
+  onEdit,
+  onDelete,
+}: Props) {
+  const config = createMauThietKeConfig();
+  const [activeTab, setActiveTab] = useState("thongtin");
+  const tabs = config.detailTabs.map((t) => ({ ...t, id: t.id || "" }));
+
+  // 🟢 HELPER THÔNG MINH: Parse dữ liệu file thiết kế (Xử lý cả mảng và chuỗi JSON)
+  const getDesignFiles = (): string[] => {
+    if (!data) return [];
+
+    const rawData = (data as any).file_thiet_ke;
+
+    // Trường hợp 1: Không có dữ liệu
+    if (!rawData) return [];
+
+    // Trường hợp 2: Đã là mảng
+    if (Array.isArray(rawData))
+      return rawData.filter((u: string) => u.trim() !== "");
+
+    // Trường hợp 3: Là chuỗi JSON (do lưu trong DB dạng text/jsonb)
+    if (typeof rawData === "string") {
+      try {
+        const parsed = JSON.parse(rawData);
+        if (Array.isArray(parsed))
+          return parsed.filter((u: string) => u.trim() !== "");
+      } catch (e) {
+        console.error("Lỗi parse file_thiet_ke:", e);
+        return [];
+      }
+    }
+
+    return [];
+  };
+
+  const designFiles = getDesignFiles();
+
+  return (
+    <KhungChiTiet
+      data={data}
+      onClose={onClose}
+      avatar={data.hinh_anh}
+      title={data.mo_ta}
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      showEditButton={allowEdit}
+      showDeleteButton={allowDelete}
+      onEdit={onEdit}
+      onDelete={onDelete}
+    >
+      <div className="p-4 space-y-4">
+        {/* 1. Phần hiển thị hình ảnh lớn */}
+        <div className="aspect-video w-full rounded-xl overflow-hidden bg-[#1a1a1a] border border-white/10 relative group">
+          {data.hinh_anh ? (
+            <img
+              src={data.hinh_anh}
+              alt=""
+              className="w-full h-full object-contain"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-white/20">
+              <Palette size={48} />
+            </div>
+          )}
+        </div>
+
+        {/* 2. Danh sách File thiết kế */}
+        {designFiles.length > 0 ? (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] text-white/40 font-bold uppercase">
+                File Thiết Kế Gốc ({designFiles.length})
+              </label>
+            </div>
+
+            <div className="grid gap-2">
+              {designFiles.map((url, idx) => (
+                <a
+                  key={idx}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-center gap-3 p-3 bg-[#151515] hover:bg-[#C69C6D] border border-white/10 hover:border-[#C69C6D] rounded-lg transition-all"
+                >
+                  <div className="w-8 h-8 rounded bg-black/20 flex items-center justify-center text-[#C69C6D] group-hover:text-black">
+                    <LinkIcon size={14} />
+                  </div>
+                  <div className="flex-1 overflow-hidden">
+                    <p className="text-xs text-[#C69C6D] group-hover:text-black font-mono truncate">
+                      {url}
+                    </p>
+                    <p className="text-[9px] text-white/40 group-hover:text-black/60 uppercase font-bold mt-0.5">
+                      Nhấn để mở / tải về
+                    </p>
+                  </div>
+                  <ExternalLink
+                    size={14}
+                    className="text-white/20 group-hover:text-black/40"
+                  />
+                </a>
+              ))}
+            </div>
+          </div>
+        ) : (
+          // Hiển thị nếu chưa có file
+          <div className="p-3 rounded-lg border border-dashed border-white/10 flex items-center justify-center gap-2 text-white/20">
+            <LinkIcon size={14} />
+            <span className="text-xs italic">Chưa có file thiết kế nào</span>
+          </div>
+        )}
+
+        {/* 3. Phần thông tin thuộc tính */}
+        <div className="grid gap-3 pt-2 border-t border-white/5">
+          {/* Phân loại */}
+          <div className="p-3 bg-[#151515] rounded-xl border border-white/5 flex items-center gap-3">
+            <Tag className="text-[#C69C6D]" size={18} />
+            <div>
+              <p className="text-[10px] text-white/40 font-bold uppercase">
+                Phân loại
+              </p>
+              <p className="text-white text-sm">{data.phan_loai}</p>
+            </div>
+          </div>
+
+          {/* Người thiết kế */}
+          <div className="p-3 bg-[#151515] rounded-xl border border-white/5 flex items-center gap-3">
+            <User className="text-[#C69C6D]" size={18} />
+            <div>
+              <p className="text-[10px] text-white/40 font-bold uppercase">
+                Người thiết kế
+              </p>
+              <p className="text-white text-sm">
+                {data.ten_nguoi_tao || "---"}
+              </p>
+            </div>
+          </div>
+
+          {/* Ngày tạo */}
+          <div className="p-3 bg-[#151515] rounded-xl border border-white/5 flex items-center gap-3">
+            <Calendar className="text-[#C69C6D]" size={18} />
+            <div>
+              <p className="text-[10px] text-white/40 font-bold uppercase">
+                Ngày tạo
+              </p>
+              <p className="text-white text-sm">
+                {new Date(data.tao_luc).toLocaleDateString("vi-VN")}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </KhungChiTiet>
+  );
+}
+</file>
+
+<file path="components/cacchucnang/mauthietke/MauThietKeForm.tsx">
+"use client";
+
+import React, { useState } from "react";
+import { Plus, Link as LinkIcon, Trash2 } from "lucide-react";
+import { KhungForm } from "@/app/components/KhungGiaoDien";
+import { MauThietKe, createMauThietKeConfig } from "./config";
+
+interface Props {
+  data: MauThietKe | null; // null = Tạo mới
+  onClose: () => void;
+  onSubmit: (formData: any) => Promise<void>;
+  loading: boolean;
+}
+
+export default function MauThietKeForm({
+  data,
+  onClose,
+  onSubmit,
+  loading,
+}: Props) {
+  const config = createMauThietKeConfig();
+
+  // Khởi tạo state form
+  const [formData, setFormData] = useState<
+    Partial<MauThietKe> & { file_thiet_ke?: string[] }
+  >(() => {
+    // Parse file_thiet_ke từ JSON nếu có
+    let files: string[] = [];
+    if (data && (data as any).file_thiet_ke) {
+      try {
+        files = Array.isArray((data as any).file_thiet_ke)
+          ? (data as any).file_thiet_ke
+          : JSON.parse((data as any).file_thiet_ke);
+      } catch {}
+    }
+    // 🟢 SỬA: Không tự động push dòng trống [""] nữa để tránh lỗi validate oan
+    // Người dùng muốn thêm thì bấm nút (+)
+    return data ? { ...data, file_thiet_ke: files } : { file_thiet_ke: [] };
+  });
+
+  // Handlers cho File Thiết Kế
+  const handleFileUrlChange = (index: number, value: string) => {
+    const newFiles = [...(formData.file_thiet_ke || [])];
+    newFiles[index] = value;
+    setFormData({ ...formData, file_thiet_ke: newFiles });
+  };
+
+  const addFileUrl = () => {
+    setFormData({
+      ...formData,
+      file_thiet_ke: [...(formData.file_thiet_ke || []), ""],
+    });
+  };
+
+  const removeFileUrl = (index: number) => {
+    const newFiles = [...(formData.file_thiet_ke || [])];
+    newFiles.splice(index, 1);
+    setFormData({ ...formData, file_thiet_ke: newFiles });
+  };
+
+  const handleSubmit = async () => {
+    // 🟢 1. VALIDATE CƠ BẢN
+    if (!formData.mo_ta?.trim()) {
+      alert("Vui lòng nhập Tên mẫu thiết kế!");
+      return;
+    }
+    if (!formData.phan_loai) {
+      alert("Vui lòng chọn Phân loại!");
+      return;
+    }
+
+    // 🟢 2. VALIDATE FILE THIẾT KẾ (BẮT BUỘC KHÔNG ĐƯỢC RỖNG)
+    const currentFiles = formData.file_thiet_ke || [];
+    // Kiểm tra xem có dòng nào chứa chuỗi rỗng không
+    const hasEmptyUrl = currentFiles.some((url) => url.trim() === "");
+
+    if (hasEmptyUrl) {
+      alert(
+        "Vui lòng điền đầy đủ đường dẫn File Thiết Kế hoặc xóa các dòng trống!"
+      );
+      return; // Chặn lưu
+    }
+
+    // Nếu mọi thứ ok -> Submit (Gửi nguyên mảng đã validate)
+    await onSubmit(formData);
+  };
+
+  return (
+    <KhungForm
+      onClose={onClose}
+      title={data ? "SỬA MẪU" : "THÊM MẪU MỚI"}
+      onSubmit={handleSubmit}
+      loading={loading}
+      isDirty={true} // Luôn bật confirm close
+      // Auto Upload Config
+      showAvatarUpload={true}
+      uploadBucket="images"
+      avatar={formData.hinh_anh}
+      onUploadComplete={(url) =>
+        setFormData((prev) => ({ ...prev, hinh_anh: url }))
+      }
+    >
+      <div className="space-y-4">
+        {/* Tên mẫu */}
+        <div>
+          <label className="text-xs font-bold text-white/60 mb-2 block uppercase">
+            Tên mẫu thiết kế <span className="text-red-500">*</span>
+          </label>
+          <input
+            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-[#C69C6D] outline-none placeholder-white/20"
+            value={formData.mo_ta || ""}
+            onChange={(e) =>
+              setFormData({ ...formData, mo_ta: e.target.value })
+            }
+            placeholder="Nhập tên mẫu..."
+          />
+        </div>
+
+        {/* Phân loại */}
+        <div>
+          <label className="text-xs font-bold text-white/60 mb-2 block uppercase">
+            Phân loại <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
+            <select
+              className="w-full bg-[#1a1a1a] text-white border border-white/10 rounded-lg px-4 py-3 focus:border-[#C69C6D] outline-none appearance-none"
+              value={formData.phan_loai || ""}
+              onChange={(e) =>
+                setFormData({ ...formData, phan_loai: e.target.value })
+              }
+            >
+              <option value="" className="bg-[#1a1a1a] text-gray-500">
+                -- Chọn loại --
+              </option>
+              {config.fields
+                .find((f) => f.key === "phan_loai")
+                ?.options?.map((opt: any) => (
+                  <option
+                    key={opt}
+                    value={opt}
+                    className="bg-[#1a1a1a] text-white py-2"
+                  >
+                    {opt}
+                  </option>
+                ))}
+            </select>
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-white/50 text-xs">
+              ▼
+            </div>
+          </div>
+        </div>
+
+        {/* File Thiết Kế (Multi-URL) */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-bold text-white/60 uppercase">
+              File Thiết Kế (Google Drive)
+            </label>
+            <button
+              type="button"
+              onClick={addFileUrl}
+              className="flex items-center gap-1 text-[10px] bg-[#C69C6D]/20 text-[#C69C6D] hover:bg-[#C69C6D] hover:text-black px-2 py-1 rounded transition-all font-bold"
+            >
+              <Plus size={12} /> THÊM LINK
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {(formData.file_thiet_ke || []).map((url, idx) => (
+              <div key={idx} className="flex gap-2 items-center">
+                <div className="flex-1 relative group">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-[#C69C6D] transition-colors">
+                    <LinkIcon size={14} />
+                  </div>
+                  {/* Ô nhập liệu có viền đỏ nếu rỗng (tuỳ chọn UI, ở đây dùng border chuẩn) */}
+                  <input
+                    className={`
+                        w-full bg-white/5 border rounded-lg pl-9 pr-4 py-2.5 text-white text-xs outline-none placeholder-white/20 transition-all
+                        ${
+                          url.trim() === ""
+                            ? "border-red-500/50 focus:border-red-500"
+                            : "border-white/10 focus:border-[#C69C6D]"
+                        }
+                    `}
+                    value={url}
+                    onChange={(e) => handleFileUrlChange(idx, e.target.value)}
+                    placeholder="Dán link Google Drive..."
+                    autoFocus={url === ""} // Tự focus vào dòng mới
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeFileUrl(idx)}
+                  className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+            {(formData.file_thiet_ke || []).length === 0 && (
+              <div className="text-[10px] text-white/20 italic text-center py-2 border border-dashed border-white/10 rounded-lg">
+                Chưa có link thiết kế nào.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </KhungForm>
+  );
+}
+</file>
+
+<file path="components/cacchucnang/mauthietke/MauThietKeList.tsx">
+"use client";
+
+import React from "react";
+import { Palette, User, Link as LinkIcon } from "lucide-react";
+import { MauThietKe } from "./config";
+
+interface Props {
+  items: MauThietKe[];
+  bulkMode: boolean;
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
+  onClickItem: (item: MauThietKe) => void;
+}
+
+export default function MauThietKeList({
+  items,
+  bulkMode,
+  selectedIds,
+  onToggleSelect,
+  onClickItem,
+}: Props) {
+  // Helper: Đếm số lượng file thiết kế
+  const getFileCount = (item: MauThietKe) => {
+    const files = item.file_thiet_ke;
+    if (Array.isArray(files))
+      return files.filter((f) => f && f.trim() !== "").length;
+    if (typeof files === "string") {
+      try {
+        const parsed = JSON.parse(files);
+        return Array.isArray(parsed)
+          ? parsed.filter((f: any) => f && f.trim() !== "").length
+          : 0;
+      } catch {
+        return 0;
+      }
+    }
+    return 0;
+  };
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 p-2 md:p-4">
+      {items.map((item) => {
+        const fileCount = getFileCount(item);
+
+        return (
+          <div
+            key={item.id}
+            onClick={(e) => {
+              if (bulkMode) {
+                e.stopPropagation();
+                onToggleSelect(item.id);
+              } else {
+                onClickItem(item);
+              }
+            }}
+            className={`
+                group relative bg-[#0f0f0f] border border-white/10 rounded-lg overflow-hidden cursor-pointer 
+                hover:border-[#C69C6D]/50 transition-all 
+                ${
+                  selectedIds.has(item.id)
+                    ? "border-[#C69C6D] bg-[#C69C6D]/10"
+                    : ""
+                }
+            `}
+          >
+            {/* 🟢 HIỂN THỊ SỐ LƯỢNG FILE THIẾT KẾ (Badge) */}
+            {fileCount > 0 && (
+              <div className="absolute top-1 left-1 z-10 flex items-center gap-1 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded text-[9px] font-bold text-[#C69C6D] border border-white/10 shadow-sm">
+                <LinkIcon size={10} />
+                <span>{fileCount}</span>
+              </div>
+            )}
+
+            {/* Checkbox Bulk Mode */}
+            {bulkMode && (
+              <div className="absolute top-1 right-1 z-10 w-5 h-5 border-2 rounded flex items-center justify-center transition-colors border-white/30 bg-black/50">
+                {selectedIds.has(item.id) && (
+                  <span className="text-[#C69C6D] font-bold text-xs">✓</span>
+                )}
+              </div>
+            )}
+
+            {/* Hình ảnh */}
+            <div className="aspect-square w-full bg-[#1a1a1a] relative group-hover:opacity-90 transition-opacity">
+              {item.hinh_anh ? (
+                <img
+                  src={item.hinh_anh}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-white/10">
+                  <Palette size={24} />
+                </div>
+              )}
+            </div>
+
+            {/* Nội dung (Đã căn giữa) */}
+            <div className="p-2 text-center">
+              <h3 className="font-bold text-white truncate text-xs leading-tight">
+                {item.mo_ta}
+              </h3>
+              <p className="text-[9px] text-[#C69C6D] mt-0.5 truncate uppercase opacity-80">
+                {item.phan_loai}
+              </p>
+              <div className="mt-1 flex items-center justify-center gap-1 text-[9px] text-white/30 truncate">
+                <User size={8} />
+                <span className="truncate">{item.ten_nguoi_tao || "---"}</span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -5583,52 +6785,55 @@ export default function KhungDanhSach({
 </file>
 
 <file path="components/KhungGiaoDien/KhungForm.tsx">
-'use client';
+"use client";
 
 /**
  * ============================================================
- * KHUNG FORM
+ * KHUNG FORM (CORE COMPONENT)
  * ============================================================
- * 
- * Panel form inline (không phải modal popup).
- * Style: Tab bar ngang + Actions góc phải (giống GenericFormInline)
+ * * Panel form inline chuẩn cho toàn hệ thống.
+ * * TÍNH NĂNG TÍCH HỢP SẴN:
+ * 1. Giao diện Header/Footer chuẩn.
+ * 2. Xác nhận khi đóng form nếu dữ liệu thay đổi (isDirty).
+ * 3. Tự động Nén ảnh (<1MB) và Upload lên Supabase (nếu có prop uploadBucket).
  */
 
-import React, { ReactNode, useState, useRef } from 'react';
-import { X, Save, Loader2, User, Camera, Plus } from 'lucide-react';
+import React, { ReactNode, useState, useRef } from "react";
+import { X, Save, Loader2, User, Camera } from "lucide-react";
+import { supabase } from "@/app/ThuVien/ketNoiSupabase";
+import { compressImage } from "@/app/ThuVien/compressImage";
 
 // ============================================================
 // TYPES
 // ============================================================
 
 export interface KhungFormProps {
-    // Data
-    isEditing?: boolean;
-    data?: any;
-    onClose: () => void;
-    
-    // Header
-    title?: string;
-    avatar?: string;
-    avatarFallback?: ReactNode;
-    showAvatarUpload?: boolean;
-    onAvatarChange?: (file: File | null) => void;
-    
-    // Form
-    onSubmit?: () => void | Promise<void>;
-    
-    // State
-    loading?: boolean;
-    isDirty?: boolean;
-    
-    // Validation
-    errors?: Record<string, string>;
-    
-    // Content
-    children: ReactNode;
-    
-    // Style
-    className?: string;
+  // Data
+  isEditing?: boolean;
+  data?: any;
+  onClose: () => void;
+
+  // Header Info
+  title?: string;
+  avatar?: string; // URL ảnh hiện tại
+  avatarFallback?: ReactNode;
+
+  // 🟢 CẤU HÌNH UPLOAD ẢNH TỰ ĐỘNG
+  showAvatarUpload?: boolean;
+  uploadBucket?: string; // Tên bucket trên Supabase (vd: 'images')
+  onUploadComplete?: (url: string) => void; // Callback trả về URL sau khi upload xong
+  onAvatarChange?: (file: File | null) => void; // (Legacy) Callback trả về file thô nếu muốn tự xử lý
+
+  // Form Actions
+  onSubmit?: () => void | Promise<void>;
+
+  // State
+  loading?: boolean; // Trạng thái đang lưu form
+  isDirty?: boolean; // Trạng thái đã chỉnh sửa (để hiện confirm khi đóng)
+
+  // Content
+  children: ReactNode;
+  className?: string;
 }
 
 // ============================================================
@@ -5636,220 +6841,297 @@ export interface KhungFormProps {
 // ============================================================
 
 export default function KhungForm({
-    isEditing = false,
-    data,
-    onClose,
-    title,
-    avatar,
-    avatarFallback,
-    showAvatarUpload = false,
-    onAvatarChange,
-    onSubmit,
-    loading = false,
-    isDirty = false,
-    errors = {},
-    children,
-    className = '',
+  isEditing = false,
+  onClose,
+  title,
+  avatar,
+  avatarFallback,
+  showAvatarUpload = false,
+  uploadBucket, // 🟢 Nhận tên bucket để kích hoạt auto-upload
+  onUploadComplete,
+  onAvatarChange,
+  onSubmit,
+  loading = false,
+  isDirty = false,
+  children,
+  className = "",
 }: KhungFormProps) {
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-    const [showConfirm, setShowConfirm] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
 
-    const handleClose = () => {
-        if (isDirty) {
-            setShowConfirm(true);
-        } else {
-            onClose();
+  // 🟢 State nội bộ để quản lý trạng thái upload ảnh
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Xử lý đóng form an toàn
+  const handleClose = () => {
+    if (isUploading) return; // Không cho đóng khi đang upload dở
+    if (isDirty) {
+      setShowConfirm(true);
+    } else {
+      onClose();
+    }
+  };
+
+  const handleConfirmClose = () => {
+    setShowConfirm(false);
+    onClose();
+  };
+
+  // Xử lý submit form
+  const handleSubmit = async () => {
+    if (loading || isUploading) return; // Chặn nếu đang bận
+    await onSubmit?.();
+  };
+
+  // Kích hoạt input file
+  const handleAvatarClick = () => {
+    if (!isUploading) fileInputRef.current?.click();
+  };
+
+  // 🟢 CORE LOGIC: XỬ LÝ ẢNH (Nén -> Upload -> Lấy URL)
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 1. Preview ngay lập tức cho mượt
+    const reader = new FileReader();
+    reader.onloadend = () => setAvatarPreview(reader.result as string);
+    reader.readAsDataURL(file);
+
+    // 2. Nếu có cấu hình bucket -> Tự động Nén & Upload
+    if (uploadBucket) {
+      try {
+        setIsUploading(true); // Bật loading
+
+        // A. Nén ảnh (Giảm dung lượng để tiết kiệm băng thông và Storage)
+        // Quality 0.7, Max width 1200px là đủ nét cho web
+        const compressedFile = await compressImage(file, 0.7, 1200);
+
+        // B. Tạo tên file an toàn (Timestamp + Random + Extension)
+        // Thay thế các ký tự đặc biệt để tránh lỗi URL
+        const safeName = file.name.replace(/[^a-zA-Z0-9]/g, "_");
+        const fileName = `img_${Date.now()}_${Math.floor(
+          Math.random() * 1000
+        )}_${safeName}.jpg`;
+
+        // C. Upload lên Supabase
+        const { error: uploadError } = await supabase.storage
+          .from(uploadBucket)
+          .upload(fileName, compressedFile, {
+            upsert: true,
+            contentType: "image/jpeg",
+          });
+
+        if (uploadError) throw uploadError;
+
+        // D. Lấy URL công khai
+        const { data: urlData } = supabase.storage
+          .from(uploadBucket)
+          .getPublicUrl(fileName);
+
+        // E. Trả về URL cho form cha để lưu vào DB
+        if (onUploadComplete) {
+          onUploadComplete(urlData.publicUrl);
         }
-    };
+      } catch (error: any) {
+        console.error("🔥 Upload failed:", error);
+        alert(`Lỗi tải ảnh: ${error.message || "Vui lòng kiểm tra kết nối"}`);
+        setAvatarPreview(null); // Reset preview nếu lỗi
+      } finally {
+        setIsUploading(false); // Tắt loading dù thành công hay thất bại
+      }
+    }
+    // 3. Nếu không cấu hình bucket -> Trả file thô về cho cha tự xử lý (Legacy support)
+    else {
+      onAvatarChange?.(file);
+    }
+  };
 
-    const handleConfirmClose = () => {
-        setShowConfirm(false);
-        onClose();
-    };
+  // Ảnh hiển thị: Ưu tiên Preview mới chọn > Ảnh cũ từ DB
+  const displayAvatar = avatarPreview || avatar;
 
-    const handleSubmit = async () => {
-        if (loading) return;
-        await onSubmit?.();
-    };
-
-    const handleAvatarClick = () => {
-        fileInputRef.current?.click();
-    };
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            // Preview
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setAvatarPreview(reader.result as string);
-            };
-            reader.readAsDataURL(file);
-            
-            // Callback
-            onAvatarChange?.(file);
-        }
-    };
-
-    const displayAvatar = avatarPreview || avatar;
-
-    return (
-        <div className={`w-full h-full flex flex-col bg-[#050505] overflow-hidden ${className}`}>
-            
-            {/* ====== TAB BAR ====== */}
-            <div className="shrink-0 h-[40px] flex items-center border-b border-white/5 bg-[#0a0a0a]">
-                
-                {/* Nút đóng + Avatar + Tên - cố định trái */}
-                <div className="shrink-0 flex items-center gap-2 px-2 border-r border-white/5">
-                    <button 
-                        onClick={handleClose} 
-                        disabled={loading}
-                        className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded transition-all disabled:opacity-50"
-                    >
-                        <X size={14} />
-                    </button>
-                    <div className="flex items-center gap-2 pr-2">
-                        {/* Avatar với upload */}
-                        <div 
-                            className={`relative w-6 h-6 rounded-full border border-[#C69C6D]/50 overflow-hidden bg-[#1a1a1a] shrink-0 ${showAvatarUpload ? 'cursor-pointer group' : ''}`}
-                            onClick={showAvatarUpload ? handleAvatarClick : undefined}
-                        >
-                            {displayAvatar ? (
-                                <img src={displayAvatar} alt="" className="w-full h-full object-cover" />
-                            ) : avatarFallback ? (
-                                <div className="w-full h-full flex items-center justify-center">
-                                    {avatarFallback}
-                                </div>
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                    <User size={10} className="text-[#C69C6D]/50" />
-                                </div>
-                            )}
-                            
-                            {/* Overlay camera icon */}
-                            {showAvatarUpload && (
-                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                    <Camera size={10} className="text-white" />
-                                </div>
-                            )}
-                        </div>
-                        
-                        <span className="text-[12px] font-bold text-[#C69C6D] uppercase tracking-wide">
-                            {isEditing ? (title || 'SỬA') : (title || 'THÊM MỚI')}
-                        </span>
-                    </div>
-                </div>
-
-                {/* Spacer */}
-                <div className="flex-1" />
-
-                {/* Actions - cố định phải */}
-                <div className="shrink-0 flex items-center gap-1 px-2 border-l border-white/5">
-                    <button 
-                        onClick={handleClose} 
-                        disabled={loading}
-                        className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white/60 rounded text-[10px] font-bold uppercase transition-all disabled:opacity-50"
-                    >
-                        HỦY
-                    </button>
-                    <button 
-                        onClick={handleSubmit} 
-                        disabled={loading}
-                        className="px-3 py-1.5 bg-[#C69C6D] hover:bg-white text-black rounded text-[10px] font-bold uppercase transition-all disabled:opacity-50 flex items-center gap-1"
-                    >
-                        {loading ? (
-                            <>
-                                <Loader2 size={12} className="animate-spin" />
-                                <span>ĐANG LƯU...</span>
-                            </>
-                        ) : (
-                            <>
-                                <Save size={12} />
-                                <span>LƯU</span>
-                            </>
-                        )}
-                    </button>
-                </div>
-            </div>
-
-            {/* Hidden file input */}
-            {showAvatarUpload && (
-                <input 
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleFileChange}
+  return (
+    <div
+      className={`w-full h-full flex flex-col bg-[#050505] overflow-hidden ${className}`}
+    >
+      {/* ====== HEADER BAR ====== */}
+      <div className="shrink-0 h-[45px] flex items-center border-b border-white/5 bg-[#0a0a0a]">
+        {/* TRÁI: Nút đóng + Info */}
+        <div className="shrink-0 flex items-center gap-3 px-3 border-r border-white/5">
+          <button
+            onClick={handleClose}
+            disabled={loading || isUploading}
+            className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-all disabled:opacity-50"
+          >
+            <X size={16} />
+          </button>
+          <div className="flex items-center gap-2 pr-2">
+            {/* Avatar Mini trên thanh header */}
+            <div className="relative w-7 h-7 rounded-full border border-[#C69C6D]/50 overflow-hidden bg-[#1a1a1a] shrink-0">
+              {displayAvatar ? (
+                <img
+                  src={displayAvatar}
+                  alt=""
+                  className="w-full h-full object-cover"
                 />
-            )}
-
-            {/* ====== CONTENT AREA ====== */}
-            <div className="flex-1 overflow-y-auto p-4">
-                <style jsx>{`.scrollbar-hide::-webkit-scrollbar { display: none; } .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }`}</style>
-                
-                {/* Avatar upload lớn (nếu có) */}
-                {showAvatarUpload && (
-                    <div className="flex justify-center mb-6">
-                        <div 
-                            onClick={handleAvatarClick}
-                            className="relative w-24 h-24 rounded-full border-2 border-[#C69C6D]/50 overflow-hidden bg-[#1a1a1a] cursor-pointer group"
-                        >
-                            {displayAvatar ? (
-                                <img src={displayAvatar} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                    <User size={32} className="text-[#C69C6D]/30" />
-                                </div>
-                            )}
-                            
-                            {/* Overlay */}
-                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity">
-                                <Camera size={20} className="text-white mb-1" />
-                                <span className="text-[8px] text-white/80 uppercase">Đổi ảnh</span>
-                            </div>
-                        </div>
-                    </div>
-                )}
-                
-                {/* Form fields */}
-                {children}
-            </div>
-
-            {/* ====== CONFIRM DIALOG ====== */}
-            {showConfirm && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80">
-                    <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 max-w-sm mx-4 text-center">
-                        <p className="text-white text-sm mb-6">Bạn có chắc muốn đóng? Các thay đổi chưa lưu sẽ mất.</p>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowConfirm(false)}
-                                className="flex-1 py-2 rounded-lg bg-white/5 text-white/60 font-bold text-xs uppercase hover:bg-white/10"
-                            >
-                                TIẾP TỤC
-                            </button>
-                            <button
-                                onClick={handleConfirmClose}
-                                className="flex-1 py-2 rounded-lg bg-red-600 text-white font-bold text-xs uppercase hover:bg-red-700"
-                            >
-                                ĐÓNG
-                            </button>
-                        </div>
-                    </div>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-[#C69C6D]/50">
+                  <User size={12} />
                 </div>
-            )}
+              )}
+            </div>
+            <span className="text-[11px] md:text-xs font-bold text-[#C69C6D] uppercase tracking-wider truncate max-w-[150px]">
+              {isEditing ? title || "CẬP NHẬT" : title || "THÊM MỚI"}
+            </span>
+          </div>
         </div>
-    );
+
+        <div className="flex-1" />
+
+        {/* PHẢI: Actions Buttons */}
+        <div className="shrink-0 flex items-center gap-2 px-3 border-l border-white/5">
+          <button
+            onClick={handleClose}
+            disabled={loading || isUploading}
+            className="hidden md:block px-4 py-1.5 bg-white/5 hover:bg-white/10 text-white/60 rounded-lg text-[10px] font-bold uppercase transition-all"
+          >
+            HỦY BỎ
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={loading || isUploading}
+            className={`
+                            px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all flex items-center gap-2
+                            ${
+                              loading || isUploading
+                                ? "bg-white/10 text-white/50 cursor-not-allowed"
+                                : "bg-[#C69C6D] hover:bg-[#b58b5d] text-black shadow-[0_0_10px_rgba(198,156,109,0.3)]"
+                            }
+                        `}
+          >
+            {loading || isUploading ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Save size={14} />
+            )}
+            <span>
+              {isUploading
+                ? "ĐANG TẢI ẢNH..."
+                : loading
+                ? "ĐANG LƯU..."
+                : "LƯU LẠI"}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* Hidden Input File */}
+      {showAvatarUpload && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+      )}
+
+      {/* ====== CONTENT AREA ====== */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
+        {/* Khu vực Upload Ảnh Lớn */}
+        {showAvatarUpload && (
+          <div className="flex justify-center mb-8">
+            <div
+              onClick={handleAvatarClick}
+              className={`
+                                relative w-28 h-28 rounded-full border-2 overflow-hidden bg-[#1a1a1a] group transition-all
+                                ${
+                                  isUploading
+                                    ? "border-[#C69C6D] cursor-wait scale-95"
+                                    : "border-[#C69C6D]/30 hover:border-[#C69C6D] cursor-pointer hover:shadow-lg"
+                                }
+                            `}
+            >
+              {displayAvatar ? (
+                <img
+                  src={displayAvatar}
+                  alt=""
+                  className={`w-full h-full object-cover transition-opacity ${
+                    isUploading ? "opacity-50" : "opacity-100"
+                  }`}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-[#C69C6D]/30">
+                  <User size={40} />
+                </div>
+              )}
+
+              {/* Overlay hiệu ứng */}
+              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity">
+                {isUploading ? (
+                  <div className="text-[#C69C6D] flex flex-col items-center gap-1">
+                    <Loader2 size={24} className="animate-spin" />
+                    <span className="text-[8px] font-bold uppercase">
+                      Uploading...
+                    </span>
+                  </div>
+                ) : (
+                  <div className="text-white flex flex-col items-center gap-1">
+                    <Camera size={24} />
+                    <span className="text-[8px] font-bold uppercase">
+                      Thay đổi
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Form Fields Children */}
+        {children}
+      </div>
+
+      {/* ====== CONFIRM DIALOG ====== */}
+      {showConfirm && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 max-w-xs w-full text-center shadow-2xl">
+            <h3 className="text-white font-bold text-lg mb-2">
+              Dữ liệu chưa lưu
+            </h3>
+            <p className="text-white/60 text-sm mb-6">
+              Bạn có chắc muốn đóng không? Mọi thay đổi sẽ bị mất.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowConfirm(false)}
+                className="flex-1 py-2.5 rounded-lg bg-white/5 text-white/70 font-bold text-xs uppercase hover:bg-white/10 transition-all"
+              >
+                Ở Lại
+              </button>
+              <button
+                onClick={handleConfirmClose}
+                className="flex-1 py-2.5 rounded-lg bg-red-600/80 hover:bg-red-600 text-white font-bold text-xs uppercase transition-all shadow-lg shadow-red-900/20"
+              >
+                Đóng & Hủy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 </file>
 
 <file path="components/KhungTrangChuan.tsx">
-'use client';
+"use client";
 
-import React, { ReactNode } from 'react';
-import MenuTren from '@/app/GiaoDienTong/MenuTren/MenuTren';
- 
-import { Z_INDEX } from '@/app/constants/zIndex';
+import React, { ReactNode } from "react";
+import MenuTren from "@/app/GiaoDienTong/MenuTren/MenuTren";
+
+import { Z_INDEX } from "@/app/constants/zIndex";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const BASE_IMG_URL = `${SUPABASE_URL}/storage/v1/object/public/hinh-nen`;
@@ -5861,32 +7143,44 @@ interface Props {
   contentClassName?: string;
 }
 
-export default function KhungTrangChuan({ 
-  children, 
-  nguoiDung, 
+export default function KhungTrangChuan({
+  children,
+  nguoiDung,
   loiChao,
-  contentClassName = "max-w-[1920px] mx-auto p-3 pb-24 md:p-6 md:pb-24 pt-24"
+  contentClassName = "max-w-[1920px] mx-auto p-3 pb-24 md:p-6 md:pb-24 pt-24",
 }: Props) {
-  
   const bgUrlMobile = `${BASE_IMG_URL}/trangchu-mobile.jpg`;
   const bgUrlTablet = `${BASE_IMG_URL}/trangchu-tablet.jpg`;
   const bgUrlDesktop = `${BASE_IMG_URL}/trangchu-desktop.jpg`;
 
-  const displayLoiChao = loiChao || `Xin chào, ${nguoiDung?.ho_ten || 'User'}`;
+  const displayLoiChao = loiChao || `Xin chào, ${nguoiDung?.ho_ten || "User"}`;
 
   return (
     <div className="relative w-full min-h-screen bg-[#050505] text-[#F5F5F5] font-sans overflow-x-hidden selection:bg-[#C69C6D] selection:text-black text-[14px]">
-      
       {/* LAYER 0: HÌNH NỀN CHUẨN */}
       <div className="fixed inset-0 w-full h-full z-0 pointer-events-none select-none bg-black">
-         <img src={bgUrlMobile} alt="BG" className="absolute inset-0 w-full h-full object-cover md:hidden opacity-100" />
-         <img src={bgUrlTablet} alt="BG" className="absolute inset-0 w-full h-full object-cover hidden md:block lg:hidden opacity-100" />
-         <img src={bgUrlDesktop} alt="BG" className="absolute inset-0 w-full h-full object-cover hidden lg:block opacity-100" />
-         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/40" />
+        <img
+          src={bgUrlMobile}
+          alt="BG"
+          className="absolute inset-0 w-full h-full object-cover md:hidden opacity-100"
+        />
+        <img
+          src={bgUrlTablet}
+          alt="BG"
+          className="absolute inset-0 w-full h-full object-cover hidden md:block lg:hidden opacity-100"
+        />
+        <img
+          src={bgUrlDesktop}
+          alt="BG"
+          className="absolute inset-0 w-full h-full object-cover hidden lg:block opacity-100"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/40" />
       </div>
 
       {/* LAYER 1: NỘI DUNG CHÍNH */}
-      <main className={`relative z-[10] w-full min-h-screen flex flex-col ${contentClassName}`}>
+      <main
+        className={`relative z-[10] w-full min-h-screen flex flex-col ${contentClassName}`}
+      >
         {children}
       </main>
 
@@ -5896,8 +7190,6 @@ export default function KhungTrangChuan({
 
       {/* LAYER 3: HỆ THỐNG MENU */}
       <MenuTren nguoiDung={nguoiDung} loiChao={displayLoiChao} />
-      
-     
     </div>
   );
 }
@@ -6949,102 +8241,113 @@ export default function StaffPresence() {
 </file>
 
 <file path="components/ThanhPhongChucNang.tsx">
-'use client';
-import React, { useState, useRef } from 'react';
-import { ChevronLeft, ChevronRight, ChevronDown, Check } from 'lucide-react';
+"use client";
+import React, { useState } from "react";
+import { Check, List } from "lucide-react";
 
 interface FunctionItem {
-    id: string;
-    label: string;
-    icon: React.ElementType;
+  id: string;
+  label: string;
+  icon: React.ElementType;
 }
 
 interface Props {
-    tenPhong: string;
-    functions: FunctionItem[];
-    activeFunction: string;
-    onFunctionChange: (id: string) => void;
+  tenPhong: string;
+  functions: FunctionItem[];
+  activeFunction: string;
+  onFunctionChange: (id: string) => void;
 }
 
-export default function ThanhPhongChucNang({ tenPhong, functions, activeFunction, onFunctionChange }: Props) {
-    const tabsRef = useRef<HTMLDivElement>(null);
-    const [showDropdown, setShowDropdown] = useState(false);
+export default function ThanhPhongChucNang({
+  tenPhong,
+  functions,
+  activeFunction,
+  onFunctionChange,
+}: Props) {
+  const [showDropdown, setShowDropdown] = useState(false);
 
-    const scrollTabs = (direction: 'left' | 'right') => {
-        if (tabsRef.current) {
-            const scrollAmount = 150;
-            tabsRef.current.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
-        }
-    };
+  // Tìm chức năng đang được chọn
+  const activeItem = functions.find((f) => f.id === activeFunction);
 
-    const activeItem = functions.find(f => f.id === activeFunction);
-    const ActiveIcon = activeItem?.icon;
+  return (
+    // justify-between: Đẩy Tên Phòng sang trái, Chức Năng sang phải
+    <div className="flex-none z-30 w-full h-[50px] bg-[#080808] border-b border-[#C69C6D]/20 shadow-md flex items-center justify-between px-4 md:px-6">
+      {/* 1. TÊN PHÒNG (BÊN TRÁI - Canh sát lề trái) */}
+      <div className="shrink-0 bg-gradient-to-r from-[#C69C6D] to-[#B58B5D] text-black px-4 py-1.5 rounded-l-md rounded-r-xl transform skew-x-[-10deg] shadow-[0_0_15px_rgba(198,156,109,0.3)]">
+        <h1 className="text-xs md:text-sm font-black uppercase tracking-[0.15em] skew-x-[10deg] whitespace-nowrap">
+          {tenPhong}
+        </h1>
+      </div>
 
-    return (
-        <div className="flex-none z-30 w-full h-[44px] bg-[#080808] border-b border-[#C69C6D]/30 shadow-[0_3px_10px_rgba(0,0,0,0.6)] flex items-center px-2 gap-1 md:px-3 md:gap-2">
-            {/* TÊN PHÒNG - Thu nhỏ */}
-            <div className="shrink-0 bg-[#C69C6D] text-black px-3 md:px-4 py-1 rounded-l-md rounded-r-xl transform skew-x-[-10deg] shadow-[0_0_10px_rgba(198,156,109,0.4)] border-r-2 border-white/20">
-                <h1 className="text-[10px] md:text-xs font-black uppercase tracking-[0.15em] skew-x-[10deg] whitespace-nowrap">{tenPhong}</h1>
+      {/* 2. TRÌNH CHỌN CHỨC NĂNG (BÊN PHẢI - Canh sát lề phải) */}
+      <div className="relative flex items-center">
+        <button
+          onClick={() => setShowDropdown(!showDropdown)}
+          className="flex items-center gap-3 group outline-none text-right"
+        >
+          {/* Tên chức năng - Chữ to, không viền */}
+          <span className="text-[#C69C6D] font-black text-base md:text-lg uppercase tracking-wide truncate max-w-[180px] sm:max-w-xs">
+            {activeItem?.label}
+          </span>
+
+          {/* Nút danh sách (Icon) - Cùng màu vàng */}
+          <List
+            size={24}
+            strokeWidth={2.5}
+            className={`transition-transform duration-300 ${
+              showDropdown
+                ? "rotate-90 text-white"
+                : "text-[#C69C6D] group-hover:text-white"
+            }`}
+          />
+        </button>
+
+        {/* MENU XỔ XUỐNG - Căn phải (right-0) */}
+        {showDropdown && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setShowDropdown(false)}
+            />
+
+            <div className="absolute top-full right-0 mt-3 w-[240px] bg-[#1a1a1a] rounded-lg shadow-[0_20px_50px_rgba(0,0,0,0.9)] overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 py-2 border border-white/5">
+              {functions.map((func) => {
+                const Icon = func.icon;
+                const isActive = func.id === activeFunction;
+                return (
+                  <button
+                    key={func.id}
+                    onClick={() => {
+                      onFunctionChange(func.id);
+                      setShowDropdown(false);
+                    }}
+                    className={`
+                                            w-full flex items-center justify-end gap-3 px-4 py-3 text-xs font-bold uppercase tracking-wide transition-all text-right
+                                            ${
+                                              isActive
+                                                ? "bg-[#C69C6D] text-black"
+                                                : "text-white/60 hover:bg-white/5 hover:text-white hover:pr-6"
+                                            }
+                                        `}
+                  >
+                    <span className="flex-1 truncate">{func.label}</span>
+                    <Icon size={16} strokeWidth={isActive ? 2.5 : 2} />
+                    {isActive && (
+                      <Check
+                        size={14}
+                        strokeWidth={3}
+                        className="shrink-0 order-first"
+                      />
+                    )}
+                  </button>
+                );
+              })}
             </div>
-
-            {/* NÚT XỔ DROPDOWN - Chọn nhanh */}
-            <div className="relative">
-                <button 
-                    onClick={() => setShowDropdown(!showDropdown)}
-                    className="flex items-center gap-1 px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[#C69C6D] transition-all active:scale-95"
-                >
-                    {ActiveIcon && <ActiveIcon size={14} strokeWidth={2.5} />}
-                    <ChevronDown size={14} className={`transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
-                </button>
-                
-                {/* Dropdown Menu */}
-                {showDropdown && (
-                    <>
-                        <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
-                        <div className="absolute top-full left-0 mt-1 bg-[#1a1a1a] border border-[#C69C6D]/30 rounded-lg shadow-[0_10px_30px_rgba(0,0,0,0.8)] z-50 min-w-[180px] overflow-hidden">
-                            {functions.map((func) => {
-                                const Icon = func.icon;
-                                const isActive = func.id === activeFunction;
-                                return (
-                                    <button 
-                                        key={func.id}
-                                        onClick={() => { onFunctionChange(func.id); setShowDropdown(false); }}
-                                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold uppercase tracking-wide transition-all border-b border-white/5 last:border-0 ${isActive ? 'bg-[#C69C6D]/20 text-[#C69C6D]' : 'text-white/60 hover:bg-white/10 hover:text-white'}`}
-                                    >
-                                        <Icon size={16} strokeWidth={2} />
-                                        <span className="flex-1 text-left">{func.label}</span>
-                                        {isActive && <Check size={14} className="text-[#C69C6D]" />}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </>
-                )}
-            </div>
-
-            {/* TABS SCROLL */}
-            <div className="flex-1 flex items-center min-w-0 gap-1">
-                <button onClick={() => scrollTabs('left')} className="p-0.5 text-[#C69C6D] hover:bg-white/10 rounded shrink-0 active:scale-95 transition-transform"><ChevronLeft size={16}/></button>
-                <div ref={tabsRef} className="flex-1 overflow-x-auto scrollbar-hide flex items-center gap-1 mask-linear-fade">
-                    <style jsx>{` .scrollbar-hide::-webkit-scrollbar { display: none; } .mask-linear-fade { mask-image: linear-gradient(to right, transparent 0%, black 3%, black 97%, transparent 100%); } `}</style>
-                    {functions.map((func) => {
-                        const Icon = func.icon;
-                        const isActive = func.id === activeFunction;
-                        return (
-                            <button 
-                                key={func.id} 
-                                onClick={() => onFunctionChange(func.id)} 
-                                className={`flex items-center gap-1 text-[9px] md:text-[10px] font-bold uppercase px-2 md:px-3 py-1.5 rounded transition-all whitespace-nowrap border ${isActive ? 'bg-white/10 text-[#C69C6D] border-[#C69C6D] shadow-[0_0_10px_rgba(198,156,109,0.2)]' : 'bg-transparent text-gray-500 border-transparent hover:text-white hover:bg-white/10'}`}
-                            >
-                                <Icon size={12} strokeWidth={2.5} /> {func.label}
-                            </button>
-                        )
-                    })}
-                </div>
-                <button onClick={() => scrollTabs('right')} className="p-0.5 text-[#C69C6D] hover:bg-white/10 rounded shrink-0 active:scale-95 transition-transform"><ChevronRight size={16}/></button>
-            </div>
-        </div>
-    );
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
 </file>
 
@@ -11375,57 +12678,63 @@ body {
 </file>
 
 <file path="layout.tsx">
-import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
-import './globals.css'; 
-import NutHoTro from '@/app/components/NutHoTro';
-import TuVanKhachHang from '@/app/components/TuVanKhachHang'; // 🟢 MỚI: Import nút của nhân viên
-import ForceFullScreen from '@/app/components/ForceFullScreen';
-import PushManager from '@/app/components/PushManager'; // 🔔 MỚI: Import trình quản lý thông báo đẩy
-// 🟢 IMPORT REACT QUERY PROVIDER
-import QueryProvider from '@/app/QueryProvider';
-// 🟢 IMPORT USER PROVIDER
-import { UserProvider } from '@/app/ThuVien/UserContext';
-// 🟢 IMPORT APP SETTINGS PROVIDER (Theme + Language)
-import { AppSettingsProvider } from '@/app/ThuVien/AppSettingsContext';
-// ✅ IMPORT ERROR BOUNDARY
-import ErrorBoundary from '@/app/components/ErrorBoundary';
+import type { Metadata, Viewport } from "next";
+// 🟢 1. CẬP NHẬT IMPORT FONT
+import { Inter, Playfair_Display } from "next/font/google";
+import "./globals.css";
+import NutHoTro from "@/app/components/NutHoTro";
+import TuVanKhachHang from "@/app/components/TuVanKhachHang";
+import ForceFullScreen from "@/app/components/ForceFullScreen";
+import PushManager from "@/app/components/PushManager";
+import QueryProvider from "@/app/QueryProvider";
+import { UserProvider } from "@/app/ThuVien/UserContext";
+import { AppSettingsProvider } from "@/app/ThuVien/AppSettingsContext";
+import ErrorBoundary from "@/app/components/ErrorBoundary";
 
-const inter = Inter({ subsets: ['latin'] });
+// 🟢 2. CẤU HÌNH FONT INTER (SANS)
+const inter = Inter({
+  subsets: ["latin", "vietnamese"], // Thêm vietnamese
+  display: "swap",
+  variable: "--font-inter",
+});
+
+// 🟢 3. CẤU HÌNH FONT PLAYFAIR DISPLAY (SERIF)
+const playfair = Playfair_Display({
+  subsets: ["latin", "vietnamese"], // Thêm vietnamese
+  display: "swap",
+  variable: "--font-playfair",
+  weight: ["400", "500", "600", "700", "800", "900"], // Nạp đủ độ đậm
+});
 
 export const metadata: Metadata = {
-  title: 'Hệ Thống Quản Lý ERP',
-  description: 'Generated by Tommy Nghiem',
-  manifest: '/manifest.json',
-  
-  // Cấu hình Icon chuẩn
+  title: "Hệ Thống Quản Lý ERP",
+  description: "Generated by Tommy Nghiem",
+  manifest: "/manifest.json",
   icons: {
-    icon: '/icon-192.png',
-    shortcut: '/icon-192.png',
-    apple: '/icon-192.png',
+    icon: "/icon-192.png",
+    shortcut: "/icon-192.png",
+    apple: "/icon-192.png",
     other: {
-      rel: 'apple-touch-icon-precomposed',
-      url: '/icon-192.png',
+      rel: "apple-touch-icon-precomposed",
+      url: "/icon-192.png",
     },
   },
-
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
-    title: 'NghiemArt ERP',
+    statusBarStyle: "black-translucent",
+    title: "NghiemArt ERP",
   },
 };
 
-// 🟢 FIX CẤU HÌNH VIEWPORT CHO SAMSUNG INTERNET & TABLET
 export const viewport: Viewport = {
-  width: 'device-width',
+  width: "device-width",
   initialScale: 1,
-  minimumScale: 1, // Ngăn thu nhỏ
-  maximumScale: 1, // Ngăn phóng to
+  minimumScale: 1,
+  maximumScale: 1,
   userScalable: false,
-  viewportFit: 'cover',
-  themeColor: '#000000',
-  interactiveWidget: 'resizes-visual',
+  viewportFit: "cover",
+  themeColor: "#000000",
+  interactiveWidget: "resizes-visual",
 };
 
 export default function RootLayout({
@@ -11435,25 +12744,21 @@ export default function RootLayout({
 }) {
   return (
     <html lang="vi">
-      <body className={`${inter.className} bg-black min-h-screen overflow-hidden overscroll-none`}>
-        {/* 🟢 BỌC USER PROVIDER CHO HỆ THỐNG AUTH */}
+      {/* 🟢 4. ÁP DỤNG BIẾN FONT VÀO BODY */}
+      {/* Thay inter.className bằng chuỗi biến variable */}
+      <body
+        className={`${inter.variable} ${playfair.variable} bg-black min-h-screen overflow-hidden overscroll-none font-sans`}
+      >
         <UserProvider>
-          {/* 🟢 BỌC APP SETTINGS PROVIDER CHO THEME + LANGUAGE */}
           <AppSettingsProvider>
             <QueryProvider>
               <ErrorBoundary>
                 <ForceFullScreen />
-                {children}  
-                
-                {/* 🟢 NÚT HỖ TRỢ CHO KHÁCH HÀNG (Góc Trái) */}
+                {children}
+
                 <NutHoTro />
-
-                {/* 🟢 NÚT TƯ VẤN CHO NHÂN VIÊN (Tự ẩn nếu là khách) */}
                 <TuVanKhachHang />
-
-                {/* 🔔 QUẢN LÝ THÔNG BÁO ĐẨY (PUSH NOTIFICATIONS) */}
                 <PushManager />
-
               </ErrorBoundary>
             </QueryProvider>
           </AppSettingsProvider>
@@ -12317,56 +13622,66 @@ export default function TrangChuDashboard() {
  * ============================================================
  * PHÒNG ADMIN - COMMAND CENTER
  * ============================================================
- * 
- * File page duy nhất của phòng admin.
+ * * File page duy nhất của phòng admin.
  * Gọi các chức năng từ cacchucnang với quyền FULL.
- * 
- * QUYỀN HẠN PHÒNG ADMIN:
+ * * QUYỀN HẠN PHÒNG ADMIN:
  * - allowView: ✅ Xem tất cả
  * - allowEdit: ✅ Sửa tất cả
  * - allowDelete: ✅ Xóa tất cả
  * - allowBulk: ✅ Thao tác hàng loạt
- * 
- * CÁC CHỨC NĂNG:
+ * * CÁC CHỨC NĂNG:
  * - Tổng quan Dashboard
  * - Nhân sự (full quyền)
  * - Khách hàng (full quyền)
+ * - Mẫu thiết kế (full quyền)
  * - Data Center (admin only)
  * - Cài đặt hệ thống (admin only)
  */
 
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { useUser } from '@/app/ThuVien/UserContext';
-import { 
-    Users, BookUser, LayoutDashboard, Database, Settings 
-} from 'lucide-react';
-import KhungTrangChuan from '@/app/components/KhungTrangChuan';
-import ThanhPhongChucNang from '@/app/components/ThanhPhongChucNang';
+import React, { useState, useEffect } from "react";
+import { useUser } from "@/app/ThuVien/UserContext";
+import {
+  Users,
+  BookUser,
+  LayoutDashboard,
+  Database,
+  Settings,
+  Palette,
+} from "lucide-react";
+import KhungTrangChuan from "@/app/components/KhungTrangChuan";
+import ThanhPhongChucNang from "@/app/components/ThanhPhongChucNang";
 
 // Import chức năng từ cacchucnang
-import { NhanSuChucNang } from '@/app/components/cacchucnang';
-import { KhachHangChucNang } from '@/app/components/cacchucnang/khachhang';
+import { NhanSuChucNang } from "@/app/components/cacchucnang";
+import { KhachHangChucNang } from "@/app/components/cacchucnang/khachhang";
+import { MauThietKeChucNang } from "@/app/components/cacchucnang/mauthietke";
 
 // ============================================================
 // QUYỀN HẠN PHÒNG ADMIN - FULL ACCESS
 // ============================================================
 
 const ADMIN_PERMISSIONS = {
-    nhansu: {
-        allowView: true,
-        allowEdit: true,
-        allowDelete: true,
-        allowBulk: true,
-    },
-    khachhang: {
-        allowView: true,
-        allowEdit: true,
-        allowDelete: true,
-        allowBulk: true,
-    },
-    // Thêm quyền cho các chức năng khác...
+  nhansu: {
+    allowView: true,
+    allowEdit: true,
+    allowDelete: true,
+    allowBulk: true,
+  },
+  khachhang: {
+    allowView: true,
+    allowEdit: true,
+    allowDelete: true,
+    allowBulk: true,
+  },
+  mauthietke: {
+    allowView: true,
+    allowEdit: true,
+    allowDelete: true,
+    allowBulk: true,
+  },
+  // Thêm quyền cho các chức năng khác...
 };
 
 // ============================================================
@@ -12374,13 +13689,12 @@ const ADMIN_PERMISSIONS = {
 // ============================================================
 
 const ADMIN_FUNCTIONS = [
-     
-    // Quản lý người dùng
-    { id: 'nhansu', label: 'NHÂN SỰ', icon: Users },
-    { id: 'khachhang', label: 'KHÁCH HÀNG', icon: BookUser },
-    // Admin only
-  
-    
+  // Quản lý người dùng
+  { id: "nhansu", label: "NHÂN SỰ", icon: Users },
+  { id: "khachhang", label: "KHÁCH HÀNG", icon: BookUser },
+  // Quản lý thiết kế
+  { id: "mauthietke", label: "MẪU THIẾT KẾ", icon: Palette },
+  // Admin only
 ];
 
 // ============================================================
@@ -12388,79 +13702,79 @@ const ADMIN_FUNCTIONS = [
 // ============================================================
 
 export default function PhongAdminPage() {
-    const { user: contextUser, loading: contextLoading } = useUser();
-    const [authLoading, setAuthLoading] = useState(true);
-    const [activeFunction, setActiveFunction] = useState<string>('dashboard');
+  const { user: contextUser, loading: contextLoading } = useUser();
+  const [authLoading, setAuthLoading] = useState(true);
+  const [activeFunction, setActiveFunction] = useState<string>("nhansu"); // Mặc định vào Nhân sự cho dễ thấy
 
-    useEffect(() => {
-        if (!contextLoading) setAuthLoading(false);
-    }, [contextLoading]);
+  useEffect(() => {
+    if (!contextLoading) setAuthLoading(false);
+  }, [contextLoading]);
 
-    // Loading state
-    if (authLoading) {
-        return (
-            <div className="min-h-screen bg-black flex items-center justify-center">
-                <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
-            </div>
-        );
-    }
-
-    // Get user info
-    let displayUser = contextUser;
-    if (!displayUser && typeof window !== 'undefined') {
-        try {
-            const stored = localStorage.getItem('USER_INFO');
-            displayUser = stored ? JSON.parse(stored) : null;
-        } catch (e) {
-            displayUser = null;
-        }
-    }
-
-    // ========================================
-    // RENDER
-    // ========================================
-
+  // Loading state
+  if (authLoading) {
     return (
-        <KhungTrangChuan
-            nguoiDung={displayUser}
-            loiChao="ADMIN COMMAND CENTER"
-            contentClassName="flex flex-col h-screen pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
-        >
-            {/* Thanh Phòng + Chức Năng */}
-            <ThanhPhongChucNang
-                tenPhong="PHÒNG ADMIN"
-                functions={ADMIN_FUNCTIONS}
-                activeFunction={activeFunction}
-                onFunctionChange={setActiveFunction}
-            />
-
-            {/* Content Area */}
-            <div className="flex-1 w-full relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-[#050505]">
-                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none" />
-                
-                <div className="absolute inset-0 z-10">
-                    <div className="w-full h-full flex flex-col relative">
-                        
-                        {/* ====== RENDER CÁC CHỨC NĂNG ====== */}
- 
-
-                        {/* Nhân sự - GỌI TỪ CACCHUCNANG với quyền ADMIN */}
-                        {activeFunction === 'nhansu' && (
-                            <NhanSuChucNang permissions={ADMIN_PERMISSIONS.nhansu} />
-                        )}
-
-                        {/* Khách hàng - GỌI TỪ CACCHUCNANG với quyền ADMIN */}
-                        {activeFunction === 'khachhang' && (
-                            <KhachHangChucNang permissions={ADMIN_PERMISSIONS.khachhang} />
-                        )}
-
-                    
-
-                    </div>
-                </div>
-            </div>
-        </KhungTrangChuan>
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
+      </div>
     );
+  }
+
+  // Get user info
+  let displayUser = contextUser;
+  if (!displayUser && typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem("USER_INFO");
+      displayUser = stored ? JSON.parse(stored) : null;
+    } catch (e) {
+      displayUser = null;
+    }
+  }
+
+  // ========================================
+  // RENDER
+  // ========================================
+
+  return (
+    <KhungTrangChuan
+      nguoiDung={displayUser}
+      loiChao="ADMIN COMMAND CENTER"
+      contentClassName="flex flex-col h-screen pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
+    >
+      {/* Thanh Phòng + Chức Năng */}
+      <ThanhPhongChucNang
+        tenPhong="PHÒNG ADMIN"
+        functions={ADMIN_FUNCTIONS}
+        activeFunction={activeFunction}
+        onFunctionChange={setActiveFunction}
+      />
+
+      {/* Content Area */}
+      <div className="flex-1 w-full relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-[#050505]">
+        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none" />
+
+        <div className="absolute inset-0 z-10">
+          <div className="w-full h-full flex flex-col relative">
+            {/* ====== RENDER CÁC CHỨC NĂNG ====== */}
+
+            {/* Nhân sự - GỌI TỪ CACCHUCNANG với quyền ADMIN */}
+            {activeFunction === "nhansu" && (
+              <NhanSuChucNang permissions={ADMIN_PERMISSIONS.nhansu} />
+            )}
+
+            {/* Khách hàng - GỌI TỪ CACCHUCNANG với quyền ADMIN */}
+            {activeFunction === "khachhang" && (
+              <KhachHangChucNang permissions={ADMIN_PERMISSIONS.khachhang} />
+            )}
+
+            {/* Mẫu thiết kế - GỌI TỪ CACCHUCNANG với quyền ADMIN */}
+            {activeFunction === "mauthietke" && (
+              <MauThietKeChucNang permissions={ADMIN_PERMISSIONS.mauthietke} />
+            )}
+          </div>
+        </div>
+      </div>
+    </KhungTrangChuan>
+  );
 }
 
 // ============================================================
@@ -12468,21 +13782,21 @@ export default function PhongAdminPage() {
 // ============================================================
 
 function PlaceholderScreen({ text }: { text: string }) {
-    return (
-        <div className="h-full flex items-center justify-center text-white/30 font-bold uppercase">
-            {text}
-        </div>
-    );
+  return (
+    <div className="h-full flex items-center justify-center text-white/30 font-bold uppercase">
+      {text}
+    </div>
+  );
 }
 
 function DashboardPlaceholder() {
-    return (
-        <div className="h-full flex flex-col items-center justify-center text-white/30">
-            <LayoutDashboard size={64} className="mb-4 opacity-30" />
-            <p className="font-bold uppercase">Dashboard Tổng Quan</p>
-            <p className="text-sm mt-2">Đang phát triển...</p>
-        </div>
-    );
+  return (
+    <div className="h-full flex flex-col items-center justify-center text-white/30">
+      <LayoutDashboard size={64} className="mb-4 opacity-30" />
+      <p className="font-bold uppercase">Dashboard Tổng Quan</p>
+      <p className="text-sm mt-2">Đang phát triển...</p>
+    </div>
+  );
 }
 </file>
 
@@ -13047,80 +14361,120 @@ export default function PhongSales() {
 </file>
 
 <file path="phongthietke/page.tsx">
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { useUser } from '@/app/ThuVien/UserContext';
-import KhungTrangChuan from '@/app/components/KhungTrangChuan';
-import ThanhPhongChucNang from '@/app/components/ThanhPhongChucNang';
-import { KhachHangChucNang } from '@/app/components/cacchucnang/khachhang';
-import { UserCheck } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation"; // Import Router để chuyển trang
+import { useUser } from "@/app/ThuVien/UserContext";
+import KhungTrangChuan from "@/app/components/KhungTrangChuan";
+import ThanhPhongChucNang from "@/app/components/ThanhPhongChucNang";
+import { Palette } from "lucide-react";
 
-// Quyền của Thiết kế: xem - KHÔNG sửa, KHÔNG xóa
+// Import chức năng Mẫu Thiết Kế
+import MauThietKeChucNang from "@/app/components/cacchucnang/mauthietke/MauThietKeChucNang";
+
+// ============================================================
+// CẤU HÌNH QUYỀN HẠN PHÒNG THIẾT KẾ
+// ============================================================
 const THIETKE_PERMISSIONS = {
-    allowView: true,
-    allowEdit: false,
-    allowDelete: false,
-    allowBulk: false,
+  allowView: true,
+  allowEdit: true,
+  allowDelete: false, // Không được xóa
+  allowBulk: false,
 };
 
 const THIETKE_FUNCTIONS = [
-    { id: 'khachhang', label: 'KHÁCH HÀNG', icon: UserCheck },
+  { id: "mauthietke", label: "KHO THIẾT KẾ", icon: Palette },
 ];
 
+// ============================================================
+// COMPONENT CHÍNH
+// ============================================================
+
 export default function PhongThietKe() {
-    const { user: contextUser, loading: contextLoading } = useUser();
-    const [authLoading, setAuthLoading] = useState(true);
-    const [activeFunction, setActiveFunction] = useState<string>('khachhang');
+  const router = useRouter(); // Khởi tạo router
+  const { user: contextUser, loading: contextLoading } = useUser();
+  const [authLoading, setAuthLoading] = useState(true);
 
-    useEffect(() => {
-        if (!contextLoading) setAuthLoading(false);
-    }, [contextLoading]);
+  // Mặc định vào thẳng Mẫu thiết kế
+  const [activeFunction, setActiveFunction] = useState<string>("mauthietke");
 
-    if (authLoading) {
-        return (
-            <div className="min-h-screen bg-black flex items-center justify-center">
-                <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
-            </div>
-        );
-    }
-
-    let displayUser = contextUser;
-    if (!displayUser && typeof window !== 'undefined') {
+  // 🟢 LOGIC KIỂM TRA ĐĂNG NHẬP
+  useEffect(() => {
+    // Chỉ chạy khi Context đã load xong
+    if (!contextLoading) {
+      // Kiểm tra user trong Context hoặc LocalStorage (đề phòng reload trang)
+      let currentUser = contextUser;
+      if (!currentUser && typeof window !== "undefined") {
         try {
-            const stored = localStorage.getItem('USER_INFO');
-            displayUser = stored ? JSON.parse(stored) : null;
-        } catch (e) {
-            displayUser = null;
-        }
+          const stored = localStorage.getItem("USER_INFO");
+          currentUser = stored ? JSON.parse(stored) : null;
+        } catch {}
+      }
+
+      // Nếu vẫn không có user -> Đá về TRANG CHỦ
+      if (!currentUser) {
+        router.push("/trangchu");
+      } else {
+        // Đã đăng nhập -> Tắt màn hình loading
+        setAuthLoading(false);
+      }
     }
+  }, [contextLoading, contextUser, router]);
 
+  // Màn hình chờ trong lúc kiểm tra (Loading Screen)
+  if (authLoading) {
     return (
-        <KhungTrangChuan
-            nguoiDung={displayUser}
-            loiChao="PHÒNG THIẾT KẾ"
-            contentClassName="flex flex-col h-screen pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
-        >
-            <ThanhPhongChucNang
-                tenPhong="PHÒNG THIẾT KẾ"
-                functions={THIETKE_FUNCTIONS}
-                activeFunction={activeFunction}
-                onFunctionChange={setActiveFunction}
-            />
-
-            <div className="flex-1 w-full relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-[#050505]">
-                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none" />
-                
-                <div className="absolute inset-0 z-10">
-                    <div className="w-full h-full flex flex-col relative">
-                        {activeFunction === 'khachhang' && (
-                            <KhachHangChucNang permissions={THIETKE_PERMISSIONS} />
-                        )}
-                    </div>
-                </div>
-            </div>
-        </KhungTrangChuan>
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
+          <p className="text-[#C69C6D] text-xs font-bold animate-pulse uppercase">
+            Đang kiểm tra quyền truy cập...
+          </p>
+        </div>
+      </div>
     );
+  }
+
+  // Get User info fallback (để hiển thị lên Header)
+  let displayUser = contextUser;
+  if (!displayUser && typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem("USER_INFO");
+      displayUser = stored ? JSON.parse(stored) : null;
+    } catch {
+      displayUser = null;
+    }
+  }
+
+  return (
+    <KhungTrangChuan
+      nguoiDung={displayUser}
+      loiChao="PHÒNG THIẾT KẾ"
+      contentClassName="flex flex-col h-screen pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
+    >
+      {/* Thanh Chức Năng */}
+      <ThanhPhongChucNang
+        tenPhong="PHÒNG THIẾT KẾ"
+        functions={THIETKE_FUNCTIONS}
+        activeFunction={activeFunction}
+        onFunctionChange={setActiveFunction}
+      />
+
+      {/* Vùng Nội Dung Chính */}
+      <div className="flex-1 w-full relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-[#050505]">
+        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none" />
+
+        <div className="absolute inset-0 z-10">
+          <div className="w-full h-full flex flex-col relative">
+            {activeFunction === "mauthietke" && (
+              <MauThietKeChucNang permissions={THIETKE_PERMISSIONS} />
+            )}
+          </div>
+        </div>
+      </div>
+    </KhungTrangChuan>
+  );
 }
 </file>
 
@@ -13615,56 +14969,75 @@ Thêm vào globals.css:
 </file>
 
 <file path="ThuVien/compressImage.ts">
-// File: app/ThuVien/compressImage.ts
-
-export const compressImage = async (file: File, quality: number = 0.8, maxWidth: number = 1920): Promise<File> => {
+export const compressImage = async (
+  file: File,
+  quality: number = 0.8,
+  maxWidth: number = 1920
+): Promise<File> => {
   return new Promise((resolve, reject) => {
+    // Validate input
+    if (!file) {
+      reject(new Error("No file provided"));
+      return;
+    }
+
     const reader = new FileReader();
     reader.readAsDataURL(file);
+
     reader.onload = (event) => {
       const img = new Image();
       img.src = event.target?.result as string;
+
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
+        try {
+          const canvas = document.createElement("canvas");
+          let width = img.width;
+          let height = img.height;
 
-        // Resize nếu ảnh quá lớn
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
+          // Resize nếu ảnh quá lớn
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            reject(new Error("Canvas context error"));
+            return;
+          }
+
+          // Vẽ ảnh lên canvas
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Xuất blob
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                reject(new Error("Compression failed: Blob is null"));
+                return;
+              }
+              // Tạo file mới từ blob đã nén
+              const compressedFile = new File([blob], file.name, {
+                type: "image/jpeg",
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            },
+            "image/jpeg",
+            quality
+          );
+        } catch (e) {
+          reject(e);
         }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error("Canvas context error"));
-          return;
-        }
-
-        ctx.drawImage(img, 0, 0, width, height);
-
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              reject(new Error("Compression failed"));
-              return;
-            }
-            // Tạo file mới từ blob đã nén
-            const compressedFile = new File([blob], file.name, {
-              type: 'image/jpeg',
-              lastModified: Date.now(),
-            });
-            resolve(compressedFile);
-          },
-          'image/jpeg',
-          quality // Chất lượng nén (0.1 - 1.0)
-        );
       };
-      img.onerror = (err) => reject(err);
+
+      img.onerror = (err) => reject(new Error("Image load error"));
     };
-    reader.onerror = (err) => reject(err);
+
+    reader.onerror = (err) => reject(new Error("File read error"));
   });
 };
 </file>
@@ -15059,527 +16432,576 @@ export default function NutDatHang() {
 </file>
 
 <file path="trangchu/page.tsx">
-'use client';
+"use client";
 
-import React, { useState, useEffect, useCallback, Suspense } from 'react';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { PlayCircle, Star, ArrowRight, LogIn } from 'lucide-react';
+import React, { useState, useEffect, useCallback, Suspense } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { PlayCircle, Star, ArrowRight, LogIn } from "lucide-react";
 
 // Import các component hệ thống
-import MenuTren from '@/app/GiaoDienTong/MenuTren/MenuTren';
- 
+import MenuTren from "@/app/GiaoDienTong/MenuTren/MenuTren";
 
 // Import component con
-import Slider1 from './slider1';
-import Slider2 from './slider2';
-import NutDatHang from './NutDatHang';
-import BackgroundManager from './BackgroundManager';
-import { useUser } from '@/app/ThuVien/UserContext';
-import { Z_INDEX } from '@/app/constants/zIndex';
-import { isRouteAllowed, getRedirectUrl } from '@/app/CongDangNhap/RoleRedirectService';
-import { useAppSettings } from '@/app/ThuVien/AppSettingsContext';
+import Slider1 from "./slider1";
+import Slider2 from "./slider2";
+import NutDatHang from "./NutDatHang";
+import BackgroundManager from "./BackgroundManager";
+import { useUser } from "@/app/ThuVien/UserContext";
+import { getRedirectUrl } from "@/app/CongDangNhap/RoleRedirectService";
+import { useAppSettings } from "@/app/ThuVien/AppSettingsContext";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const BASE_IMG_URL = `${SUPABASE_URL}/storage/v1/object/public/hinh-nen`;
 
-// 🟢 ĐỔI TÊN COMPONENT CHÍNH THÀNH Content (Không export default nữa)
 function TrangChuContent() {
-    const router = useRouter();
-    const pathname = usePathname(); // Lấy đường dẫn hiện tại
-    const searchParams = useSearchParams(); // Lấy query parameters
-    const { user: contextUser, loading: contextLoading } = useUser();
-    const { t, language } = useAppSettings(); // 🌐 Hook ngôn ngữ
-    
-    const [nguoiDung, setNguoiDung] = useState<any>(null);
-    const [loiChao, setLoiChao] = useState('');
-    const [daKiemTraLogin, setDaKiemTraLogin] = useState(false);
-    const [currentTime, setCurrentTime] = useState<string>('');
-    const [showGreeting, setShowGreeting] = useState(true);
-    const [hasGreetingFinished, setHasGreetingFinished] = useState(false);
-    const [showScrollHint, setShowScrollHint] = useState(false);
-    const [scrollStartTime, setScrollStartTime] = useState<number | null>(null);
-    
-    // 🟢 QUẢN LÝ TRẠNG THÁI HIỂN THỊ THÔNG MINH
-    const [activeOverlays, setActiveOverlays] = useState<Set<string>>(new Set());
-    const [bgVersion, setBgVersion] = useState(Date.now());
-    const [showHero, setShowHero] = useState(true);
-    const [hasScrolled, setHasScrolled] = useState(false);
-    const smoothScrollTo = useCallback((targetY: number, duration = 1200) => {
-        const startY = typeof window !== 'undefined' ? window.scrollY : 0;
-        const diff = targetY - startY;
-        const start = typeof performance !== 'undefined' ? performance.now() : 0;
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { user: contextUser, loading: contextLoading } = useUser();
+  const { t, language } = useAppSettings();
 
-        const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  const [nguoiDung, setNguoiDung] = useState<any>(null);
+  const [loiChao, setLoiChao] = useState("");
+  const [daKiemTraLogin, setDaKiemTraLogin] = useState(false);
+  const [currentTime, setCurrentTime] = useState<string>("");
+  const [showGreeting, setShowGreeting] = useState(true);
+  const [hasGreetingFinished, setHasGreetingFinished] = useState(false);
+  const [showScrollHint, setShowScrollHint] = useState(false);
+  const [scrollStartTime, setScrollStartTime] = useState<number | null>(null);
 
-        const step = (now: number) => {
-            const elapsed = now - start;
-            const t = Math.min(1, elapsed / duration);
-            const eased = easeInOutCubic(t);
-            window.scrollTo(0, startY + diff * eased);
-            if (t < 1) requestAnimationFrame(step);
-        };
+  // UI State
+  const [activeOverlays, setActiveOverlays] = useState<Set<string>>(new Set());
+  const [bgVersion, setBgVersion] = useState(Date.now());
+  const [showHero, setShowHero] = useState(true);
+  const [hasScrolled, setHasScrolled] = useState(false);
 
-        requestAnimationFrame(step);
-    }, []);
+  // Smooth Scroll
+  const smoothScrollTo = useCallback((targetY: number, duration = 1200) => {
+    const startY = typeof window !== "undefined" ? window.scrollY : 0;
+    const diff = targetY - startY;
+    const start = typeof performance !== "undefined" ? performance.now() : 0;
+    const easeInOutCubic = (t: number) =>
+      t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    const step = (now: number) => {
+      const elapsed = now - start;
+      const t = Math.min(1, elapsed / duration);
+      const eased = easeInOutCubic(t);
+      window.scrollTo(0, startY + diff * eased);
+      if (t < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, []);
 
-    const bgUrlMobile = `${BASE_IMG_URL}/trangchu-mobile.jpg?t=${bgVersion}`;
-    const bgUrlTablet = `${BASE_IMG_URL}/trangchu-tablet.jpg?t=${bgVersion}`;
-    const bgUrlDesktop = `${BASE_IMG_URL}/trangchu-desktop.jpg?t=${bgVersion}`;
+  const bgUrlMobile = `${BASE_IMG_URL}/trangchu-mobile.jpg?t=${bgVersion}`;
+  const bgUrlTablet = `${BASE_IMG_URL}/trangchu-tablet.jpg?t=${bgVersion}`;
+  const bgUrlDesktop = `${BASE_IMG_URL}/trangchu-desktop.jpg?t=${bgVersion}`;
 
-    // ✅ Load user từ localStorage (đơn giản hóa, không cần permission check)
-    useEffect(() => {
-        // ✅ Check nếu có query param login=1 thì bỏ qua load user, force hiện UI để cổng đăng nhập xuất hiện
-        const urlParams = new URLSearchParams(window.location.search);
-        const shouldShowLogin = urlParams.get('login') === '1';
-        
-        if (shouldShowLogin) {
-            console.log('🔑 Hiện cổng đăng nhập theo query param');
-            setDaKiemTraLogin(true);
-            setNguoiDung(null);
-            window.history.replaceState({}, '', '/trangchu');
-            return;
-        }
+  // ============================================================
+  // 🟢 LOGIC KIỂM TRA USER
+  // ============================================================
+  useEffect(() => {
+    // 1. Nếu có param ?login=1 thì reset user để hiện nút đăng nhập
+    const shouldShowLogin = searchParams.get("login") === "1";
+    if (shouldShowLogin) {
+      setDaKiemTraLogin(true);
+      setNguoiDung(null);
+      window.history.replaceState({}, "", "/trangchu");
+      return;
+    }
 
-        // ✅ TIMEOUT FALLBACK: Force show UI after 2s to prevent infinite black screen
-        const timeoutId = setTimeout(() => {
-            if (!daKiemTraLogin) {
-                console.warn('⚠️ TrangChuDashboard: Context loading timeout - forcing UI load');
-                setDaKiemTraLogin(true);
-                
-                const storedUser = localStorage.getItem('USER_INFO');
-                if (storedUser) {
-                    try {
-                        setNguoiDung(JSON.parse(storedUser));
-                    } catch (e) {
-                        console.error('Error parsing stored user in timeout', e);
-                    }
-                } else {
-                    // 🟢 Không có user → redirect về trang chủ để login
-                    router.replace('/');
-                    return;
-                }
-            }
-        }, 2000);
-
-        // ✅ Wait for context to finish loading
-        if (contextLoading) return () => clearTimeout(timeoutId);
-        
-        try {
-            // ✅ Load user từ context hoặc localStorage
-            if (contextUser) {
-                const viTriRaw = (contextUser as any)?.vi_tri;
-                const viTriNormalized = (contextUser as any)?.vi_tri_normalized;
-                const phanLoaiNormalized = (contextUser as any)?.phan_loai_normalized;
-                const userType = contextUser.userType;
-                const roleNormalized = userType === 'nhan_su' ? viTriNormalized : phanLoaiNormalized;
-
-                // 🔴 CHẶN NHÂN SỰ VÀO TRANGCHU - Redirect về phòng của họ
-                    if (userType === 'nhan_su') {
-                    console.log('🔴 Nhân sự không được vào /trangchu - redirect về phòng làm việc');
-                    getRedirectUrl(userType, roleNormalized).then((targetRoute: string) => {
-                        router.replace(targetRoute);
-                    });
-                    return;
-                }
-
-                const userData = {
-                    id: contextUser.id,
-                    ho_ten: contextUser.ho_ten || 'Người dùng',
-                    email: contextUser.email,
-                    userType: contextUser.userType,
-                    role: roleNormalized,
-                    vi_tri: viTriRaw || viTriNormalized || phanLoaiNormalized,
-                };
-
-                setNguoiDung(userData);
-            } else {
-                // ✅ Fallback: localStorage hoặc visitor cookie
-                const storedUser = localStorage.getItem('USER_INFO');
-                const isVisitor = document.cookie.includes('VISITOR_MODE=1');
-                
-                if (storedUser) {
-                    try {
-                        const parsed = JSON.parse(storedUser);
-                        
-                        // 🔴 CHẶN NHÂN SỰ VÀO TRANGCHU (từ localStorage)
-                        if (parsed.userType === 'nhan_su') {
-                            console.log('🔴 Nhân sự không được vào /trangchu - redirect về phòng làm việc');
-                            getRedirectUrl(parsed.userType, parsed.vi_tri_normalized || parsed.role).then((targetRoute: string) => {
-                                router.replace(targetRoute);
-                            });
-                            return;
-                        }
-                        
-                        setNguoiDung(parsed);
-                    } catch (e) {
-                        console.error('Error parsing stored user', e);
-                        setNguoiDung(null);
-                    }
-                } else if (!isVisitor) {
-                    // 🟢 Không có user và không phải visitor → redirect về trang login
-                    router.replace('/');
-                    return;
-                }
-            }
-        } finally {
-            clearTimeout(timeoutId);
-            setDaKiemTraLogin(true);
-        }
-    }, [contextUser, contextLoading, router]);
-
-    // Set greeting: time-based "Chào buổi ... <name>" and trigger animation (~5s)
-    useEffect(() => {
-        const name = nguoiDung?.ho_ten || t('home.guest');
-        const h = new Date().getHours();
-        let timeGreeting = t('home.goodEvening');
-        if (h >= 5 && h < 11) timeGreeting = t('home.goodMorning');
-        else if (h >= 11 && h < 14) timeGreeting = language === 'vi' ? 'Chào buổi trưa' : 'Good afternoon';
-        else if (h >= 14 && h < 18) timeGreeting = t('home.goodAfternoon');
-
-        setLoiChao(`${timeGreeting}, ${name}!`);
-
-        // Reset animation states whenever user changes
-        setShowGreeting(true);
-        setHasGreetingFinished(false);
-        setScrollStartTime(null);
-
-        const hideTimer = setTimeout(() => {
-            setShowGreeting(false);
-            setShowScrollHint(true); // Show scroll hint after greeting disappears
-        }, 5000); // show for ~5s
-
-        const finishTimer = setTimeout(() => {
-            setHasGreetingFinished(true);
-            setShowScrollHint(false); // Hide scroll hint when auto-scroll begins
-        }, 5700); // allow fade-out to finish
-
-        return () => {
-            clearTimeout(hideTimer);
-            clearTimeout(finishTimer);
-        };
-    }, [nguoiDung, t, language]);
-
-    // After greeting finishes, auto scroll up to content (slider 1 area) and hide hero
-    useEffect(() => {
-        if (!hasGreetingFinished) return;
-        setShowHero(false);
-        const target = document.getElementById('content-start');
-        const top = target ? target.offsetTop : window.innerHeight;
-        smoothScrollTo(top, 1400);
-    }, [hasGreetingFinished, smoothScrollTo]);
-
-    // Cập nhật đồng hồ thời gian
-    useEffect(() => {
-        const updateTime = () => {
-            const now = new Date();
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            setCurrentTime(`${hours}:${minutes}:${seconds}`);
-        };
-
-        updateTime();
-        const interval = setInterval(updateTime, 1000);
-        return () => clearInterval(interval);
-    }, []);
-
-    useEffect(() => {
-        const handleVisibilityChange = (e: any) => {
-            const { id, open } = e.detail;
-            setActiveOverlays(prev => {
-                const next = new Set(prev);
-                if (open) next.add(id);
-                else next.delete(id);
-                return next;
-            });
-            // Ẩn hero khi modal mở
-            if (open) setShowHero(false);
-        };
-
-        window.addEventListener('toggle-content-visibility', handleVisibilityChange);
-        return () => window.removeEventListener('toggle-content-visibility', handleVisibilityChange);
-    }, []);
-
-    // 🟢 HANDLE QUERY PARAM: ?openModal=X (Auto-open modal for nhan_su on redirect)
-    useEffect(() => {
-        const openModal = searchParams.get('openModal');
-        if (openModal) {
-            // Dispatch event để mở modal
-            window.dispatchEvent(new CustomEvent('openModal', { detail: { modalId: openModal } }));
-            // Ẩn hero
-            setShowHero(false);
-        }
-    }, [searchParams]);
-
-    const handleMenuToggle = useCallback((isMenuOpen: boolean) => {
-        setActiveOverlays(prev => {
-            const next = new Set(prev);
-            if (isMenuOpen) next.add('menu-duoi');
-            else next.delete('menu-duoi');
-            return next;
-        });
-        // Ẩn hero khi menu mở
-        if (isMenuOpen) setShowHero(false);
-    }, []);
-
-    const handleUpdateBackground = useCallback(() => {
-        setBgVersion(Date.now());
-    }, []);
-
-    const isVisitor = nguoiDung?.userType === 'guest' || nguoiDung?.role === 'visitor';
-
-    const handleGoToLogin = useCallback(() => {
-        // Xoá chế độ khách và chuyển ra trang login với query mở popup
-        document.cookie = 'VISITOR_MODE=; Path=/; Max-Age=0; SameSite=Lax';
-        localStorage.removeItem('USER_INFO');
-        localStorage.removeItem('USER_ROLE');
-        router.push('/?login=1');
-    }, [router]);
-
-    const handleScrollToHome = useCallback(() => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        setShowHero(true);
-        setHasScrolled(false);
-    }, []);
-
-    const hienThiNoiDung = activeOverlays.size === 0;
-
-    useEffect(() => {
-        const handleCloseAllOverlays = () => {
-            setActiveOverlays(new Set());
-            setShowHero(true);
-            setHasScrolled(false);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        };
-
-        window.addEventListener('closeAllOverlays', handleCloseAllOverlays);
-        return () => window.removeEventListener('closeAllOverlays', handleCloseAllOverlays);
-    }, []);
-
-    useEffect(() => {
-        const handleScroll = () => {
-            // Chỉ xử lý scroll nếu không có overlay nào mở
-            if (activeOverlays.size === 0) {
-                // Track scroll start time and hide hint after 1s of scrolling
-                if (window.scrollY > 50 && showScrollHint) {
-                    if (scrollStartTime === null) {
-                        setScrollStartTime(Date.now());
-                    } else if (Date.now() - scrollStartTime >= 1000) {
-                        setShowScrollHint(false);
-                    }
-                } else if (window.scrollY <= 50) {
-                    setScrollStartTime(null);
-                }
-                
-                if (window.scrollY > 100) {
-                    setShowHero(false);
-                    setHasScrolled(true);
-                } else {
-                    setShowHero(true);
-                    setHasScrolled(false);
-                }
-            }
-        };
-
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, [activeOverlays.size]);
-
-    // Lock body scroll khi có overlay mở
-    useEffect(() => {
-        if (activeOverlays.size > 0) {
-            // Lưu vị trí scroll hiện tại
-            const scrollY = window.scrollY;
-            document.body.style.position = 'fixed';
-            document.body.style.top = `-${scrollY}px`;
-            document.body.style.width = '100%';
-            document.body.style.overflow = 'hidden';
+    // 2. TIMEOUT FALLBACK (Phòng khi mạng lag)
+    const timeoutId = setTimeout(() => {
+      if (!daKiemTraLogin) {
+        setDaKiemTraLogin(true);
+        const storedUser = localStorage.getItem("USER_INFO");
+        if (storedUser) {
+          try {
+            setNguoiDung(JSON.parse(storedUser));
+          } catch {}
         } else {
-            // Khôi phục scroll
-            const scrollY = document.body.style.top;
-            document.body.style.position = '';
-            document.body.style.top = '';
-            document.body.style.width = '';
-            document.body.style.overflow = '';
-            if (scrollY) {
-                window.scrollTo(0, parseInt(scrollY || '0') * -1);
-            }
+          // Không có user -> TỰ ĐỘNG LÀ KHÁCH (Không redirect nữa)
+          setNguoiDung({ userType: "guest", role: "visitor" });
+        }
+      }
+    }, 2000);
+
+    // 3. XỬ LÝ KHI CONTEXT LOAD XONG
+    if (contextLoading) return () => clearTimeout(timeoutId);
+
+    try {
+      if (contextUser) {
+        // --- CÓ USER ĐĂNG NHẬP ---
+        const userType = contextUser.userType;
+
+        // Nếu là Nhân sự -> Đuổi về phòng làm việc
+        if (userType === "nhan_su") {
+          const role = (contextUser as any)?.vi_tri_normalized;
+          getRedirectUrl(userType, role).then((targetRoute: string) => {
+            router.replace(targetRoute);
+          });
+          return;
         }
 
-        return () => {
-            // Cleanup khi unmount
-            document.body.style.position = '';
-            document.body.style.top = '';
-            document.body.style.width = '';
-            document.body.style.overflow = '';
-        };
-    }, [activeOverlays.size]);
+        // Nếu là Khách hàng/User thường -> OK
+        setNguoiDung(contextUser);
+      } else {
+        // --- KHÔNG CÓ USER (GUEST) ---
+        const storedUser = localStorage.getItem("USER_INFO");
 
-    // Nếu chưa kiểm tra login xong, hiện màn hình đen để tránh giật
-    if (!daKiemTraLogin) return <div className="fixed inset-0 bg-[#050505]" />;
+        if (storedUser) {
+          // Có lưu trong LocalStorage
+          try {
+            const parsed = JSON.parse(storedUser);
+            if (parsed.userType === "nhan_su") {
+              getRedirectUrl(parsed.userType, parsed.vi_tri_normalized).then(
+                (targetRoute: string) => {
+                  router.replace(targetRoute);
+                }
+              );
+              return;
+            }
+            setNguoiDung(parsed);
+          } catch {
+            // Lỗi parse -> Set là khách
+            setNguoiDung({ userType: "guest", role: "visitor" });
+          }
+        } else {
+          // Hoàn toàn không có gì -> SET LÀ KHÁCH (Cho phép xem trang chủ)
+          setNguoiDung({ userType: "guest", role: "visitor" });
+        }
+      }
+    } finally {
+      clearTimeout(timeoutId);
+      setDaKiemTraLogin(true);
+    }
+  }, [contextUser, contextLoading, router, searchParams]);
 
-    return (
-        <div className="relative w-full min-h-screen bg-[#050505] text-[#F5F5F5] font-sans selection:bg-[#C69C6D] selection:text-black overflow-x-hidden">
-            
-            {/* LAYER 0: HÌNH NỀN */}
-            <div className="fixed inset-0 w-full h-full z-0 pointer-events-none select-none bg-black">
-                <img key={`m-${bgVersion}`} src={bgUrlMobile} alt="BG" className="absolute inset-0 w-full h-full object-cover md:hidden opacity-100 transition-opacity duration-1000" />
-                <img key={`t-${bgVersion}`} src={bgUrlTablet} alt="BG" className="absolute inset-0 w-full h-full object-cover hidden md:block lg:hidden opacity-100 transition-opacity duration-1000" />
-                <img key={`d-${bgVersion}`} src={bgUrlDesktop} alt="BG" className="absolute inset-0 w-full h-full object-cover hidden lg:block opacity-100 transition-opacity duration-1000" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-90" />
-            </div>
+  // Set greeting
+  useEffect(() => {
+    const name = nguoiDung?.ho_ten || t("home.guest");
+    const h = new Date().getHours();
+    let timeGreeting = t("home.goodEvening");
+    if (h >= 5 && h < 11) timeGreeting = t("home.goodMorning");
+    else if (h >= 11 && h < 14)
+      timeGreeting = language === "vi" ? "Chào buổi trưa" : "Good afternoon";
+    else if (h >= 14 && h < 18) timeGreeting = t("home.goodAfternoon");
 
-            {/* LAYER 1: NỘI DUNG CHÍNH */}
-            <main 
-                className={`relative z-[10] w-full flex flex-col items-center transition-all duration-500 ease-in-out ${
-                    hienThiNoiDung 
-                        ? 'opacity-100 translate-y-0 blur-0' 
-                        : 'opacity-0 translate-y-10 blur-sm pointer-events-none !hidden'
-                }`}
-            >
-                {/* HERO SECTION - Lời chào & Scroll Indicator */}
-                <section className={`relative w-full h-[100dvh] bg-transparent pointer-events-none flex flex-col items-center justify-center transition-all duration-700 ${
-                    showHero && hienThiNoiDung ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-20 pointer-events-none'
-                }`}>
-                    {/* Elegant backdrop với viền vàng */}
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4">
-                        <div className="w-full max-w-4xl">
-                            <div className="relative p-0 md:p-4 min-h-[60vh] flex items-center justify-center">
-                                {/* Content wrapper */}
-                                <div className="relative z-10 w-full flex flex-col items-center justify-center gap-6 text-center">
-                                    {/* Main greeting with zoom-out animation */}
-                                    {showGreeting && (
-                                        <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif font-bold text-[#C69C6D] tracking-wide leading-tight greeting-zoom-out text-center">
-                                            <span className="inline-block" style={{ textShadow: '0 4px 30px rgba(0,0,0,0.95), 0 0 60px rgba(198,156,109,0.6), 0 8px 40px rgba(0,0,0,0.8)' }}>
-                                                {loiChao}
-                                            </span>
-                                        </h1>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    {/* Scroll hint text - appears after greeting */}
-                    {showScrollHint && (
-                        <div className="absolute bottom-20 left-0 right-0 flex justify-center pointer-events-none animate-fade-in-up">
-                            <p className="text-[#C69C6D]/70 text-sm md:text-base font-light tracking-wide"
-                               style={{ textShadow: '0 2px 15px rgba(0,0,0,0.9), 0 0 30px rgba(198,156,109,0.4)' }}>
-                                Cuộn xuống để xem nội dung
-                            </p>
-                        </div>
-                    )}
-                </section>
+    setLoiChao(`${timeGreeting}, ${name}!`);
+    setShowGreeting(true);
+    setHasGreetingFinished(false);
+    setScrollStartTime(null);
 
-                <div id="content-start" className="w-full bg-black/90 backdrop-blur-xl min-h-screen pt-20 pb-32 flex flex-col items-center gap-20 relative">
-                    {/* Gradient mượt từ hero sang content - loại bỏ shadow cứng */}
-                    <div className="absolute -top-32 left-0 right-0 h-32 bg-gradient-to-b from-transparent via-transparent to-black/90 pointer-events-none"></div>
-                    
-                    <div className="w-full max-w-5xl mx-auto px-4 flex flex-col items-center gap-10 relative z-20">
-                        <div className="w-full h-[60vh] md:h-[70vh] rounded-lg shadow-[0_0_50px_rgba(0,0,0,0.8)] relative">
-                             <Slider1 />
-                        </div>
-                        <div className="animate-fade-in-up">
-                            <NutDatHang />
-                        </div>
-                    </div>
-                    
-                    <div className="w-full max-w-5xl mx-auto px-6 text-center">
-                        <div className="mb-10 space-y-3">
-                            <h2 className="text-stroke-title text-3xl md:text-5xl font-serif italic text-transparent drop-shadow-lg">Tinh Hoa Nghệ Thuật</h2>
-                            <p className="text-white/80 max-w-2xl mx-auto text-sm md:text-base font-light font-sans leading-relaxed drop-shadow-md">Hành trình biến những hạt gạo bình dị thành kiệt tác tinh xảo, mỗi sợi gạo là một nét vẽ trong bức tranh cuộc sống.</p>
-                        </div>
-                        <div className="w-full aspect-video rounded-xl overflow-hidden shadow-[0_20px_50px_rgba(198,156,109,0.15)] border border-[#C69C6D]/30 relative group bg-black">
-                            <iframe className="w-full h-full object-cover" src="https://www.youtube.com/embed/jfKfPfyJRdk?si=9lJ_kH2g0b0b0b0b&rel=0&modestbranding=1" title="Video" frameBorder="0" allowFullScreen></iframe>
-                        </div>
-                    </div>
+    const hideTimer = setTimeout(() => {
+      setShowGreeting(false);
+      setShowScrollHint(true);
+    }, 5000);
 
-                    <div className="w-full max-w-6xl mx-auto px-4">
-                        <div className="flex items-end justify-between px-2 border-b border-white/10 pb-4 mb-8">
-                            <div><h3 className="text-[#C69C6D] text-sm font-bold font-sans tracking-[0.2em] uppercase mb-1 shadow-black drop-shadow-md">Bộ Sưu Tập</h3><h2 className="text-stroke-title text-3xl md:text-4xl font-serif text-transparent">Tác Phẩm Tiêu Biểu</h2></div>
-                            <button className="hidden md:flex items-center gap-2 text-xs font-bold font-sans uppercase text-white/50 hover:text-[#C69C6D] transition-colors">Xem tất cả <ArrowRight size={14} /></button>
-                        </div>
-                        <Slider2 />
-                    </div>
+    const finishTimer = setTimeout(() => {
+      setHasGreetingFinished(true);
+      setShowScrollHint(false);
+    }, 5700);
 
-                    <div className="w-full max-w-6xl mx-auto px-4 relative z-20">
-                          <div className="text-center mb-12"><h2 className="text-stroke-title text-3xl font-serif mt-2 text-transparent">Tri Thức & Hành Trình</h2></div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div className="p-8 rounded-xl bg-white/5 border border-white/10 hover:border-[#C69C6D]/50 transition-all hover:-translate-y-1">
-                                <div className="flex items-center gap-2 mb-4 text-[#C69C6D] text-xs font-bold font-sans uppercase"><Star size={12}/> <span>Triển Lãm</span></div>
-                                <h3 className="text-xl text-white font-serif font-bold mb-2">Hồn Gạo Việt 2025</h3>
-                                <p className="text-gray-400 text-sm font-sans">Triển lãm nghệ thuật đương đại - nơi những tác phẩm gạo kể câu chuyện về tâm hồn dân tộc và giá trị vĩnh hằng.</p>
-                            </div>
-                            <div className="p-8 rounded-xl bg-white/5 border border-white/10 hover:border-[#C69C6D]/50 transition-all hover:-translate-y-1">
-                                <div className="flex items-center gap-2 mb-4 text-[#C69C6D] text-xs font-bold font-sans uppercase"><PlayCircle size={12}/> <span>Workshop</span></div>
-                                <h3 className="text-xl text-white font-serif font-bold mb-2">Lớp Học Nghệ Nhân</h3>
-                                <p className="text-gray-400 text-sm font-sans">Tự tay tạo nên cõi nghệ thuật - workshop mở cửa cho những ai muốn khám phá kỹ thuật và tâm huyết của một nghệ nhân thực thụ.</p>
-                            </div>
-                        </div>
-                    </div>
+    return () => {
+      clearTimeout(hideTimer);
+      clearTimeout(finishTimer);
+    };
+  }, [nguoiDung, t, language]);
+
+  // Auto scroll
+  useEffect(() => {
+    if (!hasGreetingFinished) return;
+    setShowHero(false);
+    const target = document.getElementById("content-start");
+    const top = target ? target.offsetTop : window.innerHeight;
+    smoothScrollTo(top, 1400);
+  }, [hasGreetingFinished, smoothScrollTo]);
+
+  // Clock
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setCurrentTime(
+        `${String(now.getHours()).padStart(2, "0")}:${String(
+          now.getMinutes()
+        ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`
+      );
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Events listeners
+  useEffect(() => {
+    const handleVisibilityChange = (e: any) => {
+      const { id, open } = e.detail;
+      setActiveOverlays((prev) => {
+        const next = new Set(prev);
+        if (open) next.add(id);
+        else next.delete(id);
+        return next;
+      });
+      if (open) setShowHero(false);
+    };
+    window.addEventListener(
+      "toggle-content-visibility",
+      handleVisibilityChange
+    );
+    return () =>
+      window.removeEventListener(
+        "toggle-content-visibility",
+        handleVisibilityChange
+      );
+  }, []);
+
+  useEffect(() => {
+    const openModal = searchParams.get("openModal");
+    if (openModal) {
+      window.dispatchEvent(
+        new CustomEvent("openModal", { detail: { modalId: openModal } })
+      );
+      setShowHero(false);
+    }
+  }, [searchParams]);
+
+  const handleUpdateBackground = useCallback(() => {
+    setBgVersion(Date.now());
+  }, []);
+
+  const isVisitor =
+    nguoiDung?.userType === "guest" || nguoiDung?.role === "visitor";
+
+  const handleGoToLogin = useCallback(() => {
+    document.cookie = "VISITOR_MODE=; Path=/; Max-Age=0; SameSite=Lax";
+    localStorage.removeItem("USER_INFO");
+    localStorage.removeItem("USER_ROLE");
+    router.push("/?login=1");
+  }, [router]);
+
+  const hienThiNoiDung = activeOverlays.size === 0;
+
+  useEffect(() => {
+    const handleCloseAllOverlays = () => {
+      setActiveOverlays(new Set());
+      setShowHero(true);
+      setHasScrolled(false);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    window.addEventListener("closeAllOverlays", handleCloseAllOverlays);
+    return () =>
+      window.removeEventListener("closeAllOverlays", handleCloseAllOverlays);
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (activeOverlays.size === 0) {
+        if (window.scrollY > 50 && showScrollHint) {
+          if (scrollStartTime === null) setScrollStartTime(Date.now());
+          else if (Date.now() - scrollStartTime >= 1000)
+            setShowScrollHint(false);
+        } else if (window.scrollY <= 50) setScrollStartTime(null);
+
+        if (window.scrollY > 100) {
+          setShowHero(false);
+          setHasScrolled(true);
+        } else {
+          setShowHero(true);
+          setHasScrolled(false);
+        }
+      }
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [activeOverlays.size, showScrollHint, scrollStartTime]);
+
+  // Lock body scroll
+  useEffect(() => {
+    if (activeOverlays.size > 0) {
+      const scrollY = window.scrollY;
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = "100%";
+      document.body.style.overflow = "hidden";
+    } else {
+      const scrollY = document.body.style.top;
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      document.body.style.overflow = "";
+      if (scrollY) window.scrollTo(0, parseInt(scrollY || "0") * -1);
+    }
+    return () => {
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      document.body.style.overflow = "";
+    };
+  }, [activeOverlays.size]);
+
+  if (!daKiemTraLogin) return <div className="fixed inset-0 bg-[#050505]" />;
+
+  return (
+    <div className="relative w-full min-h-screen bg-[#050505] text-[#F5F5F5] font-sans selection:bg-[#C69C6D] selection:text-black overflow-x-hidden">
+      {/* LAYER 0: HÌNH NỀN */}
+      <div className="fixed inset-0 w-full h-full z-0 pointer-events-none select-none bg-black">
+        <img
+          key={`m-${bgVersion}`}
+          src={bgUrlMobile}
+          alt="BG"
+          className="absolute inset-0 w-full h-full object-cover md:hidden opacity-100 transition-opacity duration-1000"
+        />
+        <img
+          key={`t-${bgVersion}`}
+          src={bgUrlTablet}
+          alt="BG"
+          className="absolute inset-0 w-full h-full object-cover hidden md:block lg:hidden opacity-100 transition-opacity duration-1000"
+        />
+        <img
+          key={`d-${bgVersion}`}
+          src={bgUrlDesktop}
+          alt="BG"
+          className="absolute inset-0 w-full h-full object-cover hidden lg:block opacity-100 transition-opacity duration-1000"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-90" />
+      </div>
+
+      {/* LAYER 1: NỘI DUNG CHÍNH */}
+      <main
+        className={`relative z-[10] w-full flex flex-col items-center transition-all duration-500 ease-in-out ${
+          hienThiNoiDung
+            ? "opacity-100 translate-y-0 blur-0"
+            : "opacity-0 translate-y-10 blur-sm pointer-events-none !hidden"
+        }`}
+      >
+        {/* HERO SECTION */}
+        <section
+          className={`relative w-full h-[100dvh] bg-transparent pointer-events-none flex flex-col items-center justify-center transition-all duration-700 ${
+            showHero && hienThiNoiDung
+              ? "opacity-100 translate-y-0"
+              : "opacity-0 -translate-y-20 pointer-events-none"
+          }`}
+        >
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4">
+            <div className="w-full max-w-4xl">
+              <div className="relative p-0 md:p-4 min-h-[60vh] flex items-center justify-center">
+                <div className="relative z-10 w-full flex flex-col items-center justify-center gap-6 text-center">
+                  {showGreeting && (
+                    <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif font-bold text-[#C69C6D] tracking-wide leading-tight greeting-zoom-out text-center">
+                      <span
+                        className="inline-block"
+                        style={{
+                          textShadow:
+                            "0 4px 30px rgba(0,0,0,0.95), 0 0 60px rgba(198,156,109,0.6), 0 8px 40px rgba(0,0,0,0.8)",
+                        }}
+                      >
+                        {loiChao}
+                      </span>
+                    </h1>
+                  )}
                 </div>
-            </main>
-
-            {/* LAYER 2: GRADIENT BẢO VỆ MENU */}
-            <div className="fixed top-0 left-0 right-0 h-28 bg-gradient-to-b from-black to-transparent z-[4900] pointer-events-none"></div>
-            <div className="fixed bottom-0 left-0 right-0 h-28 bg-gradient-to-t from-black to-transparent z-[4900] pointer-events-none"></div>
-
-            {/* LAYER 3: HỆ THỐNG MENU */}
-            <MenuTren nguoiDung={nguoiDung} loiChao={loiChao} />
-            
-            
-
-         
-
-            {/* Admin Tools - Tránh gradient MenuDuoi */}
-            <div className="fixed bottom-32 left-6 z-[5001] flex flex-col gap-4">
-                <BackgroundManager onUpdate={handleUpdateBackground} />
+              </div>
             </div>
+          </div>
 
-            {isVisitor && (
-                <button
-                    onClick={handleGoToLogin}
-                    className="fixed bottom-6 right-4 sm:bottom-8 sm:right-6 z-[5002] flex items-center gap-2 sm:gap-2.5 px-4 sm:px-5 py-3 sm:py-3.5 rounded-full
+          {showScrollHint && (
+            <div className="absolute bottom-20 left-0 right-0 flex justify-center pointer-events-none animate-fade-in-up">
+              <p
+                className="text-[#C69C6D]/70 text-sm md:text-base font-light tracking-wide"
+                style={{
+                  textShadow:
+                    "0 2px 15px rgba(0,0,0,0.9), 0 0 30px rgba(198,156,109,0.4)",
+                }}
+              >
+                Cuộn xuống để xem nội dung
+              </p>
+            </div>
+          )}
+        </section>
+
+        <div
+          id="content-start"
+          className="w-full bg-black/90 backdrop-blur-xl min-h-screen pt-20 pb-32 flex flex-col items-center gap-20 relative"
+        >
+          <div className="absolute -top-32 left-0 right-0 h-32 bg-gradient-to-b from-transparent via-transparent to-black/90 pointer-events-none"></div>
+
+          <div className="w-full max-w-5xl mx-auto px-4 flex flex-col items-center gap-10 relative z-20">
+            <div className="w-full h-[60vh] md:h-[70vh] rounded-lg shadow-[0_0_50px_rgba(0,0,0,0.8)] relative">
+              <Slider1 />
+            </div>
+            <div className="animate-fade-in-up">
+              <NutDatHang />
+            </div>
+          </div>
+
+          <div className="w-full max-w-5xl mx-auto px-6 text-center">
+            <div className="mb-10 space-y-3">
+              <h2 className="text-stroke-title text-3xl md:text-5xl font-serif italic text-transparent drop-shadow-lg">
+                Tinh Hoa Nghệ Thuật
+              </h2>
+              <p className="text-white/80 max-w-2xl mx-auto text-sm md:text-base font-light font-sans leading-relaxed drop-shadow-md">
+                Hành trình biến những hạt gạo bình dị thành kiệt tác tinh xảo,
+                mỗi sợi gạo là một nét vẽ trong bức tranh cuộc sống.
+              </p>
+            </div>
+            <div className="w-full aspect-video rounded-xl overflow-hidden shadow-[0_20px_50px_rgba(198,156,109,0.15)] border border-[#C69C6D]/30 relative group bg-black">
+              <iframe
+                className="w-full h-full object-cover"
+                src="https://www.youtube.com/embed/jfKfPfyJRdk?si=9lJ_kH2g0b0b0b0b&rel=0&modestbranding=1"
+                title="Video"
+                frameBorder="0"
+                allowFullScreen
+              ></iframe>
+            </div>
+          </div>
+
+          <div className="w-full max-w-6xl mx-auto px-4">
+            <div className="flex items-end justify-between px-2 border-b border-white/10 pb-4 mb-8">
+              <div>
+                <h3 className="text-[#C69C6D] text-sm font-bold font-sans tracking-[0.2em] uppercase mb-1 shadow-black drop-shadow-md">
+                  Bộ Sưu Tập
+                </h3>
+                <h2 className="text-stroke-title text-3xl md:text-4xl font-serif text-transparent">
+                  Tác Phẩm Tiêu Biểu
+                </h2>
+              </div>
+              <button className="hidden md:flex items-center gap-2 text-xs font-bold font-sans uppercase text-white/50 hover:text-[#C69C6D] transition-colors">
+                Xem tất cả <ArrowRight size={14} />
+              </button>
+            </div>
+            <Slider2 />
+          </div>
+
+          <div className="w-full max-w-6xl mx-auto px-4 relative z-20">
+            <div className="text-center mb-12">
+              <h2 className="text-stroke-title text-3xl font-serif mt-2 text-transparent">
+                Tri Thức & Hành Trình
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="p-8 rounded-xl bg-white/5 border border-white/10 hover:border-[#C69C6D]/50 transition-all hover:-translate-y-1">
+                <div className="flex items-center gap-2 mb-4 text-[#C69C6D] text-xs font-bold font-sans uppercase">
+                  <Star size={12} /> <span>Triển Lãm</span>
+                </div>
+                <h3 className="text-xl text-white font-serif font-bold mb-2">
+                  Hồn Gạo Việt 2025
+                </h3>
+                <p className="text-gray-400 text-sm font-sans">
+                  Triển lãm nghệ thuật đương đại - nơi những tác phẩm gạo kể câu
+                  chuyện về tâm hồn dân tộc và giá trị vĩnh hằng.
+                </p>
+              </div>
+              <div className="p-8 rounded-xl bg-white/5 border border-white/10 hover:border-[#C69C6D]/50 transition-all hover:-translate-y-1">
+                <div className="flex items-center gap-2 mb-4 text-[#C69C6D] text-xs font-bold font-sans uppercase">
+                  <PlayCircle size={12} /> <span>Workshop</span>
+                </div>
+                <h3 className="text-xl text-white font-serif font-bold mb-2">
+                  Lớp Học Nghệ Nhân
+                </h3>
+                <p className="text-gray-400 text-sm font-sans">
+                  Tự tay tạo nên cõi nghệ thuật - workshop mở cửa cho những ai
+                  muốn khám phá kỹ thuật và tâm huyết của một nghệ nhân thực
+                  thụ.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* LAYER 2: GRADIENT BẢO VỆ MENU */}
+      <div className="fixed top-0 left-0 right-0 h-28 bg-gradient-to-b from-black to-transparent z-[4900] pointer-events-none"></div>
+      <div className="fixed bottom-0 left-0 right-0 h-28 bg-gradient-to-t from-black to-transparent z-[4900] pointer-events-none"></div>
+
+      {/* LAYER 3: HỆ THỐNG MENU */}
+      <MenuTren nguoiDung={nguoiDung} loiChao={loiChao} />
+
+      {/* Admin Tools */}
+      <div className="fixed bottom-32 left-6 z-[5001] flex flex-col gap-4">
+        <BackgroundManager onUpdate={handleUpdateBackground} />
+      </div>
+
+      {isVisitor && (
+        <button
+          onClick={handleGoToLogin}
+          className="fixed bottom-6 right-4 sm:bottom-8 sm:right-6 z-[5002] flex items-center gap-2 sm:gap-2.5 px-4 sm:px-5 py-3 sm:py-3.5 rounded-full
                         bg-gradient-to-r from-[#C69C6D] via-[#F2D3A0] to-[#C69C6D]
                         text-black font-semibold text-sm sm:text-base tracking-wide
                         shadow-[0_10px_30px_rgba(0,0,0,0.35)] border border-white/20
                         backdrop-blur-md hover:scale-[1.02] active:scale-95 transition-transform duration-200"
-                >
-                    <LogIn size={18} className="opacity-80" />
-                    <span className="whitespace-nowrap">{t('auth.loginRegister')}</span>
-                </button>
-            )}
+        >
+          <LogIn size={18} className="opacity-80" />
+          <span className="whitespace-nowrap">{t("auth.loginRegister")}</span>
+        </button>
+      )}
 
-            <style jsx global>{`
-                /* Ẩn thanh cuộn */
-                ::-webkit-scrollbar { display: none; }
-                html, body { -ms-overflow-style: none; scrollbar-width: none; overflow-x: hidden; width: 100%; }
-                .text-stroke-title { -webkit-text-stroke: 1px #F5F5F5; color: transparent; text-shadow: 0 0 15px rgba(198,156,109,0.3); font-family: 'Playfair Display', Georgia, serif; }
-                @keyframes fade-in-up { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
-                .animate-fade-in-up { animation: fade-in-up 1s ease-out forwards; }
-
-                /* Greeting zoom-out animation (~5s, shrink to center) */
-                @keyframes greetingZoomOut {
-                    0% { transform: scale(1.15); opacity: 1; }
-                    40% { transform: scale(1.0); opacity: 0.9; }
-                    70% { transform: scale(0.6); opacity: 0.5; }
-                    100% { transform: scale(0.2); opacity: 0; }
-                }
-                .greeting-zoom-out {
-                    animation: greetingZoomOut 5s ease-in forwards;
-                }
-            `}</style>
-        </div>
-    );
+      <style jsx global>{`
+        ::-webkit-scrollbar {
+          display: none;
+        }
+        html,
+        body {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+          overflow-x: hidden;
+          width: 100%;
+        }
+        /* 🟢 CẬP NHẬT: Xóa font-family cứng để dùng Tailwind config */
+        .text-stroke-title {
+          -webkit-text-stroke: 1px #f5f5f5;
+          color: transparent;
+          text-shadow: 0 0 15px rgba(198, 156, 109, 0.3);
+          /* font-family: "Playfair Display", Georgia, serif; <-- ĐÃ XÓA DÒNG NÀY */
+        }
+        @keyframes fade-in-up {
+          0% {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fade-in-up {
+          animation: fade-in-up 1s ease-out forwards;
+        }
+        @keyframes greetingZoomOut {
+          0% {
+            transform: scale(1.15);
+            opacity: 1;
+          }
+          40% {
+            transform: scale(1);
+            opacity: 0.9;
+          }
+          70% {
+            transform: scale(0.6);
+            opacity: 0.5;
+          }
+          100% {
+            transform: scale(0.2);
+            opacity: 0;
+          }
+        }
+        .greeting-zoom-out {
+          animation: greetingZoomOut 5s ease-in forwards;
+        }
+      `}</style>
+    </div>
+  );
 }
 
-// 🟢 EXPORT DEFAULT MỚI: BỌC TRONG SUSPENSE
 export default function TrangChuDashboard() {
-    return (
-        <Suspense fallback={<div className="w-full h-screen bg-[#050505] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C69C6D]"></div></div>}>
-            <TrangChuContent />
-        </Suspense>
-    );
+  return (
+    <Suspense
+      fallback={
+        <div className="w-full h-screen bg-[#050505] flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C69C6D]"></div>
+        </div>
+      }
+    >
+      <TrangChuContent />
+    </Suspense>
+  );
 }
 </file>
 

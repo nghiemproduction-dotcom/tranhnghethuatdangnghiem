@@ -7,8 +7,6 @@ import {
   Send,
   User,
   CheckCircle2,
-  Clock,
-  Search,
   AlertCircle,
   Shield,
   Briefcase,
@@ -17,7 +15,6 @@ import {
 } from "lucide-react";
 import { supabase } from "@/app/ThuVien/ketNoiSupabase";
 import { useUser } from "@/app/ThuVien/UserContext";
-import { claimChatSessionAction } from "@/app/actions/QuyenHanSales";
 import { compressImage } from "@/app/ThuVien/compressImage";
 
 // Helper format thời gian
@@ -29,7 +26,6 @@ const formatTime = (iso: string) => {
 export default function TuVanKhachHang() {
   const { user } = useUser();
 
-  // --- KHAI BÁO TOÀN BỘ HOOK Ở ĐẦU ---
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"waiting" | "my_chats" | "all">(
     "waiting"
@@ -42,8 +38,24 @@ export default function TuVanKhachHang() {
   const [isClaiming, setIsClaiming] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
+  // Âm thanh thông báo
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      audioRef.current = new Audio("/sounds/hover.mp3"); // Dùng âm thanh nhẹ nhàng
+    }
+  }, []);
+
+  const playNotificationSound = () => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(() => {});
+    }
+  };
 
   // Hàm fetch sessions
   const fetchSessions = async () => {
@@ -54,6 +66,7 @@ export default function TuVanKhachHang() {
       .select("*")
       .order("cap_nhat_luc", { ascending: false });
 
+    // Logic tab
     if (activeTab === "waiting")
       query = query
         .is("nhan_su_phu_trach_id", null)
@@ -61,23 +74,34 @@ export default function TuVanKhachHang() {
     if (activeTab === "my_chats")
       query = query.eq("nhan_su_phu_trach_id", user.id);
 
-    const { data, error } = await query;
+    const { data } = await query;
     if (data) setSessions(data);
   };
 
-  // 1. LOAD DANH SÁCH KHÁCH (REALTIME)
+  // 1. LOAD DATA & REALTIME (QUAN TRỌNG: BỎ ĐIỀU KIỆN isOpen ĐỂ CHẠY NGẦM)
   useEffect(() => {
-    if (!isOpen || !user) return;
+    if (!user) return; // Chỉ cần có user là chạy, không cần isOpen
 
     fetchSessions();
 
     const channel = supabase
-      .channel("staff_dashboard_sessions")
+      .channel("staff_dashboard_sessions_global")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "tu_van_sessions" },
-        () => {
+        (payload) => {
+          // Nếu có tin nhắn mới hoặc session mới -> Reload list
           fetchSessions();
+
+          // Nếu có khách mới (INSERT) hoặc tin nhắn mới (UPDATE tin_nhan_cuoi)
+          // Phát âm thanh nếu đang không mở, hoặc tin nhắn không phải của mình
+          if (
+            payload.eventType === "INSERT" ||
+            (payload.eventType === "UPDATE" &&
+              payload.new.tin_nhan_cuoi !== payload.old.tin_nhan_cuoi)
+          ) {
+            playNotificationSound();
+          }
         }
       )
       .subscribe();
@@ -85,7 +109,7 @@ export default function TuVanKhachHang() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isOpen, activeTab, user]);
+  }, [user, activeTab]); // Bỏ isOpen ra khỏi dependency
 
   // 2. LOAD TIN NHẮN CHI TIẾT
   useEffect(() => {
@@ -102,7 +126,6 @@ export default function TuVanKhachHang() {
     };
     loadMsgs();
 
-    // Subscribe tin nhắn MỚI của session này
     const channel = supabase
       .channel(`staff_chat_room_${selectedSession.id}`)
       .on(
@@ -132,13 +155,12 @@ export default function TuVanKhachHang() {
     }, 100);
   };
 
-  // 3. HÀNH ĐỘNG: TIẾP NHẬN KHÁCH (CLAIM)
+  // 3. HÀNH ĐỘNG: TIẾP NHẬN KHÁCH
   const handleClaimSession = async () => {
     if (!selectedSession || !user) return;
     setIsClaiming(true);
 
     try {
-      // Cập nhật trực tiếp DB (hoặc dùng Server Action nếu muốn bảo mật hơn)
       const { error } = await supabase
         .from("tu_van_sessions")
         .update({
@@ -234,6 +256,12 @@ export default function TuVanKhachHang() {
   const isManager = ["admin", "quanly", "boss"].includes(user.role || "");
   const UserIcon = isManager ? Shield : Briefcase;
 
+  // Tính số lượng khách đang chờ (dựa vào state realtime sessions)
+  // Lưu ý: State sessions phụ thuộc vào activeTab, nên ta cần một effect riêng hoặc query riêng
+  // Tuy nhiên ở bản đơn giản này, ta đếm trực tiếp nếu đang ở tab waiting, hoặc hiển thị chấm đỏ nếu có update
+  // Để chính xác nhất, ta lọc từ sessions hiện tại (giả sử sessions load về chứa đủ data cần thiết)
+  const waitingCount = sessions.filter((s) => !s.nhan_su_phu_trach_id).length;
+
   return (
     <div className="fixed bottom-6 left-6 z-[9000] font-sans flex flex-col items-start gap-3">
       {/* PANEL GIAO DIỆN CHÍNH */}
@@ -248,7 +276,6 @@ export default function TuVanKhachHang() {
         >
           {/* CỘT TRÁI: DANH SÁCH */}
           <div className="w-full h-[35%] md:w-[30%] md:h-full border-b md:border-b-0 md:border-r border-white/10 flex flex-col bg-[#111]">
-            {/* Header Cột Trái */}
             <div className="p-3 border-b border-white/10 bg-[#C69C6D]/10">
               <div className="flex items-center gap-2 mb-3">
                 <UserIcon size={16} className="text-[#C69C6D]" />
@@ -256,7 +283,6 @@ export default function TuVanKhachHang() {
                   {user.ho_ten}
                 </span>
               </div>
-              {/* Tabs */}
               <div className="flex bg-black/50 p-1 rounded-lg">
                 <button
                   onClick={() => setActiveTab("waiting")}
@@ -266,7 +292,7 @@ export default function TuVanKhachHang() {
                       : "text-gray-400 hover:text-white"
                   }`}
                 >
-                  CHỜ ({sessions.filter((s) => !s.nhan_su_phu_trach_id).length})
+                  CHỜ ({waitingCount})
                 </button>
                 <button
                   onClick={() => setActiveTab("my_chats")}
@@ -281,7 +307,6 @@ export default function TuVanKhachHang() {
               </div>
             </div>
 
-            {/* List Sessions */}
             <div className="flex-1 overflow-y-auto custom-scrollbar">
               {sessions.length === 0 && (
                 <div className="text-center text-white/20 text-xs py-10">
@@ -322,7 +347,6 @@ export default function TuVanKhachHang() {
           <div className="flex-1 flex flex-col bg-[#050505] relative h-[65%] md:h-full">
             {selectedSession ? (
               <>
-                {/* Header Chat */}
                 <div className="h-12 md:h-14 border-b border-white/10 flex justify-between items-center px-4 bg-[#111] shrink-0">
                   <div>
                     <div className="flex items-center gap-2">
@@ -367,7 +391,6 @@ export default function TuVanKhachHang() {
                   </div>
                 </div>
 
-                {/* Messages Area */}
                 <div
                   className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar bg-black/50"
                   ref={scrollRef}
@@ -406,7 +429,6 @@ export default function TuVanKhachHang() {
                   )}
                 </div>
 
-                {/* Input Area */}
                 <div className="p-3 border-t border-white/10 bg-[#111] flex gap-2 shrink-0">
                   <button
                     onClick={() => fileInputRef.current?.click()}
@@ -469,7 +491,7 @@ export default function TuVanKhachHang() {
         </div>
       )}
 
-      {/* NÚT TRÒN CHÍNH (DÀNH CHO NHÂN VIÊN) */}
+      {/* NÚT TRÒN CHÍNH */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`group relative w-14 h-14 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(198,156,109,0.5)] transition-all hover:scale-110 active:scale-95 border-2 border-[#C69C6D]
@@ -482,12 +504,12 @@ export default function TuVanKhachHang() {
       >
         {isOpen ? <X size={24} /> : <User size={28} fill="currentColor" />}
 
-        {!isOpen &&
-          sessions.filter((s) => !s.nhan_su_phu_trach_id).length > 0 && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 border-2 border-[#1a1a1a] rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-sm animate-pulse">
-              {sessions.filter((s) => !s.nhan_su_phu_trach_id).length}
-            </span>
-          )}
+        {/* 🟢 HIỂN THỊ BADGE REALTIME: Luôn tính từ state sessions */}
+        {!isOpen && waitingCount > 0 && (
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 border-2 border-[#1a1a1a] rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-sm animate-pulse">
+            {waitingCount}
+          </span>
+        )}
       </button>
     </div>
   );
