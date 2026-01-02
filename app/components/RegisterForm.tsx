@@ -31,7 +31,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// Constants cho Dropdown giống module chính
 const VN_BANKS = [
   "Vietcombank",
   "VietinBank",
@@ -72,7 +71,6 @@ export default function RegisterForm({
   onSuccess,
   onSwitchToLogin,
 }: RegisterFormProps) {
-  // State
   const [userType, setUserType] = useState<"nhan_su" | "khach_hang">(
     "khach_hang"
   );
@@ -87,14 +85,14 @@ export default function RegisterForm({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
-  // Staff Specific Fields (Đồng bộ với NhanSuChucNang)
+  // Staff Fields
   const [viTri, setViTri] = useState("");
   const [luongThang, setLuongThang] = useState<number | "">("");
   const [thuongDoanhThu, setThuongDoanhThu] = useState<number | "">("");
   const [nganHang, setNganHang] = useState("");
   const [soTaiKhoan, setSoTaiKhoan] = useState("");
 
-  // Customer Specific Fields (Đồng bộ với KhachHangChucNang)
+  // Customer Fields
   const [diaChi, setDiaChi] = useState("");
   const [phanLoai, setPhanLoai] = useState("Mới");
   const [ghiChu, setGhiChu] = useState("");
@@ -105,13 +103,10 @@ export default function RegisterForm({
   const [isUploading, setIsUploading] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Helper tính lương giờ (giống NhanSuChucNang)
   const luongTheoGio = luongThang
     ? Math.round(Number(luongThang) / 24 / 8 / 1000) * 1000
     : 0;
 
-  // Xử lý chọn ảnh
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -128,7 +123,6 @@ export default function RegisterForm({
     setError(null);
 
     try {
-      // 1. Validate cơ bản
       if (!hoTen.trim()) throw new Error("Vui lòng nhập Họ và Tên");
       if (!email.includes("@")) throw new Error("Email không hợp lệ");
       if (phone.length < 10) throw new Error("Số điện thoại không hợp lệ");
@@ -136,24 +130,19 @@ export default function RegisterForm({
       if (password !== confirmPassword)
         throw new Error("Mật khẩu xác nhận không khớp");
 
-      // 2. Validate theo loại user
       if (userType === "khach_hang" && !diaChi.trim())
         throw new Error("Vui lòng nhập địa chỉ");
       if (userType === "nhan_su" && !viTri.trim())
         throw new Error("Vui lòng nhập vị trí mong muốn");
 
-      // 3. Kiểm tra user tồn tại
       const { data: existing } = await supabase
         .from(userType)
         .select("id")
         .or(`email.eq.${email.trim()},so_dien_thoai.eq.${phone.trim()}`)
         .maybeSingle();
 
-      if (existing) {
-        throw new Error("Email hoặc Số điện thoại đã tồn tại trong hệ thống.");
-      }
+      if (existing) throw new Error("Email hoặc Số điện thoại đã tồn tại.");
 
-      // 4. Upload ảnh (nếu có)
       let avatarUrl = null;
       if (avatarFile) {
         setIsUploading(true);
@@ -166,7 +155,6 @@ export default function RegisterForm({
           .from("avatar")
           .upload(fileName, compressed);
         if (upErr) throw upErr;
-
         const { data: urlData } = supabase.storage
           .from("avatar")
           .getPublicUrl(fileName);
@@ -174,7 +162,6 @@ export default function RegisterForm({
         setIsUploading(false);
       }
 
-      // 5. Tạo Auth User
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email.trim(),
         password: password,
@@ -191,7 +178,6 @@ export default function RegisterForm({
       if (authError) throw authError;
       if (!authData.user) throw new Error("Không thể tạo tài khoản.");
 
-      // 6. Lưu vào bảng user_registrations
       const registrationData = {
         auth_user_id: authData.user.id,
         ho_ten: hoTen.trim(),
@@ -199,7 +185,6 @@ export default function RegisterForm({
         so_dien_thoai: phone.trim(),
         user_type: userType,
         hinh_anh: avatarUrl,
-        // Dữ liệu chi tiết chuẩn theo schema DB
         details:
           userType === "nhan_su"
             ? {
@@ -218,15 +203,7 @@ export default function RegisterForm({
         created_at: new Date().toISOString(),
       };
 
-      const { error: regError } = await supabase
-        .from("user_registrations")
-        .insert(registrationData);
-
-      if (regError) {
-        console.warn("Lỗi lưu đơn đăng ký:", regError);
-        // Fallback logic nếu cần
-      }
-
+      await supabase.from("user_registrations").insert(registrationData);
       setSuccess(true);
       if (onSuccess) setTimeout(onSuccess, 3000);
     } catch (err: any) {
@@ -239,7 +216,7 @@ export default function RegisterForm({
 
   if (success) {
     return (
-      <div className="w-full flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-300 h-full">
+      <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-300">
         <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mb-6">
           <CheckCircle2 size={40} className="text-green-400" />
         </div>
@@ -247,7 +224,7 @@ export default function RegisterForm({
           Đăng Ký Thành Công!
         </h2>
         <p className="text-white/70 mb-6 max-w-sm">
-          Hồ sơ của bạn đã được gửi. Vui lòng chờ admin xác nhận.
+          Hồ sơ đã được gửi. Vui lòng chờ admin xác nhận.
         </p>
         <button
           onClick={onSwitchToLogin}
@@ -260,20 +237,19 @@ export default function RegisterForm({
   }
 
   return (
-    <div className="flex flex-col lg:flex-row w-full h-full overflow-hidden">
-      {/* CỘT TRÁI: QUY TRÌNH (Ẩn trên mobile để tiết kiệm chỗ, hoặc thu gọn) */}
-      <div className="hidden lg:flex w-1/3 bg-[#111] border-r border-[#C69C6D]/30 p-6 flex-col">
+    // 🟢 QUAN TRỌNG: h-[100dvh] ép khung cao đúng bằng màn hình điện thoại để kích hoạt scroll bên trong
+    <div className="flex flex-col lg:flex-row w-full h-[100dvh] lg:h-full bg-[#0a0a0a] overflow-hidden">
+      {/* CỘT TRÁI: QUY TRÌNH (Ẩn trên mobile) */}
+      <div className="hidden lg:flex w-1/3 bg-[#111] border-r border-[#C69C6D]/30 p-6 flex-col shrink-0">
         <h3 className="text-lg font-bold text-[#C69C6D] uppercase tracking-widest mb-6 flex items-center gap-2">
           <ShieldCheck size={20} /> Quy Trình
         </h3>
-
         <div className="flex-1 space-y-8 relative pl-2">
           <div className="absolute left-[19px] top-2 bottom-10 w-[1px] bg-white/10 z-0"></div>
-
           <StepItem
             number="1"
             title="Đăng Ký"
-            desc="Điền thông tin hồ sơ theo mẫu bên phải."
+            desc="Điền thông tin hồ sơ."
             active={true}
           />
           <StepItem
@@ -287,19 +263,15 @@ export default function RegisterForm({
             desc="Đăng nhập và bắt đầu làm việc."
           />
         </div>
-
-        <div className="mt-auto pt-6 border-t border-white/10">
-          <p className="text-white/40 text-xs italic">
-            * Cam kết bảo mật thông tin tuyệt đối.
-          </p>
-        </div>
       </div>
 
-      {/* CỘT PHẢI: FORM NHẬP LIỆU (Cuộn dọc được) */}
-      <div className="w-full lg:w-2/3 flex flex-col h-full bg-[#0a0a0a]">
-        {/* Header cố định */}
-        <div className="shrink-0 px-6 py-4 border-b border-white/10 flex items-center justify-between bg-[#0a0a0a]/90 backdrop-blur z-10">
-          <h2 className="text-xl font-bold text-white">Đăng Ký Tài Khoản</h2>
+      {/* CỘT PHẢI: FORM */}
+      <div className="w-full lg:w-2/3 flex flex-col h-full relative">
+        {/* HEADER CỐ ĐỊNH */}
+        <div className="shrink-0 px-6 py-4 border-b border-white/10 flex items-center justify-between bg-[#0a0a0a] z-20">
+          <h2 className="text-lg font-bold text-white uppercase tracking-wider">
+            Đăng Ký Tài Khoản
+          </h2>
           {onSwitchToLogin && (
             <button
               onClick={onSwitchToLogin}
@@ -310,43 +282,35 @@ export default function RegisterForm({
           )}
         </div>
 
-        {/* Form Body - Cuộn được */}
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+        {/* BODY CUỘN */}
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar pb-32">
+          {" "}
+          {/* pb-32 để nội dung cuối không bị nút che */}
           {error && (
-            <div className="bg-red-900/30 border border-red-500/50 p-3 rounded-lg mb-6 text-red-200 text-sm flex items-start gap-2 animate-in fade-in slide-in-from-top-2">
-              <ShieldCheck size={16} className="mt-0.5 shrink-0" />
+            <div className="bg-red-900/30 border border-red-500/50 p-3 rounded-lg mb-6 text-red-200 text-xs flex items-start gap-2">
+              <ShieldCheck size={16} className="mt-0.5 shrink-0" />{" "}
               <span>{error}</span>
             </div>
           )}
-
-          <form onSubmit={handleRegister} className="space-y-6 pb-10">
-            {/* 1. Chọn Loại & Avatar */}
-            <div className="flex flex-col sm:flex-row gap-6">
-              {/* Avatar Upload */}
-              <div className="shrink-0 flex flex-col items-center gap-2">
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-24 h-24 rounded-full border-2 border-dashed border-white/20 hover:border-[#C69C6D] flex items-center justify-center cursor-pointer overflow-hidden bg-white/5 relative group transition-all"
-                >
-                  {avatarPreview ? (
-                    <img
-                      src={avatarPreview}
-                      alt="Avatar"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <Camera
-                      className="text-white/30 group-hover:text-[#C69C6D]"
-                      size={32}
-                    />
-                  )}
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                    <ImageIcon size={20} className="text-white" />
-                  </div>
+          <form className="space-y-6">
+            {/* Avatar & User Type */}
+            <div className="flex flex-row gap-4 items-center bg-white/5 p-4 rounded-xl border border-white/10">
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="w-20 h-20 shrink-0 rounded-full border-2 border-dashed border-white/30 flex items-center justify-center bg-black cursor-pointer overflow-hidden relative group"
+              >
+                {avatarPreview ? (
+                  <img
+                    src={avatarPreview}
+                    alt="Avatar"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <Camera className="text-white/30" size={24} />
+                )}
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                  <ImageIcon size={16} className="text-white" />
                 </div>
-                <span className="text-[10px] text-white/40 uppercase font-bold">
-                  Ảnh đại diện
-                </span>
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -355,39 +319,29 @@ export default function RegisterForm({
                   onChange={handleFileChange}
                 />
               </div>
-
-              {/* Loại tài khoản */}
-              <div className="flex-1">
-                <label className="block text-white/60 text-xs font-bold uppercase mb-2">
-                  Bạn là ai?
-                </label>
-                <div className="grid grid-cols-2 gap-3 h-[88px]">
-                  <TypeButton
-                    active={userType === "khach_hang"}
-                    onClick={() => setUserType("khach_hang")}
-                    icon={User}
-                    label="Khách Hàng"
-                  />
-                  <TypeButton
-                    active={userType === "nhan_su"}
-                    onClick={() => setUserType("nhan_su")}
-                    icon={Briefcase}
-                    label="Nhân Sự"
-                  />
-                </div>
+              <div className="flex-1 grid grid-cols-2 gap-2">
+                <TypeButton
+                  active={userType === "khach_hang"}
+                  onClick={() => setUserType("khach_hang")}
+                  icon={User}
+                  label="Khách Hàng"
+                />
+                <TypeButton
+                  active={userType === "nhan_su"}
+                  onClick={() => setUserType("nhan_su")}
+                  icon={Briefcase}
+                  label="Nhân Sự"
+                />
               </div>
             </div>
 
-            {/* 2. Thông tin chung */}
+            {/* Thông tin chung */}
             <div className="space-y-4">
-              <p className="text-[#C69C6D] text-xs font-bold uppercase border-b border-white/10 pb-1">
-                Thông tin đăng nhập
-              </p>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <SectionTitle title="Thông tin đăng nhập" />
+              <div className="grid grid-cols-1 gap-4">
                 <InputGroup label="Họ và Tên" icon={User} required>
                   <input
-                    className="w-full bg-transparent outline-none text-white text-sm"
+                    className="w-full bg-transparent outline-none text-white text-sm py-1"
                     placeholder="Nguyễn Văn A"
                     value={hoTen}
                     onChange={(e) => setHoTen(e.target.value)}
@@ -395,30 +349,26 @@ export default function RegisterForm({
                 </InputGroup>
                 <InputGroup label="Số Điện Thoại" icon={Phone} required>
                   <input
-                    className="w-full bg-transparent outline-none text-white text-sm"
+                    className="w-full bg-transparent outline-none text-white text-sm py-1"
                     placeholder="09..."
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                   />
                 </InputGroup>
-              </div>
-
-              <InputGroup label="Email" icon={Mail} required>
-                <input
-                  className="w-full bg-transparent outline-none text-white text-sm"
-                  placeholder="email@example.com"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </InputGroup>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <InputGroup label="Email" icon={Mail} required>
+                  <input
+                    className="w-full bg-transparent outline-none text-white text-sm py-1"
+                    placeholder="email@example.com"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </InputGroup>
                 <InputGroup label="Mật Khẩu" icon={Lock} required>
                   <div className="relative w-full">
                     <input
-                      className="w-full bg-transparent outline-none text-white text-sm pr-8"
+                      className="w-full bg-transparent outline-none text-white text-sm pr-8 py-1"
                       placeholder="••••••"
                       type={showPassword ? "text" : "password"}
                       value={password}
@@ -427,15 +377,15 @@ export default function RegisterForm({
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-0 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                      className="absolute right-0 top-1/2 -translate-y-1/2 text-white/40"
                     >
-                      {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                      <Eye size={14} />
                     </button>
                   </div>
                 </InputGroup>
                 <InputGroup label="Xác Nhận" icon={Lock} required>
                   <input
-                    className="w-full bg-transparent outline-none text-white text-sm"
+                    className="w-full bg-transparent outline-none text-white text-sm py-1"
                     placeholder="••••••"
                     type="password"
                     value={confirmPassword}
@@ -445,26 +395,22 @@ export default function RegisterForm({
               </div>
             </div>
 
-            {/* 3. Fields riêng (Dynamic) */}
+            {/* Form Riêng */}
             {userType === "khach_hang" && (
               <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-                <p className="text-[#C69C6D] text-xs font-bold uppercase border-b border-white/10 pb-1">
-                  Hồ sơ khách hàng
-                </p>
-
+                <SectionTitle title="Hồ sơ khách hàng" />
                 <InputGroup label="Địa Chỉ Giao Hàng" icon={MapPin} required>
                   <input
-                    className="w-full bg-transparent outline-none text-white text-sm"
-                    placeholder="Số nhà, đường, phường, quận..."
+                    className="w-full bg-transparent outline-none text-white text-sm py-1"
+                    placeholder="Số nhà, đường..."
                     value={diaChi}
                     onChange={(e) => setDiaChi(e.target.value)}
                   />
                 </InputGroup>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <InputGroup label="Phân Loại" icon={Briefcase}>
                     <select
-                      className="w-full bg-transparent outline-none text-white text-sm appearance-none"
+                      className="w-full bg-transparent outline-none text-white text-sm appearance-none py-1"
                       value={phanLoai}
                       onChange={(e) => setPhanLoai(e.target.value)}
                     >
@@ -477,8 +423,8 @@ export default function RegisterForm({
                   </InputGroup>
                   <InputGroup label="Ghi Chú" icon={FileText}>
                     <input
-                      className="w-full bg-transparent outline-none text-white text-sm"
-                      placeholder="Ghi chú thêm..."
+                      className="w-full bg-transparent outline-none text-white text-sm py-1"
+                      placeholder="..."
                       value={ghiChu}
                       onChange={(e) => setGhiChu(e.target.value)}
                     />
@@ -489,196 +435,164 @@ export default function RegisterForm({
 
             {userType === "nhan_su" && (
               <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-                <p className="text-[#C69C6D] text-xs font-bold uppercase border-b border-white/10 pb-1">
-                  Hồ sơ nhân sự
-                </p>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <SectionTitle title="Hồ sơ nhân sự" />
+                <div className="grid grid-cols-1 gap-4">
                   <InputGroup
                     label="Vị Trí / Chức Vụ"
                     icon={Briefcase}
                     required
                   >
                     <input
-                      className="w-full bg-transparent outline-none text-white text-sm"
-                      placeholder="VD: Sales, Kế toán..."
+                      className="w-full bg-transparent outline-none text-white text-sm py-1"
+                      placeholder="Sales..."
                       value={viTri}
                       onChange={(e) => setViTri(e.target.value)}
                     />
                   </InputGroup>
-
-                  <InputGroup label="Thưởng Doanh Số (%)" icon={Percent}>
-                    <input
-                      type="number"
-                      className="w-full bg-transparent outline-none text-white text-sm"
-                      placeholder="0 - 30"
-                      value={thuongDoanhThu}
-                      onChange={(e) =>
-                        setThuongDoanhThu(Number(e.target.value))
-                      }
-                      max={30}
-                    />
-                  </InputGroup>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InputGroup label="Lương Cứng (VNĐ)" icon={Banknote}>
-                    <input
-                      type="number"
-                      className="w-full bg-transparent outline-none text-white text-sm"
-                      placeholder="10,000,000"
-                      value={luongThang}
-                      onChange={(e) => setLuongThang(Number(e.target.value))}
-                    />
-                  </InputGroup>
-                  <InputGroup label="Lương Theo Giờ (Auto)" icon={Clock}>
-                    <input
-                      className="w-full bg-transparent outline-none text-white/50 text-sm"
-                      readOnly
-                      value={
-                        luongTheoGio
-                          ? new Intl.NumberFormat("vi-VN").format(
-                              luongTheoGio
-                            ) + " đ/h"
-                          : "---"
-                      }
-                    />
-                  </InputGroup>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InputGroup label="Ngân Hàng" icon={Building}>
-                    <select
-                      className="w-full bg-transparent outline-none text-white text-sm appearance-none"
-                      value={nganHang}
-                      onChange={(e) => setNganHang(e.target.value)}
-                    >
-                      <option value="" className="bg-[#111]">
-                        -- Chọn ngân hàng --
-                      </option>
-                      {VN_BANKS.map((bank) => (
-                        <option key={bank} value={bank} className="bg-[#111]">
-                          {bank}
+                  <div className="grid grid-cols-2 gap-4">
+                    <InputGroup label="Lương Cứng" icon={Banknote}>
+                      <input
+                        type="number"
+                        className="w-full bg-transparent outline-none text-white text-sm py-1"
+                        placeholder="0"
+                        value={luongThang}
+                        onChange={(e) => setLuongThang(Number(e.target.value))}
+                      />
+                    </InputGroup>
+                    <InputGroup label="Thưởng %" icon={Percent}>
+                      <input
+                        type="number"
+                        className="w-full bg-transparent outline-none text-white text-sm py-1"
+                        placeholder="0"
+                        value={thuongDoanhThu}
+                        onChange={(e) =>
+                          setThuongDoanhThu(Number(e.target.value))
+                        }
+                      />
+                    </InputGroup>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <InputGroup label="Ngân Hàng" icon={Building}>
+                      <select
+                        className="w-full bg-transparent outline-none text-white text-sm appearance-none py-1"
+                        value={nganHang}
+                        onChange={(e) => setNganHang(e.target.value)}
+                      >
+                        <option value="" className="bg-[#111]">
+                          Chọn NH
                         </option>
-                      ))}
-                    </select>
-                  </InputGroup>
-                  <InputGroup label="Số Tài Khoản" icon={CreditCard}>
-                    <input
-                      className="w-full bg-transparent outline-none text-white text-sm"
-                      placeholder="STK nhận lương..."
-                      value={soTaiKhoan}
-                      onChange={(e) => setSoTaiKhoan(e.target.value)}
-                    />
-                  </InputGroup>
+                        {VN_BANKS.map((bank) => (
+                          <option key={bank} value={bank} className="bg-[#111]">
+                            {bank}
+                          </option>
+                        ))}
+                      </select>
+                    </InputGroup>
+                    <InputGroup label="Số TK" icon={CreditCard}>
+                      <input
+                        className="w-full bg-transparent outline-none text-white text-sm py-1"
+                        placeholder="..."
+                        value={soTaiKhoan}
+                        onChange={(e) => setSoTaiKhoan(e.target.value)}
+                      />
+                    </InputGroup>
+                  </div>
                 </div>
               </div>
             )}
           </form>
         </div>
 
-        {/* Footer Action - Cố định dưới cùng */}
-        <div className="shrink-0 p-6 border-t border-white/10 bg-[#0a0a0a]">
+        {/* FOOTER CỐ ĐỊNH - NÚT ĐĂNG KÝ */}
+        <div className="shrink-0 p-4 border-t border-white/10 bg-[#0a0a0a] z-20 absolute bottom-0 left-0 right-0">
           <button
             onClick={handleRegister}
             disabled={loading || isUploading}
-            className="w-full py-3.5 bg-[#C69C6D] hover:bg-white text-black font-bold uppercase tracking-widest rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(198,156,109,0.3)] flex items-center justify-center gap-2"
+            className="w-full py-3 bg-[#C69C6D] hover:bg-white text-black font-bold uppercase tracking-widest rounded-xl transition-all active:scale-95 disabled:opacity-50 shadow-lg flex items-center justify-center gap-2"
           >
             {loading || isUploading ? (
-              <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
             ) : (
               <UserPlus size={18} />
             )}
-            Gửi Đơn Đăng Ký
+            HOÀN TẤT ĐĂNG KÝ
           </button>
         </div>
       </div>
 
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar {
-          width: 4px;
+          width: 3px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
-          background: #111;
+          background: transparent;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
           background: #333;
-          border-radius: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #c69c6d;
+          border-radius: 10px;
         }
       `}</style>
     </div>
   );
 }
 
-// Sub-components
-function StepItem({ number, title, desc, active }: any) {
-  return (
-    <div className="relative flex gap-4 z-10">
-      <div
-        className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border-2 shrink-0 transition-colors ${
-          active
-            ? "bg-[#C69C6D] border-[#C69C6D] text-black"
-            : "bg-[#111] border-white/20 text-white/40"
-        }`}
-      >
-        {number}
-      </div>
-      <div>
-        <h4
-          className={`text-sm font-bold ${
-            active ? "text-white" : "text-white/60"
-          }`}
-        >
-          {title}
-        </h4>
-        <p className="text-xs text-white/40 mt-1 leading-relaxed">{desc}</p>
-      </div>
-    </div>
-  );
-}
+// Sub-components nhỏ
+const SectionTitle = ({ title }: { title: string }) => (
+  <p className="text-[#C69C6D] text-[10px] font-bold uppercase border-b border-white/10 pb-1 mb-2">
+    {title}
+  </p>
+);
 
-function TypeButton({ active, onClick, icon: Icon, label }: any) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`p-4 rounded-xl border flex flex-col items-center justify-center transition-all h-full ${
+const StepItem = ({ number, title, desc, active }: any) => (
+  <div className="relative flex gap-4 z-10">
+    <div
+      className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border-2 shrink-0 ${
         active
-          ? "bg-[#C69C6D]/20 border-[#C69C6D]"
-          : "bg-white/5 border-white/10 hover:bg-white/10"
+          ? "bg-[#C69C6D] border-[#C69C6D] text-black"
+          : "bg-[#111] border-white/20 text-white/40"
       }`}
     >
-      <Icon
-        size={24}
-        className={`mb-2 ${active ? "text-[#C69C6D]" : "text-white/50"}`}
-      />
-      <div
-        className={`font-bold text-sm ${
-          active ? "text-white" : "text-white/70"
+      {number}
+    </div>
+    <div>
+      <h4
+        className={`text-sm font-bold ${
+          active ? "text-white" : "text-white/60"
         }`}
       >
-        {label}
-      </div>
-    </button>
-  );
-}
-
-function InputGroup({ label, icon: Icon, required, children }: any) {
-  return (
-    <div className="group w-full">
-      <label className="block text-white/60 text-[10px] font-bold uppercase mb-1.5 ml-1">
-        {label} {required && <span className="text-red-400">*</span>}
-      </label>
-      <div className="flex items-center gap-3 px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus-within:border-[#C69C6D] focus-within:bg-black transition-all">
-        <Icon
-          size={16}
-          className="text-white/30 group-focus-within:text-[#C69C6D] transition-colors shrink-0"
-        />
-        {children}
-      </div>
+        {title}
+      </h4>
+      <p className="text-xs text-white/40">{desc}</p>
     </div>
-  );
-}
+  </div>
+);
+
+const TypeButton = ({ active, onClick, icon: Icon, label }: any) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`p-2 rounded-lg border flex flex-col items-center justify-center transition-all h-full ${
+      active
+        ? "bg-[#C69C6D]/20 border-[#C69C6D] text-white"
+        : "bg-white/5 border-white/10 text-white/50"
+    }`}
+  >
+    <Icon
+      size={18}
+      className={`mb-1 ${active ? "text-[#C69C6D]" : "text-white/50"}`}
+    />
+    <span className="text-xs font-bold">{label}</span>
+  </button>
+);
+
+const InputGroup = ({ label, icon: Icon, required, children }: any) => (
+  <div className="w-full">
+    <label className="block text-white/60 text-[10px] font-bold uppercase mb-1 ml-1">
+      {label} {required && <span className="text-red-400">*</span>}
+    </label>
+    <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded-lg focus-within:border-[#C69C6D] transition-all">
+      <Icon size={14} className="text-white/30 shrink-0" />
+      {children}
+    </div>
+  </div>
+);
