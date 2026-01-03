@@ -4,40 +4,56 @@
 
 :root {
   /* MÀU SẮC CHỦ ĐẠO - DAY MODE (Sáng nhưng không chói - màu giấy Gạo) */
-  --gold-artisan: #C69C6D;       /* Vàng đồng chủ đạo */
-  --gold-hover: #B58B5D;         /* Vàng đồng đậm hơn khi hover */
-  --black-matte: #1a120f;        /* Đen pha nâu đất */
-  --void-black: #050505;         /* Đen sâu thẳm */
-  --paper-rice: #F5E6D3;         /* Trắng ngà giấy dó */
-  --red-seal: #8B0000;           /* Đỏ con triện */
-  
+  --gold-artisan: #c69c6d; /* Vàng đồng chủ đạo */
+  --gold-hover: #b58b5d; /* Vàng đồng đậm hơn khi hover */
+  --black-matte: #1a120f; /* Đen pha nâu đất */
+  --void-black: #050505; /* Đen sâu thẳm */
+  --paper-rice: #f5e6d3; /* Trắng ngà giấy dó */
+  --red-seal: #8b0000; /* Đỏ con triện */
+
   /* Cấu hình giao diện Light */
-  --bg-primary: #F5F5F5;
-  --bg-secondary: #EBEBEB;
-  --bg-card: #FFFFFF;
+  --bg-primary: #f5f5f5;
+  --bg-secondary: #ebebeb;
+  --bg-card: #ffffff;
   --text-primary: #1a120f;
   --text-secondary: rgba(26, 18, 15, 0.6);
   --border-color: rgba(198, 156, 109, 0.3);
-  
-  --app-height: 100%;
+
+  /* Biến chiều cao dynamic cho Mobile */
+  --app-height: 100vh;
 }
 
 .dark-theme {
   /* Cấu hình giao diện Dark (Mặc định) */
-  --bg-primary: #050505;         /* Void Black */
-  --bg-secondary: #0A0A0A;
-  --bg-card: #1a120f;            /* Black Matte pha nâu */
-  --text-primary: #F5E6D3;       /* Paper Rice */
+  --bg-primary: #050505; /* Void Black */
+  --bg-secondary: #0a0a0a;
+  --bg-card: #1a120f; /* Black Matte pha nâu */
+  --text-primary: #f5e6d3; /* Paper Rice */
   --text-secondary: rgba(245, 230, 211, 0.5);
   --border-color: rgba(198, 156, 109, 0.2); /* Gold mờ */
 }
 
-/* Áp dụng Theme */
+/* 🟢 CẤU HÌNH GLOBAL MỚI - FIX LỖI MOBILE */
+html,
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  font-family: 'Inter', sans-serif; /* Hoặc font Serif nếu muốn nghệ hơn */
+  font-family: "Inter", sans-serif;
   transition: background-color 0.3s ease, color 0.3s ease;
+
+  /* Khóa viewport để ngăn kéo dãn trên iOS (Rubber-banding) */
+  height: 100%;
+  width: 100%;
+  overflow: hidden; /* Quan trọng: Chặn scroll body, chỉ scroll trong container con */
+  position: fixed; /* Khóa body lại */
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Class thay thế cho h-screen/h-[100dvh] để tương thích mọi trình duyệt */
+.h-app {
+  height: 100vh; /* Fallback */
+  height: var(--app-height);
 }
 
 /* 🟢 ARTISAN UTILITIES */
@@ -68,15 +84,28 @@ body {
 }
 
 @layer utilities {
-  .text-gold { color: var(--gold-artisan); }
-  .bg-gold { background-color: var(--gold-artisan); }
-  .border-gold { border-color: var(--gold-artisan); }
-  
-  .glow-text { text-shadow: 0 0 10px rgba(198, 156, 109, 0.5); }
-  
+  .text-gold {
+    color: var(--gold-artisan);
+  }
+  .bg-gold {
+    background-color: var(--gold-artisan);
+  }
+  .border-gold {
+    border-color: var(--gold-artisan);
+  }
+
+  .glow-text {
+    text-shadow: 0 0 10px rgba(198, 156, 109, 0.5);
+  }
+
   /* Ẩn scrollbar nhưng vẫn cuộn được */
-  .scrollbar-hide::-webkit-scrollbar { display: none; }
-  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
 
 /* 🟢 ẨN SCROLLBAR TOÀN BỘ APP - Vẫn cuộn được bằng vuốt/chuột */
@@ -90,7 +119,17 @@ body {
 
 /* Animation Hologram */
 @keyframes hologram {
-  0% { opacity: 0; transform: scale(0.95) translateY(10px); filter: blur(5px); }
-  100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+    filter: blur(5px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
 }
-.animate-hologram { animation: hologram 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+.animate-hologram {
+  animation: hologram 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}

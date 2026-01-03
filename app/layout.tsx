@@ -65,15 +65,19 @@ export default function RootLayout({
   return (
     <html lang="vi">
       {/* 🟢 4. ÁP DỤNG BIẾN FONT VÀO BODY */}
-      {/* Thay inter.className bằng chuỗi biến variable */}
+      {/* UPDATED: Sử dụng class 'h-app' thay vì 'min-h-screen' để fix lỗi mobile viewport.
+          Class 'h-app' được định nghĩa trong globals.css và nhận giá trị từ ForceFullScreen.tsx 
+      */}
       <body
-        className={`${inter.variable} ${playfair.variable} bg-black min-h-screen overflow-hidden overscroll-none font-sans`}
+        className={`${inter.variable} ${playfair.variable} bg-black h-app w-full overflow-hidden font-sans`}
       >
         <UserProvider>
           <AppSettingsProvider>
             <QueryProvider>
               <ErrorBoundary>
+                {/* Component này sẽ tính toán --app-height cho body */}
                 <ForceFullScreen />
+
                 {children}
 
                 <NutHoTro />

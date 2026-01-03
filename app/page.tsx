@@ -7,104 +7,91 @@ import CongDangNhap from "@/app/CongDangNhap/CongDangNhap";
 import GoogleDich from "@/app/ThuVien/GoogleDich";
 import { AuthService } from "@/app/CongDangNhap/AuthService";
 import { useAppSettings } from "@/app/ThuVien/AppSettingsContext";
-// 🟢 IMPORT QUAN TRỌNG ĐỂ FIX LỖI
 import { supabase } from "@/app/ThuVien/ketNoiSupabase";
 import { getRedirectUrl } from "@/app/CongDangNhap/RoleRedirectService";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const BASE_IMG_URL = `${SUPABASE_URL}/storage/v1/object/public/hinh-nen`;
 
-// 🟢 TÁCH COMPONENT CONTENT ĐỂ DÙNG SUSPENSE (BẮT BUỘC TRONG NEXT.JS KHI DÙNG useSearchParams)
 function TrangChuContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { language, t } = useAppSettings(); // Thêm t để dịch nếu cần
+  const { language } = useAppSettings();
 
   const [hienPopupLogin, setHienPopupLogin] = useState(false);
   const [nguoiDung, setNguoiDung] = useState<any>(null);
   const [loiChao, setLoiChao] = useState("");
   const [showGreeting, setShowGreeting] = useState(true);
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true); // Trạng thái đang kiểm tra auth
-  const [isRedirecting, setIsRedirecting] = useState(false); // Trạng thái đang chuyển hướng
-  const [daKiemTraLogin, setDaKiemTraLogin] = useState(false); // Trạng thái đã chạy xong logic login
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [daKiemTraLogin, setDaKiemTraLogin] = useState(false);
 
-  // ============================================================
-  // 🛡️ FIX ZOMBIE SESSION: CHẶN NGAY TỪ CỔNG (QUAN TRỌNG NHẤT)
-  // ============================================================
+  // 1. ZOMBIE KILLER (Giữ nguyên)
   useEffect(() => {
-    // Kiểm tra ngay lập tức nếu vừa logout xong
     const urlParams = new URLSearchParams(window.location.search);
-
     if (urlParams.get("logout")) {
-      console.log(
-        "🛑 [ZOMBIE KILLER] Phát hiện vừa đăng xuất. Dừng mọi Auto-Login."
-      );
-
-      // 1. Reset State ngay lập tức
+      console.log("🛑 [ZOMBIE KILLER] Logout detected.");
       setNguoiDung(null);
-      setDaKiemTraLogin(true); // Đánh dấu là "đã kiểm tra xong" (kết quả là null)
+      setDaKiemTraLogin(true);
       setIsCheckingAuth(false);
-
-      // 2. Xóa sạch lần nữa cho chắc (Double kill)
       if (typeof window !== "undefined") {
         localStorage.clear();
         sessionStorage.clear();
-        // Xóa cookie visitor
         document.cookie = "VISITOR_MODE=; Path=/; Max-Age=0; SameSite=Lax";
       }
-
-      // 3. Dọn dẹp URL cho đẹp (Xóa ?logout=success mà không reload)
       window.history.replaceState({}, "", "/");
       return;
     }
   }, []);
 
-  // ============================================================
-  // 🟢 LOGIC KIỂM TRA ĐĂNG NHẬP (AUTO-LOGIN)
-  // ============================================================
+  // 2. CHECK SESSION + TIMEOUT FIX (NÂNG CẤP)
   useEffect(() => {
-    // 🛑 QUAN TRỌNG: Nếu URL có logout thì BỎ QUA toàn bộ logic dưới này
     if (new URLSearchParams(window.location.search).get("logout")) return;
 
+    // --- TIMEOUT SAFETY NET ---
+    // Nếu sau 3 giây mà chưa check xong login -> Force hiện UI (coi như chưa login)
+    // Để tránh bị treo màn hình đen
+    const safetyTimer = setTimeout(() => {
+      setDaKiemTraLogin((prev) => {
+        if (!prev) {
+          console.warn("⚠️ Login check timeout - Force UI render");
+          setNguoiDung(null);
+          setIsCheckingAuth(false);
+          return true; // Force hiện UI
+        }
+        return prev;
+      });
+    }, 3000);
+
     const cleanupStaleLocalStorage = () => {
+      /* Giữ nguyên logic dọn dẹp */
       const cached = localStorage.getItem("USER_INFO");
-      if (cached === "undefined") {
-        localStorage.removeItem("USER_INFO");
-      } else if (cached) {
+      if (cached === "undefined") localStorage.removeItem("USER_INFO");
+      else if (cached) {
         try {
           JSON.parse(cached);
         } catch {
           localStorage.removeItem("USER_INFO");
         }
       }
-
-      Object.keys(localStorage)
-        .filter((key) => key.startsWith("sb-"))
-        .forEach((key) => {
-          if (localStorage.getItem(key) === "undefined") {
-            localStorage.removeItem(key);
-          }
-        });
     };
 
     const checkSession = async () => {
       setIsCheckingAuth(true);
       try {
         cleanupStaleLocalStorage();
-
-        // 1. Hỏi thẳng Server xem còn phiên đăng nhập không
         const {
           data: { session },
           error,
         } = await supabase.auth.getSession();
 
         if (error || !session) {
-          console.log("🚫 Không tìm thấy phiên đăng nhập. Reset về khách.");
+          console.log("🚫 No session found.");
           setNguoiDung(null);
           localStorage.removeItem("USER_INFO");
           localStorage.removeItem("USER_ROLE");
         } else {
-          console.log("✅ Phiên đăng nhập tồn tại:", session.user.email);
+          console.log("✅ Session valid:", session.user.email);
           const user = await AuthService.getCurrentUser();
           if (user) {
             setNguoiDung(user);
@@ -114,11 +101,11 @@ function TrangChuContent() {
           }
         }
       } catch (e) {
-        console.error("Lỗi kiểm tra session:", e);
+        console.error("Session check error:", e);
         setNguoiDung(null);
       } finally {
         setIsCheckingAuth(false);
-        setDaKiemTraLogin(true); // Đánh dấu đã kiểm tra xong
+        setDaKiemTraLogin(true); // Đánh dấu xong -> Clear timeout
       }
     };
 
@@ -127,37 +114,28 @@ function TrangChuContent() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event) => {
-      if (event === "SIGNED_IN") {
-        console.log("✅ SIGNED_IN detected - Re-checking session");
-        await checkSession();
-      } else if (event === "SIGNED_OUT") {
-        console.log("👋 SIGNED_OUT detected - Clearing user");
+      if (event === "SIGNED_IN") await checkSession();
+      else if (event === "SIGNED_OUT") {
         setNguoiDung(null);
         localStorage.removeItem("USER_INFO");
         localStorage.removeItem("USER_ROLE");
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(safetyTimer); // Clear timeout khi unmount
+    };
   }, []);
 
-  // ============================================================
-  // 🟢 AUTO-REDIRECT (CHỈ KHI ĐÃ CÓ USER VÀ KHÔNG PHẢI VỪA LOGOUT)
-  // ============================================================
+  // 3. AUTO-REDIRECT (Giữ nguyên)
   useEffect(() => {
     if (!nguoiDung || isRedirecting) return;
-
-    // Chặn redirect nếu vừa logout (An toàn 2 lớp)
     if (new URLSearchParams(window.location.search).get("logout")) return;
-
-    console.log(
-      "🟢 AUTO-REDIRECT TRIGGERED - User detected:",
-      nguoiDung.ho_ten
-    );
     handleMainAction();
   }, [nguoiDung]);
 
-  // Hiệu ứng lời chào
+  // 4. LỜI CHÀO (Giữ nguyên)
   useEffect(() => {
     const name = nguoiDung?.ho_ten || (language === "vi" ? "Khách" : "Guest");
     const h = new Date().getHours();
@@ -175,57 +153,43 @@ function TrangChuContent() {
     return () => clearTimeout(timer);
   }, [nguoiDung, language]);
 
-  // Xử lý khách vãng lai
   const handleGuestVisit = () => {
     document.cookie = "VISITOR_MODE=1; path=/; max-age=86400; SameSite=Lax";
-    console.log("🚀 Khách tham quan đang vào...");
     router.push("/trangchu");
   };
 
-  // Xử lý nút chính (Vào phòng / Đăng nhập)
   const handleMainAction = async () => {
-    // Nếu chưa đăng nhập -> Mở Popup
     if (!nguoiDung) {
       setHienPopupLogin(true);
       return;
     }
-
-    // Nếu đã đăng nhập -> Tính toán đường dẫn chính xác
     setIsRedirecting(true);
     try {
-      // Lấy role chuẩn hóa
       const role =
         nguoiDung.role ||
         nguoiDung.vi_tri_normalized ||
         nguoiDung.phan_loai_normalized ||
         "khach";
       const type = nguoiDung.userType || "khach_hang";
-
-      console.log(`🚀 Đang điều hướng cho: ${type} - ${role}`);
-
       const targetUrl = await getRedirectUrl(type, role);
-
-      console.log(`🎯 Đích đến: ${targetUrl}`);
       router.push(targetUrl);
     } catch (e) {
-      console.error("Lỗi điều hướng:", e);
+      console.error("Redirect error:", e);
       setIsRedirecting(false);
-      alert("Có lỗi khi xác định phòng ban. Vui lòng đăng nhập lại.");
       setNguoiDung(null);
     }
   };
 
-  // Link ảnh nền (Thêm version để tránh cache)
-  const bgVersion = React.useMemo(() => Date.now(), []); // Giữ version cố định trong phiên
+  const bgVersion = React.useMemo(() => Date.now(), []);
   const bgMobile = `${BASE_IMG_URL}/login-mobile.jpg?v=${bgVersion}`;
   const bgDesktop = `${BASE_IMG_URL}/login-desktop.jpg?v=${bgVersion}`;
 
-  // Nếu chưa kiểm tra login xong (và không phải logout mode), hiện màn hình đen
+  // MÀN HÌNH CHỜ (Đã có timeout bảo vệ ở trên)
   if (!daKiemTraLogin)
     return <div className="fixed inset-0 bg-[#050505] z-50" />;
 
   return (
-    <div className="relative h-[100dvh] w-full bg-[#050505] text-[#F5F5F5] overflow-hidden font-sans flex flex-col">
+    <div className="relative h-app w-full bg-[#050505] text-[#F5F5F5] overflow-hidden font-sans flex flex-col">
       {/* Background */}
       <div className="absolute inset-0 w-full h-full z-0 pointer-events-none select-none">
         {SUPABASE_URL && (
@@ -249,10 +213,9 @@ function TrangChuContent() {
 
       <GoogleDich />
 
-      {/* Content Container */}
       <div className="absolute inset-0 z-10 flex flex-col justify-center items-center translate-y-[10%] p-4">
         <div className="w-full max-w-[95%] md:max-w-2xl flex flex-col items-center gap-6 md:gap-8 animate-fade-in-up">
-          {/* Header */}
+          {/* Header Text */}
           <div className="text-center w-full">
             <div className="flex items-center justify-center gap-2 mb-2 md:mb-3">
               <MapPin size={16} className="text-yellow-500" />
@@ -306,7 +269,6 @@ function TrangChuContent() {
 
             <div className="hidden sm:block w-[1px] h-12 bg-white/20" />
 
-            {/* Nút Nội Bộ: Xử lý thông minh */}
             <button
               onClick={handleMainAction}
               disabled={isCheckingAuth || isRedirecting}
@@ -377,7 +339,6 @@ function TrangChuContent() {
   );
 }
 
-// 🟢 EXPORT DEFAULT CHÍNH: BỌC TRONG SUSPENSE ĐỂ TRÁNH LỖI NEXT.JS
 export default function TrangChuDashboard() {
   return (
     <Suspense

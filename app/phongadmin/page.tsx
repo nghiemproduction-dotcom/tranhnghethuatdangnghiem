@@ -21,6 +21,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useUser } from "@/app/ThuVien/UserContext";
 import {
   Users,
@@ -83,15 +84,36 @@ const ADMIN_FUNCTIONS = [
 
 export default function PhongAdminPage() {
   const { user: contextUser, loading: contextLoading } = useUser();
-  const [authLoading, setAuthLoading] = useState(true);
+  const router = useRouter();
   const [activeFunction, setActiveFunction] = useState<string>("nhansu"); // Mặc định vào Nhân sự cho dễ thấy
 
+  // 🛡️ BẢO MẬT: Chặn truy cập trái phép ngay từ Client
   useEffect(() => {
-    if (!contextLoading) setAuthLoading(false);
-  }, [contextLoading]);
+    if (!contextLoading) {
+      // 1. Nếu chưa đăng nhập -> Cút về home
+      if (!contextUser) {
+        console.warn(
+          "⛔ Unauthorized access to Admin Panel - Redirecting to Home"
+        );
+        router.replace("/");
+        return;
+      }
 
-  // Loading state
-  if (authLoading) {
+      // 2. Nếu đã đăng nhập nhưng không phải Admin/Boss -> Cũng cút
+      const role = contextUser.vi_tri_normalized || "";
+      const isAdmin = ["admin", "boss"].includes(role.toLowerCase());
+
+      if (!isAdmin) {
+        console.warn(
+          `⛔ Forbidden access attempt by ${contextUser.email} (Role: ${role})`
+        );
+        router.replace("/trangchu");
+      }
+    }
+  }, [contextLoading, contextUser, router]);
+
+  // Loading state (Chờ check auth xong mới render)
+  if (contextLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
@@ -99,15 +121,12 @@ export default function PhongAdminPage() {
     );
   }
 
-  // Get user info
-  let displayUser = contextUser;
-  if (!displayUser && typeof window !== "undefined") {
-    try {
-      const stored = localStorage.getItem("USER_INFO");
-      displayUser = stored ? JSON.parse(stored) : null;
-    } catch (e) {
-      displayUser = null;
-    }
+  // Double check trước khi render (để tránh flash content)
+  const role = contextUser?.vi_tri_normalized || "";
+  const isAdmin = ["admin", "boss"].includes(role.toLowerCase());
+
+  if (!contextUser || !isAdmin) {
+    return null; // Render nothing while redirecting
   }
 
   // ========================================
@@ -116,7 +135,7 @@ export default function PhongAdminPage() {
 
   return (
     <KhungTrangChuan
-      nguoiDung={displayUser}
+      nguoiDung={contextUser} // Dùng trực tiếp contextUser, không fallback localStorage
       loiChao="ADMIN COMMAND CENTER"
       contentClassName="flex flex-col h-screen pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
     >

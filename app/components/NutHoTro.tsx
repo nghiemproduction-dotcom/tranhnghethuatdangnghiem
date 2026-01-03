@@ -31,6 +31,17 @@ const useSoundEffect = () => {
   return () => audioRef.current?.play().catch(() => {});
 };
 
+// 🟢 Helper tạo ID khách vãng lai (Giữ chat khi F5)
+const getGuestId = () => {
+  if (typeof window === "undefined") return "guest";
+  let id = localStorage.getItem("guest_chat_id");
+  if (!id) {
+    id = "guest_" + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem("guest_chat_id", id);
+  }
+  return id;
+};
+
 export default function NutHoTro() {
   const { user } = useUser();
   const router = useRouter();
@@ -46,8 +57,12 @@ export default function NutHoTro() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [onlineStaffCount, setOnlineStaffCount] = useState(0);
 
+  // 🟢 Thêm state thông tin nhân viên đang chat
+  const [staffInfo, setStaffInfo] = useState<any>(null);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const guestId = getGuestId(); // Lấy ID khách vãng lai
 
   // 1. REALTIME STAFF COUNT
   useEffect(() => {
@@ -56,14 +71,11 @@ export default function NutHoTro() {
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState();
         const allUsers: any[] = Object.values(state).flat();
-
-        // Lọc những người có role hỗ trợ
         const supportStaff = allUsers.filter(
           (u) =>
             u.role &&
             ["admin", "boss", "quanly", "sales"].includes(u.role.toLowerCase())
         );
-
         setOnlineStaffCount(supportStaff.length);
       })
       .subscribe();
@@ -85,17 +97,38 @@ export default function NutHoTro() {
         );
       } else {
         const saved = localStorage.getItem("guest_chat_info");
+        // Nếu đã có thông tin hoặc đã có ID guest cũ -> Vào chat luôn
         if (saved) {
           const p = JSON.parse(saved);
           setGuestInfo(p);
           setViewMode("chat");
           initChatSession(null, p.name, p.phone);
+        } else if (localStorage.getItem("guest_chat_id")) {
+          // Nếu chưa có tên nhưng đã từng chat (có guest_id) -> Thử tìm session cũ
+          checkExistingGuestSession();
         } else {
           setViewMode("form_guest");
         }
       }
     }
   }, [isOpen, user]);
+
+  // Hàm kiểm tra session cũ của khách vãng lai
+  const checkExistingGuestSession = async () => {
+    const { data } = await supabase
+      .from("tu_van_sessions")
+      .select("*")
+      .eq("khach_vang_lai_id", guestId)
+      .neq("trang_thai", "ket_thuc")
+      .single();
+    if (data) {
+      setViewMode("chat");
+      setSessionId(data.id);
+      subscribeToChat(data.id);
+    } else {
+      setViewMode("form_guest");
+    }
+  };
 
   // Auto scroll
   useEffect(() => {
@@ -118,17 +151,29 @@ export default function NutHoTro() {
   ) => {
     let q = supabase
       .from("tu_van_sessions")
-      .select("id")
+      .select("*")
       .neq("trang_thai", "ket_thuc");
+
     if (userId) q = q.eq("khach_hang_id", userId);
-    else q = q.eq("sdt_lien_he", phone);
+    else q = q.eq("khach_vang_lai_id", guestId); // Dùng guestId cố định
 
     const { data } = await q
       .order("cap_nhat_luc", { ascending: false })
       .limit(1);
+
     if (data && data.length > 0) {
       setSessionId(data[0].id);
       subscribeToChat(data[0].id);
+
+      // Load info nhân viên nếu có
+      if (data[0].nhan_su_phu_trach_id) {
+        const { data: s } = await supabase
+          .from("nhan_su")
+          .select("ho_ten, hinh_anh")
+          .eq("id", data[0].nhan_su_phu_trach_id)
+          .single();
+        setStaffInfo(s);
+      }
     }
   };
 
@@ -157,15 +202,41 @@ export default function NutHoTro() {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "tu_van_sessions",
+          filter: `id=eq.${sId}`,
+        },
+        async (payload) => {
+          // Cập nhật người phụ trách nếu có thay đổi
+          if (
+            payload.new.nhan_su_phu_trach_id &&
+            payload.new.nhan_su_phu_trach_id !==
+              payload.old.nhan_su_phu_trach_id
+          ) {
+            const { data: s } = await supabase
+              .from("nhan_su")
+              .select("ho_ten, hinh_anh")
+              .eq("id", payload.new.nhan_su_phu_trach_id)
+              .single();
+            setStaffInfo(s);
+          }
+        }
+      )
       .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
     };
   };
 
-  // 4. GỬI TIN NHẮN
+  // 4. GỬI TIN NHẮN & PUSH NOTIFICATION
   const handleSend = async (file?: File) => {
     if (!inputMsg.trim() && !file) return;
+
     setIsSending(true);
     const text = inputMsg;
     setInputMsg("");
@@ -187,13 +258,15 @@ export default function NutHoTro() {
         }
       }
 
+      // Tạo session mới nếu chưa có
       if (!activeId) {
         const { data: newSess, error } = await supabase
           .from("tu_van_sessions")
           .insert({
             khach_hang_id: user?.id || null,
-            khach_vang_lai_id: !user ? `guest_${Date.now()}` : null,
-            ten_hien_thi: user?.ho_ten || guestInfo.name,
+            khach_vang_lai_id: !user ? guestId : null, // Dùng guestId
+            ten_hien_thi:
+              user?.ho_ten || guestInfo.name || `Khách ${guestId.slice(-4)}`,
             sdt_lien_he: user?.so_dien_thoai || guestInfo.phone,
             loai_khach: user ? "thanh_vien" : "vang_lai",
             trang_thai: "cho_tu_van",
@@ -201,6 +274,7 @@ export default function NutHoTro() {
           })
           .select()
           .single();
+
         if (!error) {
           activeId = newSess.id;
           setSessionId(newSess.id);
@@ -208,6 +282,7 @@ export default function NutHoTro() {
           isNew = true;
         }
       } else {
+        // Update tin nhắn cuối (Trigger DB sẽ tự lo phần is_read)
         await supabase
           .from("tu_van_sessions")
           .update({
@@ -224,20 +299,23 @@ export default function NutHoTro() {
       if (activeId) {
         await supabase.from("tu_van_messages").insert({
           session_id: activeId,
-          nguoi_gui_id: user?.id || "guest",
+          nguoi_gui_id: user?.id || guestId,
           la_nhan_vien: false,
           noi_dung: text,
           hinh_anh: imgUrl,
         });
 
-        // Gửi Push Notification cho nhân viên
+        // 🟢 GỬI PUSH NOTIFICATION CHO NHÂN VIÊN
         fetch("/api/push/notify-staff", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            title: `Khách: ${user?.ho_ten || guestInfo.name}`,
-            body: text || "Đã gửi ảnh",
-            url: isNew ? "/phongsales" : undefined,
+            title: `💬 Khách: ${user?.ho_ten || guestInfo.name || "Vãng lai"}`,
+            body: text || "Đã gửi hình ảnh",
+            url: "/quan-ly/tu-van", // Link để nhân viên bấm vào
+            sessionId: activeId,
+            // Nếu chưa có staffInfo thì gửi null để bắn all, có rồi thì ưu tiên bắn người đó
+            targetStaffId: staffInfo ? null : null,
           }),
         }).catch(() => {});
       }
@@ -261,7 +339,7 @@ export default function NutHoTro() {
         .glass-panel {
           background: rgba(10, 10, 10, 0.95);
           backdrop-filter: blur(20px);
-          border-right: 1px solid rgba(198, 156, 109, 0.2); /* Đổi border sang phải cho đẹp */
+          border-right: 1px solid rgba(198, 156, 109, 0.2);
           box-shadow: 10px 0 50px rgba(0, 0, 0, 0.8);
         }
         .chat-bubble-guest {
@@ -277,29 +355,30 @@ export default function NutHoTro() {
         }
       `}</style>
 
-      {/* 🟢 1. DỜI CONTAINER VỀ BÊN TRÁI (left-6) & ALIGN ITEMS START */}
       <div className="fixed bottom-6 left-6 z-[9000] font-sans flex flex-col items-start gap-4">
-        {/* PANEL LỚN: Full màn hình mobile, Full chiều cao bên TRÁI desktop */}
         {isOpen && (
           <div className="fixed inset-0 z-[9999] flex justify-start">
-            {" "}
-            {/* 🟢 justify-start để căn trái */}
-            {/* Backdrop tối */}
             <div
               className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in"
               onClick={() => setIsOpen(false)}
             ></div>
-            {/* 🟢 SLIDE TỪ TRÁI QUA (slide-in-from-left) */}
             <div className="relative w-full md:w-[450px] h-full glass-panel flex flex-col animate-in slide-in-from-left duration-300">
               {/* Header */}
               <div className="flex items-center justify-between p-5 border-b border-[#C69C6D]/20 bg-[#151515]">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-[#C69C6D]/10 flex items-center justify-center text-[#C69C6D]">
-                    <Headphones size={20} />
+                    {staffInfo && staffInfo.hinh_anh ? (
+                      <img
+                        src={staffInfo.hinh_anh}
+                        className="w-full h-full rounded-full object-cover"
+                      />
+                    ) : (
+                      <Headphones size={20} />
+                    )}
                   </div>
                   <div>
                     <h2 className="text-sm font-bold text-white uppercase tracking-widest">
-                      Trung Tâm Hỗ Trợ
+                      {staffInfo ? staffInfo.ho_ten : "Trung Tâm Hỗ Trợ"}
                     </h2>
                     <div className="flex items-center gap-1.5 mt-1">
                       <span
@@ -310,7 +389,9 @@ export default function NutHoTro() {
                         }`}
                       ></span>
                       <span className="text-[10px] text-white/60">
-                        {onlineStaffCount > 0
+                        {staffInfo
+                          ? "Đang hỗ trợ bạn"
+                          : onlineStaffCount > 0
                           ? `${onlineStaffCount} tư vấn viên Online`
                           : "Đang ngoại tuyến"}
                       </span>
@@ -414,8 +495,6 @@ export default function NutHoTro() {
                           </div>
                         </div>
                       ))}
-
-                      {/* Thông báo lịch sự khi chờ lâu */}
                       {showPoliteMessage && (
                         <div className="bg-[#15202B] border border-[#C69C6D]/30 p-4 rounded-xl flex gap-4 animate-in fade-in slide-in-from-bottom-2 shadow-xl mx-2">
                           <Info className="text-[#C69C6D] shrink-0" size={24} />
@@ -463,7 +542,6 @@ export default function NutHoTro() {
                           e.target.files?.[0] && handleSend(e.target.files[0])
                         }
                       />
-
                       <div className="flex-1 bg-white/5 border border-white/10 rounded-xl flex items-center px-4 min-h-[46px] focus-within:border-[#C69C6D] transition-colors">
                         <input
                           className="flex-1 bg-transparent text-sm text-white placeholder-white/30 outline-none py-3"
