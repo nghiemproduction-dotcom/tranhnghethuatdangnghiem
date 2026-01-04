@@ -50,7 +50,7 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Class thay thế h-screen để tương thích biến dynamic */
+/* Class thay thế h-[100dvh] để tương thích biến dynamic */
 .h-app {
   height: 100vh; /* Fallback */
   height: var(--app-height);

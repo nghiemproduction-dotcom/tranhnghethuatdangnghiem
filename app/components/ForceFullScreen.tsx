@@ -6,9 +6,10 @@ import {
   Share,
   PlusSquare,
   Smartphone,
-  Monitor,
   XCircle,
   CheckCircle2,
+  Globe,
+  MoreHorizontal,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 
@@ -16,10 +17,10 @@ export default function ForceFullScreen() {
   const pathname = usePathname();
   const [showPrompt, setShowPrompt] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isInAppBrowser, setIsInAppBrowser] = useState(false); // Detect Zalo/FB
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
-  // 1. LOGIC TÍNH CHIỀU CAO "BẤT TỬ" (Fix lỗi hở trắng trên Safari/Chrome Mobile)
+  // 1. LOGIC TÍNH CHIỀU CAO "BẤT TỬ" (Giữ nguyên vì đã tốt)
   useEffect(() => {
     const setAppHeight = () => {
       const vh = window.visualViewport
@@ -27,16 +28,13 @@ export default function ForceFullScreen() {
         : window.innerHeight;
       document.documentElement.style.setProperty("--app-height", `${vh}px`);
     };
-
     setAppHeight();
-
     if (window.visualViewport) {
       window.visualViewport.addEventListener("resize", setAppHeight);
       window.visualViewport.addEventListener("scroll", setAppHeight);
     } else {
       window.addEventListener("resize", setAppHeight);
     }
-
     return () => {
       if (window.visualViewport) {
         window.visualViewport.removeEventListener("resize", setAppHeight);
@@ -47,69 +45,64 @@ export default function ForceFullScreen() {
     };
   }, []);
 
-  // 2. LOGIC KIỂM TRA & ÉP CÀI ĐẶT
+  // 2. LOGIC KIỂM TRA THÔNG MINH
   useEffect(() => {
-    // Kiểm tra xem người dùng đã bấm "Ẩn vĩnh viễn" chưa
+    // Check nếu người dùng đã "Cấm hiện lại"
     const isDismissed =
       typeof window !== "undefined" &&
       localStorage.getItem("PWA_PROMPT_DISMISSED") === "true";
 
     if (isDismissed) return;
 
-    // --- A. Xử lý cho Android/Chrome (Sự kiện chuẩn) ---
+    // A. Bắt sự kiện cài đặt của Chrome (Android/PC)
     const handleBeforeInstall = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      // Nếu chưa cài đặt, hiện popup ngay
-      setShowPrompt(true);
+      // Chỉ hiện popup nếu đang ở các trang nội bộ
+      if (checkIsInternalPage()) setShowPrompt(true);
     };
     window.addEventListener("beforeinstallprompt", handleBeforeInstall);
 
-    // --- B. Xử lý cho iOS và check trạng thái ---
+    // B. Logic kiểm tra thiết bị & Môi trường
     const checkDeviceAndMode = () => {
-      const userAgent = window.navigator.userAgent.toLowerCase();
+      const userAgent = window.navigator.userAgent || window.navigator.vendor;
 
-      // Detect Mobile
-      const mobile =
-        /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(
-          userAgent
-        );
-      setIsMobile(mobile);
+      // 1. Check xem có phải Zalo/Facebook/Instagram không? (QUAN TRỌNG)
+      // Các app này dùng browser riêng (webview) rất tù, không cài app được
+      const isInApp = /Zalo|FBAN|FBAV|Instagram/.test(userAgent);
+      setIsInAppBrowser(isInApp);
 
-      // Detect iOS chuẩn (Bao gồm iPad Pro đời mới giả dạng Mac)
+      // 2. Check iOS
       const isIOSDevice =
-        /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        /iPad|iPhone|iPod/.test(userAgent) ||
         (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-
       setIsIOS(isIOSDevice);
 
-      // Kiểm tra đã cài đặt (Standalone) chưa?
+      // 3. Check xem đã cài app chưa (Standalone mode)
       const isStandalone =
         window.matchMedia("(display-mode: standalone)").matches ||
-        window.matchMedia("(display-mode: fullscreen)").matches ||
-        window.matchMedia("(display-mode: minimal-ui)").matches ||
         (window.navigator as any).standalone ||
         document.referrer.includes("android-app://");
 
-      // Điều kiện hiển thị:
-      // 1. Phải là trang nội bộ (để không làm phiền ở trang login/home)
-      const isInternalPage =
-        pathname.startsWith("/phong") ||
-        pathname.startsWith("/dashboard") ||
-        pathname.startsWith("/admin");
+      // 4. QUYẾT ĐỊNH HIỂN THỊ
+      const isInternal = checkIsInternalPage();
 
-      // 2. Nếu là iOS và chưa cài đặt -> Hiện luôn
-      if (isIOSDevice && !isStandalone && isInternalPage) {
-        setShowPrompt(true);
-      }
-
-      // Nếu đã cài rồi thì tắt prompt
       if (isStandalone) {
-        setShowPrompt(false);
+        setShowPrompt(false); // Đã cài rồi thì ẩn luôn
+      } else if (isInternal) {
+        // Nếu chưa cài và đang ở trang nội bộ
+        if (isInApp) {
+          setShowPrompt(true); // Zalo/FB -> Hiện cảnh báo bắt mở browser ngoài
+        } else if (isIOSDevice) {
+          setShowPrompt(true); // iOS -> Hiện hướng dẫn
+        }
+        // Android/Chrome sẽ được handle bởi sự kiện `beforeinstallprompt` ở trên
       }
     };
 
     checkDeviceAndMode();
+    
+    // Check lại khi resize (xoay màn hình)
     window.addEventListener("resize", checkDeviceAndMode);
 
     return () => {
@@ -117,6 +110,15 @@ export default function ForceFullScreen() {
       window.removeEventListener("resize", checkDeviceAndMode);
     };
   }, [pathname]);
+
+  // Hàm phụ kiểm tra trang nội bộ
+  const checkIsInternalPage = () => {
+    return (
+      pathname.startsWith("/phong") ||
+      pathname.startsWith("/dashboard") ||
+      pathname.startsWith("/admin")
+    );
+  };
 
   const handleInstallClick = async () => {
     if (deferredPrompt) {
@@ -127,9 +129,8 @@ export default function ForceFullScreen() {
         setShowPrompt(false);
       }
     } else {
-      alert(
-        'Vui lòng tìm nút "Cài đặt" hoặc "Thêm vào màn hình chính" (Add to Home Screen) trong menu trình duyệt.'
-      );
+      // Fallback cho PC hoặc browser lạ
+      alert("Hãy tìm biểu tượng Cài đặt trên thanh địa chỉ trình duyệt.");
     }
   };
 
@@ -140,17 +141,23 @@ export default function ForceFullScreen() {
 
   if (!showPrompt) return null;
 
+  // --- RENDER GIAO DIỆN ---
+
   return (
     <div className="fixed inset-0 z-[99999] bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center p-6 animate-in fade-in duration-500 text-center">
+      {/* Nút đóng */}
       <button
         onClick={() => setShowPrompt(false)}
         className="absolute top-4 right-4 text-white/30 hover:text-white p-2"
       >
-        <XCircle size={24} />
+        <XCircle size={30} />
       </button>
 
+      {/* Icon chính */}
       <div className="w-20 h-20 mb-6 rounded-2xl bg-gradient-to-br from-[#C69C6D] to-[#5D4037] flex items-center justify-center shadow-[0_0_40px_rgba(198,156,109,0.3)] animate-bounce">
-        {isIOS ? (
+        {isInAppBrowser ? (
+          <Globe className="text-white w-10 h-10" />
+        ) : isIOS ? (
           <Smartphone className="text-white w-10 h-10" />
         ) : (
           <Download className="text-white w-10 h-10" />
@@ -158,16 +165,36 @@ export default function ForceFullScreen() {
       </div>
 
       <h2 className="text-2xl font-bold text-[#F5E6D3] mb-4 uppercase tracking-widest font-serif">
-        Cài Đặt Ứng Dụng
+        {isInAppBrowser ? "Mở Trình Duyệt" : "Cài Đặt Ứng Dụng"}
       </h2>
 
       <p className="text-gray-400 text-sm md:text-base max-w-md mb-8 leading-relaxed">
-        {isIOS
-          ? "Để ứng dụng hoạt động ổn định và toàn màn hình trên iPhone/iPad, vui lòng thêm vào màn hình chính."
+        {isInAppBrowser
+          ? "Bạn đang dùng Zalo/Facebook. Để ứng dụng hoạt động ổn định, vui lòng mở bằng trình duyệt (Safari/Chrome)."
+          : isIOS
+          ? "Để full màn hình và không bị lỗi trên iPhone, hãy thêm vào màn hình chính."
           : "Cài đặt ứng dụng vào thiết bị để có trải nghiệm tốt nhất, không bị lỗi giao diện."}
       </p>
 
-      {isIOS ? (
+      {/* KHỐI NỘI DUNG TUỲ THEO THIẾT BỊ */}
+      
+      {/* 1. Trường hợp Zalo/FB */}
+      {isInAppBrowser && (
+        <div className="bg-[#1a120f] border border-red-500/30 p-5 rounded-xl max-w-xs w-full text-left space-y-4 shadow-2xl animate-pulse">
+           <div className="flex items-center gap-3 text-[#F5E6D3] text-sm font-bold">
+            <MoreHorizontal size={20} />
+            <span>1. Nhấn vào dấu 3 chấm góc trên</span>
+          </div>
+          <div className="w-full h-[1px] bg-[#8B5E3C]/20"></div>
+          <div className="flex items-center gap-3 text-[#C69C6D] text-sm font-bold">
+            <Globe size={20} />
+            <span>2. Chọn "Mở bằng trình duyệt"</span>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Trường hợp iOS (iPhone) */}
+      {!isInAppBrowser && isIOS && (
         <div className="bg-[#1a120f] border border-[#8B5E3C]/30 p-5 rounded-xl max-w-xs w-full text-left space-y-4 shadow-2xl">
           <div className="flex items-center gap-3 text-[#C69C6D] text-sm font-bold">
             <Share size={20} />
@@ -179,7 +206,10 @@ export default function ForceFullScreen() {
             <span>2. Chọn "Thêm vào MH chính"</span>
           </div>
         </div>
-      ) : (
+      )}
+
+      {/* 3. Trường hợp Android/Chrome */}
+      {!isInAppBrowser && !isIOS && (
         <div className="w-full max-w-xs space-y-3">
           <button
             onClick={handleInstallClick}

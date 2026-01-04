@@ -62,7 +62,7 @@ export default function PhongThietKe() {
   // Màn hình chờ trong lúc kiểm tra (Loading Screen)
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-[100dvh] bg-black flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
           <p className="text-[#C69C6D] text-xs font-bold animate-pulse uppercase">
@@ -88,7 +88,7 @@ export default function PhongThietKe() {
     <KhungTrangChuan
       nguoiDung={displayUser}
       loiChao="PHÒNG THIẾT KẾ"
-      contentClassName="flex flex-col h-screen pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
+      contentClassName="flex flex-col h-[100dvh] pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
     >
       {/* Thanh Chức Năng */}
       <ThanhPhongChucNang

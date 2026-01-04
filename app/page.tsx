@@ -339,7 +339,7 @@ export default function TrangChuDashboard() {
   return (
     <Suspense
       fallback={
-        <div className="w-full h-screen bg-[#050505] flex items-center justify-center">
+        <div className="w-full h-[100dvh] bg-[#050505] flex items-center justify-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C69C6D]"></div>
         </div>
       }

@@ -302,7 +302,7 @@ function TrangChuContent() {
   if (!daKiemTraLogin) return <div className="fixed inset-0 bg-[#050505]" />;
 
   return (
-    <div className="relative w-full min-h-screen bg-[#050505] text-[#F5F5F5] font-sans selection:bg-[#C69C6D] selection:text-black overflow-x-hidden">
+    <div className="relative w-full min-h-[100dvh] bg-[#050505] text-[#F5F5F5] font-sans selection:bg-[#C69C6D] selection:text-black overflow-x-hidden">
       {/* 🟢 COMPONENT AUTH MODAL */}
       <CongDangNhap
         isOpen={showAuthModal}
@@ -388,7 +388,7 @@ function TrangChuContent() {
 
         <div
           id="content-start"
-          className="w-full bg-black/90 backdrop-blur-xl min-h-screen pt-20 pb-32 flex flex-col items-center gap-20 relative"
+          className="w-full bg-black/90 backdrop-blur-xl min-h-[100dvh] pt-20 pb-32 flex flex-col items-center gap-20 relative"
         >
           <div className="absolute -top-32 left-0 right-0 h-32 bg-gradient-to-b from-transparent via-transparent to-black/90 pointer-events-none"></div>
 
@@ -561,7 +561,7 @@ export default function TrangChuDashboard() {
   return (
     <Suspense
       fallback={
-        <div className="w-full h-screen bg-[#050505] flex items-center justify-center">
+        <div className="w-full h-[100dvh] bg-[#050505] flex items-center justify-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C69C6D]"></div>
         </div>
       }

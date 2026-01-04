@@ -193,7 +193,7 @@ export default function ModalProfile({ isOpen, onClose, nguoiDung }: ModalProfil
     return (
       <div className="fixed inset-0 flex items-center justify-center sm:items-start sm:justify-end" style={{ zIndex: Z_INDEX.modal }}>
         <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative w-full h-full sm:h-screen sm:max-w-md bg-gradient-to-br from-[#0A0A0A] to-[#1A1A1A] border-l border-white/20 shadow-2xl flex flex-col overflow-hidden">
+        <div className="relative w-full h-full sm:h-[100dvh] sm:max-w-md bg-gradient-to-br from-[#0A0A0A] to-[#1A1A1A] border-l border-white/20 shadow-2xl flex flex-col overflow-hidden">
           
           {/* Header màn con */}
           <div className="flex-shrink-0 px-4 py-4 border-b border-white/10 bg-black/40 backdrop-blur-md">
@@ -240,7 +240,7 @@ export default function ModalProfile({ isOpen, onClose, nguoiDung }: ModalProfil
     <div className="fixed inset-0 flex items-center justify-center sm:items-start sm:justify-end" style={{ zIndex: Z_INDEX.modal }}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative w-full h-full sm:h-screen sm:max-w-md bg-gradient-to-br from-[#0A0A0A] to-[#1A1A1A] border-l border-white/20 shadow-2xl flex flex-col overflow-hidden">
+      <div className="relative w-full h-full sm:h-[100dvh] sm:max-w-md bg-gradient-to-br from-[#0A0A0A] to-[#1A1A1A] border-l border-white/20 shadow-2xl flex flex-col overflow-hidden">
         
         {/* Header - Avatar & Tên */}
         <div className="flex-shrink-0 px-6 py-6 border-b border-white/10 bg-black/40 backdrop-blur-md">

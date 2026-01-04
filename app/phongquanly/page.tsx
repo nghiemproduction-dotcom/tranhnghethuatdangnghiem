@@ -33,7 +33,7 @@ export default function PhongQuanLy() {
     // Loading state
     if (authLoading) {
         return (
-            <div className="min-h-screen bg-black flex items-center justify-center">
+            <div className="min-h-[100dvh] bg-black flex items-center justify-center">
                 <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
             </div>
         );
@@ -54,7 +54,7 @@ export default function PhongQuanLy() {
         <KhungTrangChuan
             nguoiDung={displayUser}
             loiChao="PHÒNG QUẢN LÝ"
-            contentClassName="flex flex-col h-screen pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
+            contentClassName="flex flex-col h-[100dvh] pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
         >
             {/* Thanh Phòng + Chức Năng */}
             <ThanhPhongChucNang

@@ -28,7 +28,7 @@ export default function KhungTrangChuan({
   const displayLoiChao = loiChao || `Xin chào, ${nguoiDung?.ho_ten || "User"}`;
 
   return (
-    <div className="relative w-full min-h-screen bg-[#050505] text-[#F5F5F5] font-sans overflow-x-hidden selection:bg-[#C69C6D] selection:text-black text-[14px]">
+    <div className="relative w-full min-h-[100dvh] bg-[#050505] text-[#F5F5F5] font-sans overflow-x-hidden selection:bg-[#C69C6D] selection:text-black text-[14px]">
       {/* LAYER 0: HÌNH NỀN CHUẨN */}
       <div className="fixed inset-0 w-full h-full z-0 pointer-events-none select-none bg-black">
         <img
@@ -51,7 +51,7 @@ export default function KhungTrangChuan({
 
       {/* LAYER 1: NỘI DUNG CHÍNH */}
       <main
-        className={`relative z-[10] w-full min-h-screen flex flex-col ${contentClassName}`}
+        className={`relative z-[10] w-full min-h-[100dvh] flex flex-col ${contentClassName}`}
       >
         {children}
       </main>

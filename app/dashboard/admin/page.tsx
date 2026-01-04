@@ -16,7 +16,7 @@ export default function AdminDashboardPage() {
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+      <div className="min-h-[100dvh] bg-[#050505] flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C69C6D] mx-auto mb-4" />
           <p className="text-gray-400">Đang tải...</p>
@@ -32,7 +32,7 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] p-4 md:p-8">
+    <div className="min-h-[100dvh] bg-[#050505] p-4 md:p-8">
       {/* HEADER */}
       <div className="mb-8">
         <h1 className="text-4xl font-bold text-[#C69C6D] mb-2">📊 Admin Dashboard</h1>
