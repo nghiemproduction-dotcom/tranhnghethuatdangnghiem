@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/app/ThuVien/ketNoiSupabase';
-import KhungTrangChuan from '@/app/components/KhungTrangChuan';
+import KhungTrangChuan from '@/app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan';
 import { useUser } from '@/app/ThuVien/UserContext';
 import { Search, ShoppingCart, Filter, Loader2 } from 'lucide-react';
 

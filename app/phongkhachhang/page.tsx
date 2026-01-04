@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useUser } from '@/app/ThuVien/UserContext';
-import KhungTrangChuan from '@/app/components/KhungTrangChuan';
+import KhungTrangChuan from '@/app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan';
 import ThanhPhongChucNang from '@/app/components/ThanhPhongChucNang';
 import { KhachHangChucNang } from '@/app/components/cacchucnang/khachhang';
 import { UserCheck } from 'lucide-react';

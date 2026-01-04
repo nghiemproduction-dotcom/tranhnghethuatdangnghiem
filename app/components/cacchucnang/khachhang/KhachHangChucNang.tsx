@@ -23,7 +23,7 @@ import {
   KhungDanhSach,
   KhungChiTiet,
   KhungForm,
-} from "@/app/components/KhungGiaoDien";
+} from "@/app/components/cacchucnang/KhungGiaoDienChucNang";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import {
   KhachHang,

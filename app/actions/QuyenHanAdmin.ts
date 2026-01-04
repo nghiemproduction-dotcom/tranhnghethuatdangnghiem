@@ -3,6 +3,7 @@
 import postgres from 'postgres';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { createClient } from '@supabase/supabase-js'; // 🟢 1. IMPORT THÊM
 
 // Kết nối DB
 const sql = postgres(process.env.DATABASE_URL!, {
@@ -189,4 +190,58 @@ export async function addColumnAction(tableName: string, colName: string, colTyp
         await sql.unsafe(`ALTER TABLE "${tableName}" ADD COLUMN "${colName}" ${colType}`);
         return { success: true };
     } catch (error: any) { return { success: false, error: error.message }; }
+}
+
+// --- 🟢 7. HÀM MỚI: ĐỒNG BỘ USER (SYNC) ---
+export async function syncUsersAction() {
+    try {
+        await requireSuperAdmin(); // Chỉ Admin/Boss được chạy
+
+        // Tạo Client quyền tối cao (Service Role) để thao tác Auth
+        const supabaseAdmin = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            { auth: { autoRefreshToken: false, persistSession: false } }
+        );
+
+        // 1. Lấy danh sách nhân sự hiện có (postgres.js returns array-like)
+        const employees = await sql`SELECT email, ho_ten FROM "nhan_su"`;
+        const empEmails = new Set(Array.from(employees).map((e: any) => e.email));
+
+        // 2. Lấy danh sách User trong Auth
+        const { data: { users: authUsers }, error: authError } = await supabaseAdmin.auth.admin.listUsers();
+        if (authError) throw new Error(authError.message);
+
+        let added = 0;
+        let deleted = 0;
+
+        // 3. XÓA USER DƯ THỪA (Có trong Auth nhưng không có trong Nhân sự)
+        for (const user of authUsers) {
+            // Giữ lại admin gốc hoặc các email đặc biệt nếu cần
+            if (user.email === 'admin@local') continue;
+
+            if (user.email && !empEmails.has(user.email)) {
+                await supabaseAdmin.auth.admin.deleteUser(user.id);
+                deleted++;
+            }
+        }
+
+        // 4. TẠO USER THIẾU (Có trong Nhân sự nhưng chưa có Auth)
+        for (const emp of employees) {
+            const existingUser = authUsers.find(u => u.email === emp.email);
+            if (!existingUser && emp.email) {
+                await supabaseAdmin.auth.admin.createUser({
+                    email: emp.email,
+                    password: '12345678', // Mật khẩu mặc định
+                    email_confirm: true,
+                    user_metadata: { full_name: emp.ho_ten }
+                });
+                added++;
+            }
+        }
+
+        return { success: true, message: `Đã đồng bộ: Xóa ${deleted}, Thêm ${added}` };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
 }

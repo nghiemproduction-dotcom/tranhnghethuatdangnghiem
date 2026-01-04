@@ -136,7 +136,7 @@ export default function MauThietKeForm({
       showAvatarUpload={true}
       uploadBucket="images"
       avatar={formData.hinh_anh}
-      onUploadComplete={(url: string) => handleChange("hinh_anh", url)}
+      onUploadComplete={(url) => handleChange("hinh_anh", url)}
     >
       <div className="space-y-4">
         {/* Tên mẫu */}

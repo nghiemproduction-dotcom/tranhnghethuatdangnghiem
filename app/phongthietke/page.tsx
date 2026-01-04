@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation"; // Import Router để chuyển trang
 import { useUser } from "@/app/ThuVien/UserContext";
-import KhungTrangChuan from "@/app/components/KhungTrangChuan";
+import KhungTrangChuan from "@/app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan";
 import ThanhPhongChucNang from "@/app/components/ThanhPhongChucNang";
 import { Palette } from "lucide-react";
 

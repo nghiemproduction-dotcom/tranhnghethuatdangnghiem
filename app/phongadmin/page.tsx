@@ -2,26 +2,11 @@
  * ============================================================
  * PHÒNG ADMIN - COMMAND CENTER
  * ============================================================
- * * File page duy nhất của phòng admin.
- * Gọi các chức năng từ cacchucnang với quyền FULL.
- * * QUYỀN HẠN PHÒNG ADMIN:
- * - allowView: ✅ Xem tất cả
- * - allowEdit: ✅ Sửa tất cả
- * - allowDelete: ✅ Xóa tất cả
- * - allowBulk: ✅ Thao tác hàng loạt
- * * CÁC CHỨC NĂNG:
- * - Tổng quan Dashboard
- * - Nhân sự (full quyền)
- * - Khách hàng (full quyền)
- * - Mẫu thiết kế (full quyền)
- * - Data Center (admin only)
- * - Cài đặt hệ thống (admin only)
  */
 
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useUser } from "@/app/ThuVien/UserContext";
 import {
   Users,
@@ -29,14 +14,15 @@ import {
   LayoutDashboard,
   Database,
   Settings,
-  Palette,
+  Palette, // 🟢 THÊM: Import icon cho thiết kế
 } from "lucide-react";
-import KhungTrangChuan from "@/app/components/KhungTrangChuan";
+import KhungTrangChuan from "@/app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan"; // Kiểm tra lại đường dẫn này cho đúng với dự án
 import ThanhPhongChucNang from "@/app/components/ThanhPhongChucNang";
 
 // Import chức năng từ cacchucnang
 import { NhanSuChucNang } from "@/app/components/cacchucnang";
 import { KhachHangChucNang } from "@/app/components/cacchucnang/khachhang";
+// Import chức năng Mẫu Thiết Kế
 import { MauThietKeChucNang } from "@/app/components/cacchucnang/mauthietke";
 
 // ============================================================
@@ -56,13 +42,13 @@ const ADMIN_PERMISSIONS = {
     allowDelete: true,
     allowBulk: true,
   },
+  // 🟢 THÊM: Cấu hình quyền cho Mẫu thiết kế
   mauthietke: {
     allowView: true,
     allowEdit: true,
     allowDelete: true,
     allowBulk: true,
   },
-  // Thêm quyền cho các chức năng khác...
 };
 
 // ============================================================
@@ -73,9 +59,8 @@ const ADMIN_FUNCTIONS = [
   // Quản lý người dùng
   { id: "nhansu", label: "NHÂN SỰ", icon: Users },
   { id: "khachhang", label: "KHÁCH HÀNG", icon: BookUser },
-  // Quản lý thiết kế
-  { id: "mauthietke", label: "MẪU THIẾT KẾ", icon: Palette },
-  // Admin only
+  // 🟢 THÊM: Mục menu Mẫu thiết kế
+  { id: "mauthietke", label: "KHO THIẾT KẾ", icon: Palette },
 ];
 
 // ============================================================
@@ -84,36 +69,15 @@ const ADMIN_FUNCTIONS = [
 
 export default function PhongAdminPage() {
   const { user: contextUser, loading: contextLoading } = useUser();
-  const router = useRouter();
-  const [activeFunction, setActiveFunction] = useState<string>("nhansu"); // Mặc định vào Nhân sự cho dễ thấy
+  const [authLoading, setAuthLoading] = useState(true);
+  const [activeFunction, setActiveFunction] = useState<string>("dashboard");
 
-  // 🛡️ BẢO MẬT: Chặn truy cập trái phép ngay từ Client
   useEffect(() => {
-    if (!contextLoading) {
-      // 1. Nếu chưa đăng nhập -> Cút về home
-      if (!contextUser) {
-        console.warn(
-          "⛔ Unauthorized access to Admin Panel - Redirecting to Home"
-        );
-        router.replace("/");
-        return;
-      }
+    if (!contextLoading) setAuthLoading(false);
+  }, [contextLoading]);
 
-      // 2. Nếu đã đăng nhập nhưng không phải Admin/Boss -> Cũng cút
-      const role = contextUser.vi_tri_normalized || "";
-      const isAdmin = ["admin", "boss"].includes(role.toLowerCase());
-
-      if (!isAdmin) {
-        console.warn(
-          `⛔ Forbidden access attempt by ${contextUser.email} (Role: ${role})`
-        );
-        router.replace("/trangchu");
-      }
-    }
-  }, [contextLoading, contextUser, router]);
-
-  // Loading state (Chờ check auth xong mới render)
-  if (contextLoading) {
+  // Loading state
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
@@ -121,12 +85,15 @@ export default function PhongAdminPage() {
     );
   }
 
-  // Double check trước khi render (để tránh flash content)
-  const role = contextUser?.vi_tri_normalized || "";
-  const isAdmin = ["admin", "boss"].includes(role.toLowerCase());
-
-  if (!contextUser || !isAdmin) {
-    return null; // Render nothing while redirecting
+  // Get user info
+  let displayUser = contextUser;
+  if (!displayUser && typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem("USER_INFO");
+      displayUser = stored ? JSON.parse(stored) : null;
+    } catch (e) {
+      displayUser = null;
+    }
   }
 
   // ========================================
@@ -135,7 +102,7 @@ export default function PhongAdminPage() {
 
   return (
     <KhungTrangChuan
-      nguoiDung={contextUser} // Dùng trực tiếp contextUser, không fallback localStorage
+      nguoiDung={displayUser}
       loiChao="ADMIN COMMAND CENTER"
       contentClassName="flex flex-col h-screen pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
     >
@@ -155,20 +122,24 @@ export default function PhongAdminPage() {
           <div className="w-full h-full flex flex-col relative">
             {/* ====== RENDER CÁC CHỨC NĂNG ====== */}
 
-            {/* Nhân sự - GỌI TỪ CACCHUCNANG với quyền ADMIN */}
+            {/* Nhân sự */}
             {activeFunction === "nhansu" && (
               <NhanSuChucNang permissions={ADMIN_PERMISSIONS.nhansu} />
             )}
 
-            {/* Khách hàng - GỌI TỪ CACCHUCNANG với quyền ADMIN */}
+            {/* Khách hàng */}
             {activeFunction === "khachhang" && (
               <KhachHangChucNang permissions={ADMIN_PERMISSIONS.khachhang} />
             )}
 
-            {/* Mẫu thiết kế - GỌI TỪ CACCHUCNANG với quyền ADMIN */}
+            {/* 🟢 THÊM: Hiển thị chức năng Mẫu thiết kế */}
             {activeFunction === "mauthietke" && (
               <MauThietKeChucNang permissions={ADMIN_PERMISSIONS.mauthietke} />
             )}
+            
+             {/* Dashboard (Mặc định) */}
+             {activeFunction === "dashboard" && <DashboardPlaceholder />}
+
           </div>
         </div>
       </div>
@@ -179,14 +150,6 @@ export default function PhongAdminPage() {
 // ============================================================
 // COMPONENTS PHỤ
 // ============================================================
-
-function PlaceholderScreen({ text }: { text: string }) {
-  return (
-    <div className="h-full flex items-center justify-center text-white/30 font-bold uppercase">
-      {text}
-    </div>
-  );
-}
 
 function DashboardPlaceholder() {
   return (

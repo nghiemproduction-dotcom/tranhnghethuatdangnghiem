@@ -62,6 +62,12 @@ const PHAN_LOAI_OPTIONS = [
   "Không hoạt động",
 ];
 
+// 🟢 Helper lấy ID khách vãng lai từ localStorage (để merge chat)
+const getGuestId = () => {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("guest_chat_id");
+};
+
 interface RegisterFormProps {
   onSuccess?: () => void;
   onSwitchToLogin?: () => void;
@@ -75,6 +81,7 @@ export default function RegisterForm({
     "khach_hang"
   );
 
+  // Common Fields
   const [hoTen, setHoTen] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -84,12 +91,14 @@ export default function RegisterForm({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
+  // Staff Fields
   const [viTri, setViTri] = useState("");
   const [luongThang, setLuongThang] = useState<number | "">("");
   const [thuongDoanhThu, setThuongDoanhThu] = useState<number | "">("");
   const [nganHang, setNganHang] = useState("");
   const [soTaiKhoan, setSoTaiKhoan] = useState("");
 
+  // Customer Fields
   const [diaChi, setDiaChi] = useState("");
   const [phanLoai, setPhanLoai] = useState("Mới");
   const [ghiChu, setGhiChu] = useState("");
@@ -121,6 +130,7 @@ export default function RegisterForm({
     setError(null);
 
     try {
+      // 1. Validation
       if (!hoTen.trim()) throw new Error("Vui lòng nhập Họ và Tên");
       if (!email.includes("@")) throw new Error("Email không hợp lệ");
       if (phone.length < 10) throw new Error("Số điện thoại không hợp lệ");
@@ -133,6 +143,7 @@ export default function RegisterForm({
       if (userType === "nhan_su" && !viTri.trim())
         throw new Error("Vui lòng nhập vị trí mong muốn");
 
+      // 2. Check existing
       const { data: existing } = await supabase
         .from(userType)
         .select("id")
@@ -143,6 +154,7 @@ export default function RegisterForm({
         throw new Error("Email hoặc Số điện thoại đã tồn tại trong hệ thống.");
       }
 
+      // 3. Upload Avatar
       let avatarUrl = null;
       if (avatarFile) {
         setIsUploading(true);
@@ -163,6 +175,7 @@ export default function RegisterForm({
         setIsUploading(false);
       }
 
+      // 4. Create Auth User
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email.trim(),
         password: password,
@@ -178,6 +191,9 @@ export default function RegisterForm({
 
       if (authError) throw authError;
       if (!authData.user) throw new Error("Không thể tạo tài khoản.");
+
+      // 5. Insert Registration Data
+      const guestId = getGuestId(); // 🟢 Lấy ID vãng lai để merge chat
 
       const registrationData = {
         auth_user_id: authData.user.id,
@@ -199,6 +215,7 @@ export default function RegisterForm({
                 dia_chi: diaChi,
                 phan_loai: phanLoai,
                 ghi_chu: ghiChu,
+                guest_id: guestId, // 🟢 Gửi kèm guest_id lên DB
               },
         status: "pending",
         created_at: new Date().toISOString(),
@@ -211,7 +228,7 @@ export default function RegisterForm({
       if (regError) {
         console.warn("Lỗi lưu đơn đăng ký:", regError);
       } else {
-        // 🟢 GỬI THÔNG BÁO CHO ADMIN/NHÂN SỰ NGAY SAU KHI LƯU DB THÀNH CÔNG
+        // 6. Notify Staff
         fetch("/api/push/notify-staff", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -219,11 +236,10 @@ export default function RegisterForm({
             title: `🆕 Đăng ký mới: ${hoTen}`,
             body: `${
               userType === "nhan_su" ? "Ứng viên" : "Khách hàng"
-            } ${hoTen} vừa gửi hồ sơ đăng ký. Vui lòng kiểm tra và duyệt.`,
-            // URL này nên trỏ đến trang Admin duyệt thành viên của bạn
+            } ${hoTen} vừa đăng ký. Vui lòng duyệt.`,
             url: "/quan-ly/duyet-thanh-vien",
           }),
-        }).catch((err) => console.error("Notify admin error:", err));
+        }).catch((err) => console.error("Notify error:", err));
       }
 
       setSuccess(true);
@@ -238,7 +254,7 @@ export default function RegisterForm({
 
   if (success) {
     return (
-      <div className="w-full flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-300 h-full">
+      <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-300">
         <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mb-6">
           <CheckCircle2 size={40} className="text-green-400" />
         </div>
@@ -246,7 +262,7 @@ export default function RegisterForm({
           Đăng Ký Thành Công!
         </h2>
         <p className="text-white/70 mb-6 max-w-sm">
-          Hồ sơ của bạn đã được gửi. Vui lòng chờ admin xác nhận.
+          Hồ sơ của bạn đã được gửi. Vui lòng chờ admin xác nhận qua Email.
         </p>
         <button
           onClick={onSwitchToLogin}
@@ -259,7 +275,7 @@ export default function RegisterForm({
   }
 
   return (
-    // h-[100dvh] để fix lỗi cuộn trên mobile
+    // 🟢 Fix lỗi cuộn trên mobile bằng h-[100dvh]
     <div className="flex flex-col lg:flex-row w-full h-[100dvh] lg:h-full bg-[#0a0a0a] overflow-hidden">
       {/* CỘT TRÁI: QUY TRÌNH (Ẩn trên mobile) */}
       <div className="hidden lg:flex w-1/3 bg-[#111] border-r border-[#C69C6D]/30 p-6 flex-col shrink-0">
@@ -269,11 +285,10 @@ export default function RegisterForm({
 
         <div className="flex-1 space-y-8 relative pl-2">
           <div className="absolute left-[19px] top-2 bottom-10 w-[1px] bg-white/10 z-0"></div>
-
           <StepItem
             number="1"
             title="Đăng Ký"
-            desc="Điền thông tin hồ sơ theo mẫu bên phải."
+            desc="Điền thông tin hồ sơ."
             active={true}
           />
           <StepItem
@@ -383,7 +398,6 @@ export default function RegisterForm({
               <p className="text-[#C69C6D] text-xs font-bold uppercase border-b border-white/10 pb-1">
                 Thông tin đăng nhập
               </p>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <InputGroup label="Họ và Tên" icon={User} required>
                   <input
@@ -403,7 +417,6 @@ export default function RegisterForm({
                   />
                 </InputGroup>
               </div>
-
               <InputGroup label="Email" icon={Mail} required>
                 <input
                   className="w-full bg-transparent outline-none text-white text-sm"
@@ -413,7 +426,6 @@ export default function RegisterForm({
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </InputGroup>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <InputGroup label="Mật Khẩu" icon={Lock} required>
                   <div className="relative w-full">
@@ -445,22 +457,20 @@ export default function RegisterForm({
               </div>
             </div>
 
-            {/* 3. Fields riêng (Dynamic) */}
+            {/* 3. Fields riêng */}
             {userType === "khach_hang" && (
               <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
                 <p className="text-[#C69C6D] text-xs font-bold uppercase border-b border-white/10 pb-1">
                   Hồ sơ khách hàng
                 </p>
-
                 <InputGroup label="Địa Chỉ Giao Hàng" icon={MapPin} required>
                   <input
                     className="w-full bg-transparent outline-none text-white text-sm"
-                    placeholder="Số nhà, đường, phường, quận..."
+                    placeholder="Số nhà, đường..."
                     value={diaChi}
                     onChange={(e) => setDiaChi(e.target.value)}
                   />
                 </InputGroup>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <InputGroup label="Phân Loại" icon={Briefcase}>
                     <select
@@ -492,7 +502,6 @@ export default function RegisterForm({
                 <p className="text-[#C69C6D] text-xs font-bold uppercase border-b border-white/10 pb-1">
                   Hồ sơ nhân sự
                 </p>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <InputGroup
                     label="Vị Trí / Chức Vụ"
@@ -501,12 +510,11 @@ export default function RegisterForm({
                   >
                     <input
                       className="w-full bg-transparent outline-none text-white text-sm"
-                      placeholder="VD: Sales, Kế toán..."
+                      placeholder="VD: Sales..."
                       value={viTri}
                       onChange={(e) => setViTri(e.target.value)}
                     />
                   </InputGroup>
-
                   <InputGroup label="Thưởng Doanh Số (%)" icon={Percent}>
                     <input
                       type="number"
@@ -520,7 +528,6 @@ export default function RegisterForm({
                     />
                   </InputGroup>
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <InputGroup label="Lương Cứng (VNĐ)" icon={Banknote}>
                     <input
@@ -545,7 +552,6 @@ export default function RegisterForm({
                     />
                   </InputGroup>
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <InputGroup label="Ngân Hàng" icon={Building}>
                     <select
@@ -554,7 +560,7 @@ export default function RegisterForm({
                       onChange={(e) => setNganHang(e.target.value)}
                     >
                       <option value="" className="bg-[#111]">
-                        -- Chọn ngân hàng --
+                        -- Chọn --
                       </option>
                       {VN_BANKS.map((bank) => (
                         <option key={bank} value={bank} className="bg-[#111]">
@@ -566,7 +572,7 @@ export default function RegisterForm({
                   <InputGroup label="Số Tài Khoản" icon={CreditCard}>
                     <input
                       className="w-full bg-transparent outline-none text-white text-sm"
-                      placeholder="STK nhận lương..."
+                      placeholder="STK..."
                       value={soTaiKhoan}
                       onChange={(e) => setSoTaiKhoan(e.target.value)}
                     />

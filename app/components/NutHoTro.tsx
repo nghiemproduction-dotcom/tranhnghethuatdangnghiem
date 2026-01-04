@@ -97,14 +97,12 @@ export default function NutHoTro() {
         );
       } else {
         const saved = localStorage.getItem("guest_chat_info");
-        // Nếu đã có thông tin hoặc đã có ID guest cũ -> Vào chat luôn
         if (saved) {
           const p = JSON.parse(saved);
           setGuestInfo(p);
           setViewMode("chat");
           initChatSession(null, p.name, p.phone);
         } else if (localStorage.getItem("guest_chat_id")) {
-          // Nếu chưa có tên nhưng đã từng chat (có guest_id) -> Thử tìm session cũ
           checkExistingGuestSession();
         } else {
           setViewMode("form_guest");
@@ -155,7 +153,7 @@ export default function NutHoTro() {
       .neq("trang_thai", "ket_thuc");
 
     if (userId) q = q.eq("khach_hang_id", userId);
-    else q = q.eq("khach_vang_lai_id", guestId); // Dùng guestId cố định
+    else q = q.eq("khach_vang_lai_id", guestId);
 
     const { data } = await q
       .order("cap_nhat_luc", { ascending: false })
@@ -165,7 +163,6 @@ export default function NutHoTro() {
       setSessionId(data[0].id);
       subscribeToChat(data[0].id);
 
-      // Load info nhân viên nếu có
       if (data[0].nhan_su_phu_trach_id) {
         const { data: s } = await supabase
           .from("nhan_su")
@@ -177,7 +174,7 @@ export default function NutHoTro() {
     }
   };
 
-  // Subscribe Chat
+  // 🟢 Subscribe Chat (Đã tối ưu)
   const subscribeToChat = async (sId: string) => {
     const { data } = await supabase
       .from("tu_van_messages")
@@ -186,8 +183,9 @@ export default function NutHoTro() {
       .order("tao_luc", { ascending: true });
     if (data) setMessages(data);
 
+    // Dùng tên channel unique để tránh conflict
     const channel = supabase
-      .channel(`guest_chat_${sId}`)
+      .channel(`guest_chat_room_${sId}`)
       .on(
         "postgres_changes",
         {
@@ -197,7 +195,11 @@ export default function NutHoTro() {
           filter: `session_id=eq.${sId}`,
         },
         (payload) => {
-          setMessages((p) => [...p, payload.new]);
+          setMessages((p) => {
+            // Chống duplicate
+            if (p.some((m) => m.id === payload.new.id)) return p;
+            return [...p, payload.new];
+          });
           if (scrollRef.current)
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
@@ -211,7 +213,6 @@ export default function NutHoTro() {
           filter: `id=eq.${sId}`,
         },
         async (payload) => {
-          // Cập nhật người phụ trách nếu có thay đổi
           if (
             payload.new.nhan_su_phu_trach_id &&
             payload.new.nhan_su_phu_trach_id !==
@@ -258,13 +259,12 @@ export default function NutHoTro() {
         }
       }
 
-      // Tạo session mới nếu chưa có
       if (!activeId) {
         const { data: newSess, error } = await supabase
           .from("tu_van_sessions")
           .insert({
             khach_hang_id: user?.id || null,
-            khach_vang_lai_id: !user ? guestId : null, // Dùng guestId
+            khach_vang_lai_id: !user ? guestId : null,
             ten_hien_thi:
               user?.ho_ten || guestInfo.name || `Khách ${guestId.slice(-4)}`,
             sdt_lien_he: user?.so_dien_thoai || guestInfo.phone,
@@ -282,7 +282,6 @@ export default function NutHoTro() {
           isNew = true;
         }
       } else {
-        // Update tin nhắn cuối (Trigger DB sẽ tự lo phần is_read)
         await supabase
           .from("tu_van_sessions")
           .update({
@@ -305,16 +304,15 @@ export default function NutHoTro() {
           hinh_anh: imgUrl,
         });
 
-        // 🟢 GỬI PUSH NOTIFICATION CHO NHÂN VIÊN
+        // Gửi thông báo cho nhân viên
         fetch("/api/push/notify-staff", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             title: `💬 Khách: ${user?.ho_ten || guestInfo.name || "Vãng lai"}`,
             body: text || "Đã gửi hình ảnh",
-            url: "/quan-ly/tu-van", // Link để nhân viên bấm vào
+            url: "/quan-ly/tu-van",
             sessionId: activeId,
-            // Nếu chưa có staffInfo thì gửi null để bắn all, có rồi thì ưu tiên bắn người đó
             targetStaffId: staffInfo ? null : null,
           }),
         }).catch(() => {});
@@ -332,6 +330,8 @@ export default function NutHoTro() {
     setViewMode("chat");
     initChatSession(null, guestInfo.name, guestInfo.phone);
   };
+
+  if (user?.userType === "nhan_su") return null; // Nhân sự dùng TuVanKhachHang
 
   return (
     <>

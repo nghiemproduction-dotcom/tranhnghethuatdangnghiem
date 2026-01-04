@@ -3,6 +3,8 @@
 import postgres from "postgres";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+// 👇 IMPORT MỚI
+import { sendNotificationToRoles } from "./NotificationAction";
 
 // Kết nối DB
 const sql = postgres(process.env.DATABASE_URL!, {
@@ -34,9 +36,9 @@ async function requireManager() {
   } = await supabase.auth.getUser();
   if (!user || !user.email) throw new Error("Unauthorized: Bạn chưa đăng nhập");
 
-  // Lấy thông tin nhân sự (Dùng lower(email) để chắc ăn)
+  // Lấy thông tin nhân sự
   const [nhanSu] = await sql`
-        SELECT vi_tri, vi_tri_normalized 
+        SELECT id, ho_ten, vi_tri, vi_tri_normalized 
         FROM nhan_su 
         WHERE lower(email) = lower(${user.email})
         LIMIT 1
@@ -52,7 +54,8 @@ async function requireManager() {
     throw new Error("Forbidden: Bạn không có quyền Quản Lý nghiệp vụ này");
   }
 
-  return user; // Trả về user để dùng tiếp nếu cần
+  // 👇 TRẢ VỀ THÔNG TIN NHÂN SỰ ĐỂ GỬI NOTI (Thay vì user object của Auth)
+  return nhanSu;
 }
 
 function validateIdentifier(name: string) {
@@ -61,18 +64,16 @@ function validateIdentifier(name: string) {
 }
 
 // ==============================================================================
-// 🚀 OPTIMIZED ACTIONS (BỎ CHECK QUYỀN ĐỂ TĂNG TỐC ĐỘ ĐỌC)
+// 🚀 ACTIONS (ĐÃ BẬT BẢO MẬT)
 // ==============================================================================
 
 // --- 💬 NGHIỆP VỤ CHAT & HỖ TRỢ ---
 
-// 1. Lấy danh sách tất cả phiên chat
 export async function getManagerChatSessionsAction(
   filterStatus: string = "all"
 ) {
   try {
-    // 🚀 BỎ QUA CHECK AUTH (Middleware đã chặn rồi)
-    // await requireManager();
+    await requireManager(); // 🛡️ BẢO MẬT ĐÃ BẬT
 
     let query = `
             SELECT 
@@ -96,11 +97,9 @@ export async function getManagerChatSessionsAction(
   }
 }
 
-// 2. Lấy nội dung tin nhắn của 1 phiên
 export async function getManagerChatMessagesAction(sessionId: string) {
   try {
-    // 🚀 BỎ QUA CHECK AUTH
-    // await requireManager();
+    await requireManager(); // 🛡️ BẢO MẬT ĐÃ BẬT
 
     const data = await sql`
             SELECT * FROM tu_van_messages 
@@ -114,7 +113,7 @@ export async function getManagerChatMessagesAction(sessionId: string) {
   }
 }
 
-// --- 👥 NGHIỆP VỤ NHÂN SỰ (ĐÃ TỐI ƯU TỐC ĐỘ) ---
+// --- 👥 NGHIỆP VỤ NHÂN SỰ ---
 
 export async function getNhanSuDataAction(
   page: number,
@@ -123,10 +122,8 @@ export async function getNhanSuDataAction(
   filterRole: string
 ) {
   try {
-    // 🚀 BỎ QUA CHECK AUTH ĐỂ LOAD NHANH
-    // await requireManager();
+    await requireManager(); // 🛡️ BẢO MẬT ĐÃ BẬT
 
-    // 2. Chuẩn bị Query
     let baseQuery = `SELECT * FROM "nhan_su" WHERE 1=1`;
     let countQueryBase = `SELECT count(*) as total FROM "nhan_su" WHERE 1=1`;
     const params: any[] = [];
@@ -151,7 +148,7 @@ export async function getNhanSuDataAction(
     const offset = (page - 1) * pageSize;
     baseQuery += ` ORDER BY tao_luc DESC LIMIT ${pageSize} OFFSET ${offset}`;
 
-    // 🔥 TỐI ƯU QUAN TRỌNG: CHẠY 2 CÂU LỆNH CÙNG LÚC (PARALLEL)
+    // 🔥 TỐI ƯU: Chạy song song sau khi đã check quyền
     const [dataResult, countResult] = await Promise.all([
       sql.unsafe(baseQuery, params),
       sql.unsafe(countQueryBase, params),
@@ -167,20 +164,17 @@ export async function getNhanSuDataAction(
   }
 }
 
-// 🔒 CÁC HÀM GHI (CREATE/UPDATE/DELETE) VẪN GIỮ CHECK AUTH
+// 🔒 CÁC HÀM GHI (CREATE/UPDATE/DELETE)
 
 export async function createNhanSuAction(data: any) {
   try {
-    await requireManager(); // Vẫn check khi tạo mới
+    const manager = await requireManager();
     await sql.unsafe(
-      `
-            INSERT INTO "nhan_su" (
-                ho_ten, so_dien_thoai, vi_tri, vi_tri_normalized, email, 
-                trang_thai, luong_thang, thuong_doanh_thu, 
-                ngan_hang, so_tai_khoan, hinh_anh
-            )
-            VALUES ($1, $2, $3, $4, $5, 'Đang hoạt động', $6, $7, $8, $9, $10)
-        `,
+      `INSERT INTO "nhan_su" (
+            ho_ten, so_dien_thoai, vi_tri, vi_tri_normalized, email, 
+            trang_thai, luong_thang, thuong_doanh_thu, 
+            ngan_hang, so_tai_khoan, hinh_anh
+        ) VALUES ($1, $2, $3, $4, $5, 'Đang hoạt động', $6, $7, $8, $9, $10)`,
       [
         data.ho_ten,
         data.so_dien_thoai,
@@ -194,6 +188,17 @@ export async function createNhanSuAction(data: any) {
         data.hinh_anh || null,
       ]
     );
+
+    // 🔔 GỬI THÔNG BÁO: Nhân sự mới
+    sendNotificationToRoles(
+      ["admin", "boss"],
+      "Tuyển dụng mới",
+      `${manager.ho_ten} vừa thêm nhân sự: ${data.ho_ten} (${data.vi_tri})`,
+      "/phongquanly",
+      "user_follow",
+      manager.ho_ten
+    );
+
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -202,14 +207,12 @@ export async function createNhanSuAction(data: any) {
 
 export async function updateNhanSuAction(id: string, data: any) {
   try {
-    await requireManager(); // Vẫn check khi sửa
+    const manager = await requireManager();
     await sql.unsafe(
-      `
-            UPDATE "nhan_su"
-            SET ho_ten = $1, so_dien_thoai = $2, vi_tri = $3, vi_tri_normalized = $4, email = $5,
-                luong_thang = $6, thuong_doanh_thu = $7, ngan_hang = $8, so_tai_khoan = $9, hinh_anh = $10
-            WHERE id = $11
-        `,
+      `UPDATE "nhan_su"
+       SET ho_ten = $1, so_dien_thoai = $2, vi_tri = $3, vi_tri_normalized = $4, email = $5,
+           luong_thang = $6, thuong_doanh_thu = $7, ngan_hang = $8, so_tai_khoan = $9, hinh_anh = $10
+       WHERE id = $11`,
       [
         data.ho_ten,
         data.so_dien_thoai,
@@ -224,6 +227,17 @@ export async function updateNhanSuAction(id: string, data: any) {
         id,
       ]
     );
+
+    // 🔔 GỬI THÔNG BÁO: Cập nhật nhân sự
+    sendNotificationToRoles(
+      ["admin", "boss"],
+      "Cập nhật hồ sơ",
+      `${manager.ho_ten} đã cập nhật thông tin của ${data.ho_ten}`,
+      "/phongquanly",
+      "system_update",
+      manager.ho_ten
+    );
+
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -232,8 +246,19 @@ export async function updateNhanSuAction(id: string, data: any) {
 
 export async function deleteNhanSuAction(id: string) {
   try {
-    await requireManager(); // Vẫn check khi xóa
+    const manager = await requireManager();
     await sql.unsafe(`DELETE FROM "nhan_su" WHERE id = $1`, [id]);
+
+    // 🔔 GỬI THÔNG BÁO: Xóa nhân sự (Cảnh báo)
+    sendNotificationToRoles(
+      ["admin", "boss"],
+      "⚠️ Xóa nhân sự",
+      `${manager.ho_ten} đã xóa một nhân sự khỏi hệ thống.`,
+      "/phongquanly",
+      "security_alert",
+      manager.ho_ten
+    );
+
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -287,8 +312,7 @@ export async function getKhachHangDataAction(
   filterRole: string
 ) {
   try {
-    // 🚀 BỎ QUA CHECK AUTH ĐỂ LOAD NHANH
-    // await requireManager();
+    await requireManager(); // 🛡️ BẢO MẬT ĐÃ BẬT
 
     let query = `SELECT * FROM "khach_hang" WHERE 1=1`;
     let countQuery = `SELECT count(*) as total FROM "khach_hang" WHERE 1=1`;
@@ -313,7 +337,6 @@ export async function getKhachHangDataAction(
     const offset = (page - 1) * pageSize;
     query += ` ORDER BY tao_luc DESC LIMIT ${pageSize} OFFSET ${offset}`;
 
-    // 🔥 CHẠY SONG SONG
     const [data, countResult] = await Promise.all([
       sql.unsafe(query, params),
       sql.unsafe(countQuery, params),
@@ -331,7 +354,7 @@ export async function getKhachHangDataAction(
 
 export async function createKhachHangAction(data: any) {
   try {
-    await requireManager();
+    const manager = await requireManager();
     const phanLoaiNorm =
       data.phan_loai_normalized ||
       (data.phan_loai
@@ -343,10 +366,8 @@ export async function createKhachHangAction(data: any) {
         : "moi");
 
     await sql.unsafe(
-      `
-            INSERT INTO "khach_hang" (ho_ten, so_dien_thoai, email, phan_loai, phan_loai_normalized, hinh_anh, dia_chi, tao_luc)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, now())
-        `,
+      `INSERT INTO "khach_hang" (ho_ten, so_dien_thoai, email, phan_loai, phan_loai_normalized, hinh_anh, dia_chi, tao_luc)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, now())`,
       [
         data.ho_ten,
         data.so_dien_thoai,
@@ -357,6 +378,18 @@ export async function createKhachHangAction(data: any) {
         data.dia_chi || null,
       ]
     );
+
+    // 🔔 GỬI THÔNG BÁO: Khách hàng mới
+    // Báo cho Sales để chăm sóc ngay
+    sendNotificationToRoles(
+      ["sales", "boss", "admin"],
+      "Khách hàng mới",
+      `${manager.ho_ten} đã thêm khách hàng tiềm năng: ${data.ho_ten}`,
+      "/phongkhachhang",
+      "user_follow",
+      manager.ho_ten
+    );
+
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -377,11 +410,9 @@ export async function updateKhachHangAction(id: string, data: any) {
         : "moi");
 
     await sql.unsafe(
-      `
-            UPDATE "khach_hang"
-            SET ho_ten = $1, so_dien_thoai = $2, email = $3, phan_loai = $4, phan_loai_normalized = $5, hinh_anh = $6, dia_chi = $7
-            WHERE id = $8
-        `,
+      `UPDATE "khach_hang"
+       SET ho_ten = $1, so_dien_thoai = $2, email = $3, phan_loai = $4, phan_loai_normalized = $5, hinh_anh = $6, dia_chi = $7
+       WHERE id = $8`,
       [
         data.ho_ten,
         data.so_dien_thoai,
@@ -453,8 +484,7 @@ export async function getDistinctValuesAction(
   columnName: string
 ) {
   try {
-    // 🚀 BỎ QUA CHECK AUTH ĐỂ LOAD DROPDOWN NHANH
-    // await requireManager();
+    await requireManager(); // 🛡️ BẢO MẬT ĐÃ BẬT
     validateIdentifier(tableName);
     validateIdentifier(columnName);
 
@@ -472,11 +502,10 @@ export async function getDistinctValuesAction(
   }
 }
 
-// 🟢 LẤY TÁC PHẨM HOÀN THIỆN (Dữ liệu cho Phòng Trưng Bày)
+// 🟢 LẤY TÁC PHẨM HOÀN THIỆN
 export async function getFinishedArtworksAction(limit: number = 50) {
   try {
-    // 🚀 BỎ QUA CHECK AUTH
-    // await requireManager();
+    await requireManager(); // 🛡️ BẢO MẬT ĐÃ BẬT
 
     const data = await sql`
             SELECT 

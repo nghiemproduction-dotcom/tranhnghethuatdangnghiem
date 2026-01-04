@@ -26,13 +26,13 @@ function TrangChuContent() {
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [daKiemTraLogin, setDaKiemTraLogin] = useState(false);
 
-  // 1. ZOMBIE KILLER (Giữ nguyên)
+  // 1. ZOMBIE KILLER - Xử lý khi vừa Logout
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get("logout")) {
       console.log("🛑 [ZOMBIE KILLER] Logout detected.");
       setNguoiDung(null);
-      setDaKiemTraLogin(true);
+      setDaKiemTraLogin(true); // Cho phép render UI ngay
       setIsCheckingAuth(false);
       if (typeof window !== "undefined") {
         localStorage.clear();
@@ -44,42 +44,38 @@ function TrangChuContent() {
     }
   }, []);
 
-  // 2. CHECK SESSION + TIMEOUT FIX (NÂNG CẤP)
+  // 2. CHECK SESSION + SAFETY TIMER (FIX LỖI MÀN HÌNH ĐEN)
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("logout")) return;
 
-    // --- TIMEOUT SAFETY NET ---
-    // Nếu sau 3 giây mà chưa check xong login -> Force hiện UI (coi như chưa login)
-    // Để tránh bị treo màn hình đen
+    // 🟢 TIMER CỨU HỘ: Sau 3s nếu chưa check xong thì coi như chưa login để hiện nút
     const safetyTimer = setTimeout(() => {
       setDaKiemTraLogin((prev) => {
         if (!prev) {
           console.warn("⚠️ Login check timeout - Force UI render");
           setNguoiDung(null);
           setIsCheckingAuth(false);
-          return true; // Force hiện UI
+          return true; // Bắt buộc render UI
         }
         return prev;
       });
     }, 3000);
 
-    const cleanupStaleLocalStorage = () => {
-      /* Giữ nguyên logic dọn dẹp */
-      const cached = localStorage.getItem("USER_INFO");
-      if (cached === "undefined") localStorage.removeItem("USER_INFO");
-      else if (cached) {
-        try {
-          JSON.parse(cached);
-        } catch {
-          localStorage.removeItem("USER_INFO");
-        }
-      }
-    };
-
     const checkSession = async () => {
       setIsCheckingAuth(true);
       try {
-        cleanupStaleLocalStorage();
+        // Dọn rác localStorage
+        const cached = localStorage.getItem("USER_INFO");
+        if (cached === "undefined") localStorage.removeItem("USER_INFO");
+        else if (cached) {
+          try {
+            JSON.parse(cached);
+          } catch {
+            localStorage.removeItem("USER_INFO");
+          }
+        }
+
+        // Hỏi Supabase
         const {
           data: { session },
           error,
@@ -105,7 +101,7 @@ function TrangChuContent() {
         setNguoiDung(null);
       } finally {
         setIsCheckingAuth(false);
-        setDaKiemTraLogin(true); // Đánh dấu xong -> Clear timeout
+        setDaKiemTraLogin(true); // Đánh dấu đã xong
       }
     };
 
@@ -124,18 +120,18 @@ function TrangChuContent() {
 
     return () => {
       subscription.unsubscribe();
-      clearTimeout(safetyTimer); // Clear timeout khi unmount
+      clearTimeout(safetyTimer); // Xóa timer khi unmount
     };
   }, []);
 
-  // 3. AUTO-REDIRECT (Giữ nguyên)
+  // 3. AUTO-REDIRECT
   useEffect(() => {
     if (!nguoiDung || isRedirecting) return;
     if (new URLSearchParams(window.location.search).get("logout")) return;
     handleMainAction();
   }, [nguoiDung]);
 
-  // 4. LỜI CHÀO (Giữ nguyên)
+  // 4. LỜI CHÀO
   useEffect(() => {
     const name = nguoiDung?.ho_ten || (language === "vi" ? "Khách" : "Guest");
     const h = new Date().getHours();
@@ -184,7 +180,7 @@ function TrangChuContent() {
   const bgMobile = `${BASE_IMG_URL}/login-mobile.jpg?v=${bgVersion}`;
   const bgDesktop = `${BASE_IMG_URL}/login-desktop.jpg?v=${bgVersion}`;
 
-  // MÀN HÌNH CHỜ (Đã có timeout bảo vệ ở trên)
+  // MÀN HÌNH CHỜ (Đã có timeout bảo vệ nên sẽ không treo mãi)
   if (!daKiemTraLogin)
     return <div className="fixed inset-0 bg-[#050505] z-50" />;
 
@@ -215,7 +211,7 @@ function TrangChuContent() {
 
       <div className="absolute inset-0 z-10 flex flex-col justify-center items-center translate-y-[10%] p-4">
         <div className="w-full max-w-[95%] md:max-w-2xl flex flex-col items-center gap-6 md:gap-8 animate-fade-in-up">
-          {/* Header Text */}
+          {/* Header */}
           <div className="text-center w-full">
             <div className="flex items-center justify-center gap-2 mb-2 md:mb-3">
               <MapPin size={16} className="text-yellow-500" />

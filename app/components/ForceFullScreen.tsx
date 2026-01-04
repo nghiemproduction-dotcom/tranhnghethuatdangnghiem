@@ -47,7 +47,7 @@ export default function ForceFullScreen() {
     };
   }, []);
 
-  // 2. LOGIC KIỂM TRA & ÉP CÀI ĐẶT (ĐÃ NÂNG CẤP)
+  // 2. LOGIC KIỂM TRA & ÉP CÀI ĐẶT
   useEffect(() => {
     // Kiểm tra xem người dùng đã bấm "Ẩn vĩnh viễn" chưa
     const isDismissed =
@@ -69,21 +69,21 @@ export default function ForceFullScreen() {
     const checkDeviceAndMode = () => {
       const userAgent = window.navigator.userAgent.toLowerCase();
 
-      // 🟢 Detect Mobile chuẩn hơn
+      // Detect Mobile
       const mobile =
         /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(
           userAgent
         );
       setIsMobile(mobile);
 
-      // 🟢 Detect iOS chuẩn hơn (Bao gồm cả iPad Pro đời mới)
+      // Detect iOS chuẩn (Bao gồm iPad Pro đời mới giả dạng Mac)
       const isIOSDevice =
         /iPad|iPhone|iPod/.test(navigator.userAgent) ||
         (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
       setIsIOS(isIOSDevice);
 
-      // 🟢 Kiểm tra đã cài đặt (Standalone) chưa?
+      // Kiểm tra đã cài đặt (Standalone) chưa?
       const isStandalone =
         window.matchMedia("(display-mode: standalone)").matches ||
         window.matchMedia("(display-mode: fullscreen)").matches ||
@@ -91,28 +91,25 @@ export default function ForceFullScreen() {
         (window.navigator as any).standalone ||
         document.referrer.includes("android-app://");
 
-      // 🟢 Điều kiện hiển thị:
+      // Điều kiện hiển thị:
       // 1. Phải là trang nội bộ (để không làm phiền ở trang login/home)
       const isInternalPage =
         pathname.startsWith("/phong") ||
         pathname.startsWith("/dashboard") ||
         pathname.startsWith("/admin");
 
-      // 2. Nếu là iOS và chưa cài đặt -> Hiện luôn (Vì iOS không có sự kiện beforeinstallprompt)
-      // 3. Nếu là Android -> Đã được xử lý bởi sự kiện 'beforeinstallprompt' ở trên
+      // 2. Nếu là iOS và chưa cài đặt -> Hiện luôn
       if (isIOSDevice && !isStandalone && isInternalPage) {
         setShowPrompt(true);
       }
 
-      // Nếu đã cài rồi thì tắt prompt (để chắc chắn)
+      // Nếu đã cài rồi thì tắt prompt
       if (isStandalone) {
         setShowPrompt(false);
       }
     };
 
     checkDeviceAndMode();
-
-    // Check lại khi resize (xoay màn hình)
     window.addEventListener("resize", checkDeviceAndMode);
 
     return () => {
@@ -130,7 +127,6 @@ export default function ForceFullScreen() {
         setShowPrompt(false);
       }
     } else {
-      // Fallback khi trình duyệt chặn hoặc lỗi
       alert(
         'Vui lòng tìm nút "Cài đặt" hoặc "Thêm vào màn hình chính" (Add to Home Screen) trong menu trình duyệt.'
       );
@@ -146,7 +142,6 @@ export default function ForceFullScreen() {
 
   return (
     <div className="fixed inset-0 z-[99999] bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center p-6 animate-in fade-in duration-500 text-center">
-      {/* Nút tắt khẩn cấp */}
       <button
         onClick={() => setShowPrompt(false)}
         className="absolute top-4 right-4 text-white/30 hover:text-white p-2"
@@ -168,7 +163,7 @@ export default function ForceFullScreen() {
 
       <p className="text-gray-400 text-sm md:text-base max-w-md mb-8 leading-relaxed">
         {isIOS
-          ? "Để ứng dụng hoạt động ổn định và toàn màn hình trên iPhone/iPad, vui lòng làm theo hướng dẫn dưới đây."
+          ? "Để ứng dụng hoạt động ổn định và toàn màn hình trên iPhone/iPad, vui lòng thêm vào màn hình chính."
           : "Cài đặt ứng dụng vào thiết bị để có trải nghiệm tốt nhất, không bị lỗi giao diện."}
       </p>
 
@@ -183,9 +178,6 @@ export default function ForceFullScreen() {
             <PlusSquare size={20} />
             <span>2. Chọn "Thêm vào MH chính"</span>
           </div>
-          <p className="text-xs text-white/40 italic mt-2 text-center">
-            (Add to Home Screen)
-          </p>
         </div>
       ) : (
         <div className="w-full max-w-xs space-y-3">
@@ -198,7 +190,6 @@ export default function ForceFullScreen() {
         </div>
       )}
 
-      {/* 🟢 NÚT CHO NGƯỜI ĐÃ CÀI RỒI - GIẢI PHÁP CUỐI CÙNG */}
       <button
         onClick={handleDismiss}
         className="mt-8 flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-colors text-xs font-medium border border-white/5"

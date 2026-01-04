@@ -3,13 +3,13 @@
 @tailwind utilities;
 
 :root {
-  /* MÀU SẮC CHỦ ĐẠO - DAY MODE (Sáng nhưng không chói - màu giấy Gạo) */
-  --gold-artisan: #c69c6d; /* Vàng đồng chủ đạo */
-  --gold-hover: #b58b5d; /* Vàng đồng đậm hơn khi hover */
-  --black-matte: #1a120f; /* Đen pha nâu đất */
-  --void-black: #050505; /* Đen sâu thẳm */
-  --paper-rice: #f5e6d3; /* Trắng ngà giấy dó */
-  --red-seal: #8b0000; /* Đỏ con triện */
+  /* MÀU SẮC CHỦ ĐẠO - DAY MODE */
+  --gold-artisan: #c69c6d;
+  --gold-hover: #b58b5d;
+  --black-matte: #1a120f;
+  --void-black: #050505;
+  --paper-rice: #f5e6d3;
+  --red-seal: #8b0000;
 
   /* Cấu hình giao diện Light */
   --bg-primary: #f5f5f5;
@@ -19,21 +19,21 @@
   --text-secondary: rgba(26, 18, 15, 0.6);
   --border-color: rgba(198, 156, 109, 0.3);
 
-  /* Biến chiều cao dynamic cho Mobile */
+  /* Biến chiều cao dynamic cho Mobile - Mặc định 100vh */
   --app-height: 100vh;
 }
 
 .dark-theme {
-  /* Cấu hình giao diện Dark (Mặc định) */
-  --bg-primary: #050505; /* Void Black */
+  /* Cấu hình giao diện Dark */
+  --bg-primary: #050505;
   --bg-secondary: #0a0a0a;
-  --bg-card: #1a120f; /* Black Matte pha nâu */
-  --text-primary: #f5e6d3; /* Paper Rice */
+  --bg-card: #1a120f;
+  --text-primary: #f5e6d3;
   --text-secondary: rgba(245, 230, 211, 0.5);
-  --border-color: rgba(198, 156, 109, 0.2); /* Gold mờ */
+  --border-color: rgba(198, 156, 109, 0.2);
 }
 
-/* 🟢 CẤU HÌNH GLOBAL MỚI - FIX LỖI MOBILE */
+/* 🟢 CẤU HÌNH QUAN TRỌNG: FIX LỖI SCROLL TRÊN MOBILE */
 html,
 body {
   background-color: var(--bg-primary);
@@ -41,16 +41,16 @@ body {
   font-family: "Inter", sans-serif;
   transition: background-color 0.3s ease, color 0.3s ease;
 
-  /* Khóa viewport để ngăn kéo dãn trên iOS (Rubber-banding) */
+  /* Khóa viewport: Ngăn kéo dãn (Rubber-banding) trên iOS */
   height: 100%;
   width: 100%;
-  overflow: hidden; /* Quan trọng: Chặn scroll body, chỉ scroll trong container con */
-  position: fixed; /* Khóa body lại */
+  overflow: hidden; /* Chặn scroll ở body, bắt buộc scroll ở thẻ con (div) */
+  position: fixed; /* Khóa cứng body */
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
 }
 
-/* Class thay thế cho h-screen/h-[100dvh] để tương thích mọi trình duyệt */
+/* Class thay thế h-screen để tương thích biến dynamic */
 .h-app {
   height: 100vh; /* Fallback */
   height: var(--app-height);
@@ -58,7 +58,6 @@ body {
 
 /* 🟢 ARTISAN UTILITIES */
 @layer components {
-  /* Nút bấm phong cách nghệ nhân */
   .btn-artisan {
     @apply px-6 py-3 rounded-xl font-bold uppercase tracking-widest transition-all duration-300;
     background-color: var(--gold-artisan);
@@ -74,7 +73,6 @@ body {
     transform: scale(0.98);
   }
 
-  /* Khung chứa nội dung phong cách tranh lụa */
   .artisan-card {
     background-color: var(--bg-card);
     border: 1px solid var(--border-color);
@@ -93,12 +91,10 @@ body {
   .border-gold {
     border-color: var(--gold-artisan);
   }
-
   .glow-text {
     text-shadow: 0 0 10px rgba(198, 156, 109, 0.5);
   }
 
-  /* Ẩn scrollbar nhưng vẫn cuộn được */
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
@@ -108,7 +104,6 @@ body {
   }
 }
 
-/* 🟢 ẨN SCROLLBAR TOÀN BỘ APP - Vẫn cuộn được bằng vuốt/chuột */
 *::-webkit-scrollbar {
   display: none;
 }
@@ -117,7 +112,6 @@ body {
   scrollbar-width: none;
 }
 
-/* Animation Hologram */
 @keyframes hologram {
   0% {
     opacity: 0;

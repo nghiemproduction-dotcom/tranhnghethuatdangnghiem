@@ -2,6 +2,8 @@
 import postgres from "postgres";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+// 👇 IMPORT MỚI: Action gửi thông báo trung tâm
+import { sendNotificationToRoles } from "./NotificationAction";
 
 const sql = postgres(process.env.DATABASE_URL!, {
   ssl: "require",
@@ -9,6 +11,89 @@ const sql = postgres(process.env.DATABASE_URL!, {
   idle_timeout: 20,
 });
 
+// --- HELPER: CHUẨN HÓA TÊN FILE (Chỉ xử lý text, không gắn user) ---
+const standardizeBasicName = (inputName: string) => {
+  let name = inputName.trim();
+
+  // 1. Viết hoa chữ cái đầu (VD: "thọ" -> "Thọ")
+  if (name.length > 0) {
+    name = name.charAt(0).toUpperCase() + name.slice(1);
+  }
+
+  // 2. Tự động thêm "cm" và dấu gạch ngang cho kích thước
+  // VD: "20x30" -> " - 20x30cm"
+  name = name.replace(/(\d+)\s*[xX*]\s*(\d+)\s*(cm|CM)?/g, (match, w, h) => {
+    return ` - ${w}x${h}cm`;
+  });
+
+  // 3. Xử lý dấu gạch ngang bị thừa
+  name = name
+    .replace(/\s*-\s*-\s*/g, " - ")
+    .replace(/\s*-\s*/g, " - ")
+    .replace(/^\s*-\s*/, "");
+
+  return name;
+};
+
+// --- HELPER: XỬ LÝ LIST FILE TRƯỚC KHI LƯU ---
+const processFileList = (input: any, currentUser: string) => {
+  if (!input) return "[]";
+
+  let files: any[] = [];
+
+  // Parse dữ liệu đầu vào
+  try {
+    if (Array.isArray(input)) files = input;
+    else if (typeof input === "string") {
+      const parsed = JSON.parse(input);
+      if (Array.isArray(parsed)) files = parsed;
+    }
+  } catch {
+    return "[]";
+  }
+
+  // Xử lý từng file
+  const processedFiles = files
+    .map((file: any) => {
+      const now = new Date().toISOString();
+
+      // TRƯỜNG HỢP 1: File là string (kiểu cũ) -> convert sang object mới
+      if (typeof file === "string") {
+        return {
+          ten: standardizeBasicName("File đính kèm"),
+          url: file,
+          nguoi_dang: currentUser, // Gắn người đang sửa vì file cũ chưa có info
+          last_modified: now,
+        };
+      }
+
+      // TRƯỜNG HỢP 2: Là object chuẩn
+      if (typeof file === "object" && file.url) {
+        // Logic bảo toàn lịch sử:
+        // - Nếu file đã có 'nguoi_dang' (file cũ) -> Giữ nguyên.
+        // - Nếu chưa có (file mới thêm) -> Gán currentUser.
+        const uploader = file.nguoi_dang || currentUser;
+
+        // - Nếu file cũ -> Giữ nguyên thời gian.
+        // - Nếu mới -> Lấy thời gian hiện tại.
+        const timestamp = file.last_modified || now;
+
+        return {
+          ...file,
+          // Luôn chuẩn hóa lại tên (để sửa lỗi chính tả nếu user mới nhập)
+          ten: standardizeBasicName(file.ten || "File thiết kế"),
+          nguoi_dang: uploader,
+          last_modified: timestamp,
+        };
+      }
+      return null;
+    })
+    .filter(Boolean); // Lọc bỏ null
+
+  return JSON.stringify(processedFiles);
+};
+
+// --- CORE AUTH ---
 async function requireAuth() {
   const cookieStore = cookies();
   const supabase = createServerClient(
@@ -31,54 +116,44 @@ async function requireAuth() {
   return user;
 }
 
-// 🛡️ HÀM KIỂM TRA QUYỀN SỞ HỮU (CORE LOGIC)
-// Trả về: true nếu được phép, throw Error nếu không
 async function checkOwnershipOrAdmin(
   userEmail: string,
   resourceId?: string,
   action: "update" | "delete" = "update"
 ) {
-  // 1. Lấy thông tin nhân sự đang thao tác
   const [nhanSu] = await sql`
-        SELECT id, vi_tri_normalized 
+        SELECT id, vi_tri_normalized, ho_ten 
         FROM nhan_su 
         WHERE email = ${userEmail}
     `;
 
-  if (!nhanSu) throw new Error("Không tìm thấy thông tin nhân sự của bạn.");
+  if (!nhanSu) throw new Error("Không tìm thấy thông tin nhân sự.");
 
   const role = nhanSu.vi_tri_normalized || "";
-  // Danh sách các vai trò được coi là Admin
   const isAdmin = ["admin", "quanly", "boss"].includes(role);
 
-  // 2. Nếu là Admin -> Cho phép hết
-  if (isAdmin) return true;
+  // Trả về cả info nhân sự để dùng tên
+  const userInfo = { id: nhanSu.id, name: nhanSu.ho_ten || "Nhân viên" };
 
-  // 3. Nếu là Xóa -> CHẶN NGAY nếu không phải Admin
+  if (isAdmin) return userInfo;
+
   if (action === "delete") {
     throw new Error("⛔ Bạn không có quyền xóa (Chỉ Admin mới được xóa).");
   }
 
-  // 4. Nếu là Sửa -> Kiểm tra "Chính chủ"
   if (resourceId) {
-    const [mau] = await sql`
-            SELECT nguoi_tao FROM mau_thiet_ke WHERE id = ${resourceId}
-        `;
-
-    if (!mau) throw new Error("Mẫu thiết kế không tồn tại.");
-
-    // So sánh ID người tạo với ID nhân sự đang login
+    const [mau] =
+      await sql`SELECT nguoi_tao FROM mau_thiet_ke WHERE id = ${resourceId}`;
+    if (!mau) throw new Error("Mẫu không tồn tại.");
     if (mau.nguoi_tao !== nhanSu.id) {
       throw new Error("⛔ Bạn chỉ được phép sửa mẫu do chính mình tạo ra.");
     }
   }
-
-  return true;
+  return userInfo;
 }
 
-// --- CÁC HÀM XỬ LÝ CHÍNH ---
+// --- ACTIONS ---
 
-// 1. LẤY DANH SÁCH (ĐÃ UPDATE LỌC HAS_FILE)
 export async function getMauThietKeDataAction(
   page: number,
   pageSize: number,
@@ -96,21 +171,16 @@ export async function getMauThietKeDataAction(
     const params: any[] = [];
     let paramCount = 1;
 
-    // Tìm kiếm
     if (search) {
       query += ` AND (m.mo_ta ILIKE $${paramCount})`;
       params.push(`%${search}%`);
       paramCount++;
     }
 
-    // Lọc theo Tab (Phân loại hoặc Has File)
     if (filterCategory && filterCategory !== "all") {
-      // 🟢 FIX: Xử lý trường hợp lọc "Đã có file"
       if (filterCategory === "has_file") {
-        // Kiểm tra file_thiet_ke khác null, khác chuỗi rỗng và khác mảng rỗng '[]'
         query += ` AND m.file_thiet_ke IS NOT NULL AND m.file_thiet_ke::text != '[]' AND m.file_thiet_ke::text != '' `;
       } else {
-        // Lọc phân loại bình thường
         query += ` AND m.phan_loai_normalized = $${paramCount}`;
         params.push(filterCategory);
         paramCount++;
@@ -134,14 +204,13 @@ export async function getMauThietKeDataAction(
   }
 }
 
-// 2. TẠO MỚI MẪU
 export async function createMauThietKeAction(data: any) {
   try {
     const user = await requireAuth();
-    const [nhanSu] = await sql`SELECT id FROM nhan_su WHERE email = ${
+    // Lấy thông tin người dùng đang thao tác
+    const [nhanSu] = await sql`SELECT id, ho_ten FROM nhan_su WHERE email = ${
       user.email || ""
     }`;
-
     if (!nhanSu) throw new Error("Không xác định được danh tính nhân sự.");
 
     const phanLoaiNorm =
@@ -154,8 +223,11 @@ export async function createMauThietKeAction(data: any) {
             .toLowerCase()
         : "");
 
-    // Chuẩn bị file thiết kế (đảm bảo là JSON string)
-    const fileThietKeJson = JSON.stringify(data.file_thiet_ke || []);
+    // 🟢 TỰ ĐỘNG CHUẨN HÓA TÊN FILE + GẮN NGƯỜI TẠO
+    const fileThietKeJson = processFileList(
+      data.file_thiet_ke,
+      nhanSu.ho_ten || "Admin"
+    );
 
     await sql.unsafe(
       `
@@ -175,18 +247,32 @@ export async function createMauThietKeAction(data: any) {
       ]
     );
 
+    // 🔔 GỬI THÔNG BÁO TỰ ĐỘNG
+    // Logic: Báo cho Admin, Boss, Quản lý và Phòng Thiết kế
+    sendNotificationToRoles(
+      ["admin", "boss", "quanly", "thietke"],
+      "Mẫu thiết kế mới",
+      `${nhanSu.ho_ten} vừa thêm mẫu: "${data.mo_ta}"`,
+      "/phongthietke", // Link mở khi click
+      "artwork_new", // Icon type
+      nhanSu.ho_ten // Người gửi
+    );
+
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
 }
 
-// 3. CẬP NHẬT MẪU (Có check quyền)
 export async function updateMauThietKeAction(id: string, data: any) {
   try {
     const user = await requireAuth();
-    // Check: Admin hoặc Chính chủ mới được sửa
-    await checkOwnershipOrAdmin(user.email || "", id, "update");
+    // Check quyền và lấy luôn thông tin người đang sửa (currentUser)
+    const currentUser = await checkOwnershipOrAdmin(
+      user.email || "",
+      id,
+      "update"
+    );
 
     const phanLoaiNorm =
       data.phan_loai_normalized ||
@@ -198,7 +284,11 @@ export async function updateMauThietKeAction(id: string, data: any) {
             .toLowerCase()
         : "");
 
-    const fileThietKeJson = JSON.stringify(data.file_thiet_ke || []);
+    // 🟢 TỰ ĐỘNG CHUẨN HÓA TÊN FILE
+    const fileThietKeJson = processFileList(
+      data.file_thiet_ke,
+      currentUser.name || "Admin"
+    );
 
     await sql.unsafe(
       `
@@ -207,7 +297,8 @@ export async function updateMauThietKeAction(id: string, data: any) {
                 phan_loai = $2,
                 phan_loai_normalized = $3,
                 hinh_anh = $4,
-                file_thiet_ke = $5
+                file_thiet_ke = $5,
+                tao_luc = now()
             WHERE id = $6
         `,
       [
@@ -220,21 +311,43 @@ export async function updateMauThietKeAction(id: string, data: any) {
       ]
     );
 
+    // 🔔 GỬI THÔNG BÁO CẬP NHẬT
+    sendNotificationToRoles(
+      ["admin", "boss", "quanly", "thietke"],
+      "Cập nhật mẫu thiết kế",
+      `${currentUser.name} vừa cập nhật mẫu: "${data.mo_ta}"`,
+      "/phongthietke",
+      "system_update",
+      currentUser.name
+    );
+
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
 }
 
-// 4. XÓA (Chỉ Admin)
 export async function deleteMauThietKeAction(id: string) {
   try {
     const user = await requireAuth();
-
-    // Check: Chỉ Admin mới được xóa
-    await checkOwnershipOrAdmin(user.email || "", id, "delete");
+    const currentUser = await checkOwnershipOrAdmin(
+      user.email || "",
+      id,
+      "delete"
+    );
 
     await sql.unsafe(`DELETE FROM "mau_thiet_ke" WHERE id = $1`, [id]);
+
+    // 🔔 GỬI THÔNG BÁO XÓA (Chỉ báo cho Admin/Boss biết có người xóa)
+    sendNotificationToRoles(
+      ["admin", "boss"],
+      "Đã xóa mẫu thiết kế",
+      `${currentUser.name} đã xóa một mẫu thiết kế khỏi hệ thống.`,
+      "/phongthietke",
+      "system_alert",
+      currentUser.name
+    );
+
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };

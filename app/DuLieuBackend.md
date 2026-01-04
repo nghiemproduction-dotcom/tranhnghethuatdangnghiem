@@ -178,6 +178,22 @@
 - FOREIGN KEY: lich_su_vi_pham_nhan_su_id_fkey
 - CHECK: 27491_53366_1_not_null
 
+## Table: mau_thiet_ke
+
+| Column | Type | Nullable | Default | Extra |\n|---|---|---|---|---|\n| id | uuid | NO | gen_random_uuid()... | 🔑 PK |
+| mo_ta | text | YES | - | |
+| phan_loai | text | YES | - | |
+| phan_loai_normalized | text | YES | - | |
+| hinh_anh | text | YES | - | |
+| nguoi_tao | uuid | YES | - | 🔗 FK -> nhan_su.id |
+| tao_luc | timestamp with time zone | YES | now()... | |
+| file_thiet_ke | jsonb | YES | '[]'::jsonb... | |
+
+> Constraints:
+
+- FOREIGN KEY: mau_thiet_ke_nguoi_tao_fkey
+- CHECK: 27491_55088_1_not_null
+
 ## Table: nhan_su
 
 | Column | Type | Nullable | Default | Extra |\n|---|---|---|---|---|\n| id | uuid | NO | gen_random_uuid()... | 🔑 PK |
@@ -385,10 +401,28 @@
 | tin_nhan_cuoi | text | YES | - | |
 | cap_nhat_luc | timestamp with time zone | YES | now()... | |
 | tao_luc | timestamp with time zone | YES | now()... | |
+| ho_tro_vien_ids | ARRAY | YES | '{}'::uuid[]... | |
+| is_read | boolean | YES | true... | |
+| last_sender_type | text | YES | 'staff'::text... | |
 
 > Constraints:
 
 - CHECK: 27491_54920_1_not_null
+
+## Table: user_devices
+
+| Column | Type | Nullable | Default | Extra |\n|---|---|---|---|---|\n| id | uuid | NO | gen_random_uuid()... | 🔑 PK |
+| user_id | uuid | YES | - | 🔗 FK -> nhan_su.id |
+| fcm_token | text | NO | - | |
+| platform | text | YES | - | |
+| last_active | timestamp with time zone | YES | now()... | |
+
+> Constraints:
+
+- UNIQUE: user_devices_user_id_fcm_token_key
+- FOREIGN KEY: user_devices_user_id_fkey
+- CHECK: 27491_56281_1_not_null
+- CHECK: 27491_56281_3_not_null
 
 ## Table: user_registrations
 
@@ -402,6 +436,8 @@
 | requested_phan_loai | text | YES | - | |
 | status | text | YES | 'pending'::text... | |
 | created_at | timestamp with time zone | YES | now()... | |
+| hinh_anh | text | YES | - | |
+| details | jsonb | YES | - | |
 
 > Constraints:
 

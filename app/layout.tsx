@@ -1,29 +1,30 @@
 import type { Metadata, Viewport } from "next";
-// 🟢 1. CẬP NHẬT IMPORT FONT
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
+
+// Components
 import NutHoTro from "@/app/components/NutHoTro";
 import TuVanKhachHang from "@/app/components/TuVanKhachHang";
 import ForceFullScreen from "@/app/components/ForceFullScreen";
 import PushManager from "@/app/components/PushManager";
+import ErrorBoundary from "@/app/components/ErrorBoundary";
+
+// Providers
 import QueryProvider from "@/app/QueryProvider";
 import { UserProvider } from "@/app/ThuVien/UserContext";
 import { AppSettingsProvider } from "@/app/ThuVien/AppSettingsContext";
-import ErrorBoundary from "@/app/components/ErrorBoundary";
 
-// 🟢 2. CẤU HÌNH FONT INTER (SANS)
 const inter = Inter({
-  subsets: ["latin", "vietnamese"], // Thêm vietnamese
+  subsets: ["latin", "vietnamese"],
   display: "swap",
   variable: "--font-inter",
 });
 
-// 🟢 3. CẤU HÌNH FONT PLAYFAIR DISPLAY (SERIF)
 const playfair = Playfair_Display({
-  subsets: ["latin", "vietnamese"], // Thêm vietnamese
+  subsets: ["latin", "vietnamese"],
   display: "swap",
   variable: "--font-playfair",
-  weight: ["400", "500", "600", "700", "800", "900"], // Nạp đủ độ đậm
+  weight: ["400", "500", "600", "700", "800", "900"],
 });
 
 export const metadata: Metadata = {
@@ -54,7 +55,7 @@ export const viewport: Viewport = {
   userScalable: false,
   viewportFit: "cover",
   themeColor: "#000000",
-  interactiveWidget: "resizes-visual",
+  interactiveWidget: "resizes-visual", // Giúp bàn phím ảo không che input
 };
 
 export default function RootLayout({
@@ -64,10 +65,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="vi">
-      {/* 🟢 4. ÁP DỤNG BIẾN FONT VÀO BODY */}
-      {/* UPDATED: Sử dụng class 'h-app' thay vì 'min-h-screen' để fix lỗi mobile viewport.
-          Class 'h-app' được định nghĩa trong globals.css và nhận giá trị từ ForceFullScreen.tsx 
-      */}
       <body
         className={`${inter.variable} ${playfair.variable} bg-black h-app w-full overflow-hidden font-sans`}
       >
@@ -75,13 +72,20 @@ export default function RootLayout({
           <AppSettingsProvider>
             <QueryProvider>
               <ErrorBoundary>
-                {/* Component này sẽ tính toán --app-height cho body */}
+                {/* 1. Xử lý chiều cao & Fullscreen cho Mobile PWA */}
                 <ForceFullScreen />
 
+                {/* 2. Nội dung chính của trang (Page) */}
                 {children}
 
+                {/* 3. Các thành phần Fixed (Nổi trên cùng) */}
+                {/* NutHoTro: Góc Phải (Khách hàng) */}
                 <NutHoTro />
+
+                {/* TuVanKhachHang: Góc Trái (Nhân viên) */}
                 <TuVanKhachHang />
+
+                {/* PushManager: Xử lý đăng ký nhận thông báo ngầm */}
                 <PushManager />
               </ErrorBoundary>
             </QueryProvider>

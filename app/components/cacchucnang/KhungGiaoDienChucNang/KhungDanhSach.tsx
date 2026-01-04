@@ -59,6 +59,8 @@ export interface KhungDanhSachProps {
   // Actions
   showAddButton?: boolean;
   onAdd?: () => void;
+  // 🟢 THÊM: Cho phép chèn nút tùy chỉnh (vd: Sync User)
+  extraActions?: ReactNode; 
 
   // Bulk mode
   bulkMode?: boolean;
@@ -92,6 +94,7 @@ export default function KhungDanhSach({
   onSortChange,
   showAddButton = true,
   onAdd,
+  extraActions, // 🟢 Nhận prop này
   bulkMode = false,
   onBulkModeToggle,
   selectedCount = 0,
@@ -162,6 +165,7 @@ export default function KhungDanhSach({
 
         {/* Actions - cố định phải */}
         <div className="shrink-0 flex items-center gap-1 px-2 border-l border-white/5 bg-[#0a0a0a]">
+          
           {/* Search */}
           {onSearch && (
             <div className="relative flex items-center">
@@ -228,6 +232,13 @@ export default function KhungDanhSach({
                   </div>
                 </>
               )}
+            </div>
+          )}
+
+          {/* 🟢 EXTRA ACTIONS (Nút Sync, Export...) */}
+          {extraActions && (
+            <div className="flex items-center gap-1 pl-1 border-l border-white/5 ml-1">
+               {extraActions}
             </div>
           )}
 
