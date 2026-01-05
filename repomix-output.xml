@@ -41,6 +41,7 @@ The content is organized as follows:
 
 <directory_structure>
 .gitignore
+.idx/dev.nix
 app/actions/admindb.ts
 app/actions/NotificationAction.ts
 app/actions/QuyenHanAdmin.ts
@@ -84,12 +85,6 @@ app/components/cacchucnang/nhansu/config.ts
 app/components/cacchucnang/nhansu/index.ts
 app/components/cacchucnang/nhansu/NhanSuChucNang.tsx
 app/components/cacchucnang/types.ts
-app/components/cacchucnang/viecmau/config.ts
-app/components/cacchucnang/viecmau/index.ts
-app/components/cacchucnang/viecmau/MauThietKeChucNang.tsx
-app/components/cacchucnang/viecmau/MauThietKeDetail.tsx
-app/components/cacchucnang/viecmau/MauThietKeForm.tsx
-app/components/cacchucnang/viecmau/MauThietKeList.tsx
 app/components/ConfirmDialog.tsx
 app/components/ErrorBoundary.tsx
 app/components/ForceFullScreen.tsx
@@ -155,6 +150,7 @@ app/trangchu/slider1.tsx
 app/trangchu/slider2.tsx
 app/types/index.ts
 docs/CauLenhLayDuLieuBackEnd.md
+docs/CauLenhRunServer3000trenIDX.md
 eslint.config.mjs
 next.config.mjs
 package.json
@@ -184,89 +180,65 @@ typeDefs.ts
 <files>
 This section contains the contents of the repository's files.
 
-<file path="app/components/IOSInstallGuide.tsx">
-"use client";
-import { useState, useEffect } from "react";
-import { X, Share, PlusSquare } from "lucide-react"; // Hoặc dùng icon svg nào ông có
-
-export default function IOSInstallGuide({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center">
-      <div className="w-full max-w-md bg-zinc-900 p-6 rounded-t-2xl sm:rounded-2xl border border-zinc-800 shadow-2xl animate-in slide-in-from-bottom duration-300">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold text-white">Cài đặt ứng dụng</h3>
-          <button onClick={onClose} className="p-1 text-zinc-400 hover:text-white">
-            <X size={24} />
-          </button>
-        </div>
-        
-        <div className="space-y-4 text-zinc-300">
-          <p>Để cài đặt ứng dụng lên màn hình chính iPhone/iPad:</p>
-          
-          <div className="flex items-center gap-3 p-3 bg-zinc-800/50 rounded-lg">
-            <Share className="text-blue-500" />
-            <span>1. Bấm vào nút <strong>Chia sẻ</strong> ở thanh dưới cùng.</span>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-zinc-800/50 rounded-lg">
-            <PlusSquare className="text-white" />
-            <span>2. Chọn dòng <strong>Thêm vào MH chính</strong> (Add to Home Screen).</span>
-          </div>
-        </div>
-        
-        <div className="mt-6 text-center text-sm text-zinc-500">
-          Bấm xong nó sẽ hiện icon app ở màn hình chính như app thật.
-        </div>
-      </div>
-    </div>
-  );
-}
+<file path="docs/CauLenhRunServer3000trenIDX.md">
+npm run dev -- --hostname 0.0.0.0 --port 3000
 </file>
 
-<file path=".gitignore">
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+<file path=".idx/dev.nix">
+{ pkgs, ... }: {
+  # 1. Chọn kênh phần mềm ổn định
+  channel = "stable-24.05";
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+  # 2. Cài đặt công cụ hệ thống (Node.js 20 là chuẩn cho Next.js mới)
+  packages = [
+    pkgs.nodejs_20
+  ];
 
-# testing
-/coverage
+  # 3. Cấu hình các biến môi trường hệ thống (nếu cần)
+  env = {};
 
-# next.js
-/.next/
-/out/
+  # 4. Cấu hình IDX
+  idx = {
+    # Tự động cài Extension xịn cho Next.js/React
+    extensions = [
+      "dbaeumer.vscode-eslint"       # Bắt lỗi code
+      "esbenp.prettier-vscode"       # Format code đẹp
+      "bradlc.vscode-tailwindcss"    # Nếu bạn dùng Tailwind (nên có)
+    ];
 
-# production
-/build
+    # --- TỰ ĐỘNG HÓA (Thêm cái này cho nhàn) ---
+    workspace = {
+      # Chạy khi tạo mới workspace (lần đầu tiên clone về)
+      onCreate = {
+        npm-install = "npm install --no-audit --prefer-offline";
+      };
+      # Chạy mỗi khi mở lại workspace (Start)
+      onStart = {
+        # Có thể thêm lệnh gì đó nếu thích, ví dụ: git pull
+      };
+    };
 
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+    # --- PREVIEW (Đoạn code chuẩn của bạn) ---
+    previews = {
+      enable = true;
+      previews = {
+        web = {
+          command = [
+            "npm"
+            "run"
+            "dev"
+            "--"
+            "--port"
+            "$PORT"
+            "--hostname"
+            "0.0.0.0"
+          ];
+          manager = "web";
+        };
+      };
+    };
+  };
+}
 </file>
 
 <file path="app/actions/NotificationAction.ts">
@@ -2264,76 +2236,6 @@ export default function KhungForm({
 }
 </file>
 
-<file path="app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan.tsx">
-"use client";
-
-import React, { ReactNode } from "react";
-import MenuTren from "@/app/GiaoDienTong/MenuTren/MenuTren";
-
-import { Z_INDEX } from "@/app/constants/zIndex";
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const BASE_IMG_URL = `${SUPABASE_URL}/storage/v1/object/public/hinh-nen`;
-
-interface Props {
-  children: ReactNode;
-  nguoiDung: any;
-  loiChao?: string;
-  contentClassName?: string;
-}
-
-export default function KhungTrangChuan({
-  children,
-  nguoiDung,
-  loiChao,
-  contentClassName = "max-w-[1920px] mx-auto p-3 pb-24 md:p-6 md:pb-24 pt-24",
-}: Props) {
-  const bgUrlMobile = `${BASE_IMG_URL}/trangchu-mobile.jpg`;
-  const bgUrlTablet = `${BASE_IMG_URL}/trangchu-tablet.jpg`;
-  const bgUrlDesktop = `${BASE_IMG_URL}/trangchu-desktop.jpg`;
-
-  const displayLoiChao = loiChao || `Xin chào, ${nguoiDung?.ho_ten || "User"}`;
-
-  return (
-    <div className="relative w-full min-h-[100dvh] bg-[#050505] text-[#F5F5F5] font-sans overflow-x-hidden selection:bg-[#C69C6D] selection:text-black text-[14px]">
-      {/* LAYER 0: HÌNH NỀN CHUẨN */}
-      <div className="fixed inset-0 w-full h-full z-0 pointer-events-none select-none bg-black">
-        <img
-          src={bgUrlMobile}
-          alt="BG"
-          className="absolute inset-0 w-full h-full object-cover md:hidden opacity-100"
-        />
-        <img
-          src={bgUrlTablet}
-          alt="BG"
-          className="absolute inset-0 w-full h-full object-cover hidden md:block lg:hidden opacity-100"
-        />
-        <img
-          src={bgUrlDesktop}
-          alt="BG"
-          className="absolute inset-0 w-full h-full object-cover hidden lg:block opacity-100"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/40" />
-      </div>
-
-      {/* LAYER 1: NỘI DUNG CHÍNH */}
-      <main
-        className={`relative z-[10] w-full min-h-[100dvh] flex flex-col ${contentClassName}`}
-      >
-        {children}
-      </main>
-
-      {/* LAYER 2: GRADIENT BẢO VỆ MENU */}
-      <div className="fixed top-0 left-0 right-0 h-28 bg-gradient-to-b from-black to-transparent z-[4900] pointer-events-none"></div>
-      <div className="fixed bottom-0 left-0 right-0 h-28 bg-gradient-to-t from-black to-transparent z-[4900] pointer-events-none"></div>
-
-      {/* LAYER 3: HỆ THỐNG MENU */}
-      <MenuTren nguoiDung={nguoiDung} loiChao={displayLoiChao} />
-    </div>
-  );
-}
-</file>
-
 <file path="app/components/cacchucnang/KhungXuLyChucNang/index.ts">
 
 </file>
@@ -3157,1170 +3059,6 @@ export interface ManagerConfig<T = any> {
 }
 </file>
 
-<file path="app/components/cacchucnang/viecmau/config.ts">
-import { Palette, Image as ImageIcon, Tag, User } from "lucide-react";
-import {
-  ManagerConfig,
-  FieldConfig,
-  FilterTabConfig,
-  TabConfig,
-} from "../types";
-import {
-  getMauThietKeDataAction,
-  createMauThietKeAction,
-  updateMauThietKeAction,
-  deleteMauThietKeAction,
-} from "@/app/actions/QuyenHanThietKe";
-
-// 1. CẬP NHẬT INTERFACE (Thêm file_thiet_ke)
-export interface MauThietKe {
-  id: string;
-  mo_ta: string;
-  phan_loai: string;
-  phan_loai_normalized: string;
-  hinh_anh: string;
-  // Thêm trường này để lưu danh sách link
-  file_thiet_ke?: string[];
-  nguoi_tao: string;
-  ten_nguoi_tao?: string;
-  tao_luc: string;
-}
-
-export interface MauThietKePermissions {
-  allowView?: boolean;
-  allowEdit?: boolean;
-  allowDelete?: boolean;
-  allowBulk?: boolean;
-}
-
-// Các loại phân loại chuẩn hóa
-const PHAN_LOAI_OPTIONS = [
-  "Tranh chân dung gạo In UV + Vẽ mặt",
-  "Tranh phong cảnh Gạo - Tấm - Cám",
-  "Đĩa Tranh Gạo",
-  "Tranh gạo In UV",
-  "Tranh In Để Bàn",
-  "Nón lá gạo",
-  "Tranh gạo in UV có đồng hồ",
-  "Tranh chân dung thủ công 100%",
-];
-
-const fields: FieldConfig[] = [
-  {
-    key: "hinh_anh",
-    label: "Hình ảnh mẫu",
-    type: "image",
-    showInForm: true,
-    showInDetail: false,
-    showInCard: true,
-  },
-  {
-    key: "mo_ta",
-    label: "Mô tả / Tên mẫu",
-    type: "text",
-    placeholder: "Nhập tên mẫu thiết kế...",
-    required: true,
-    icon: Palette,
-  },
-  {
-    key: "phan_loai",
-    label: "Phân loại",
-    type: "select",
-    options: PHAN_LOAI_OPTIONS,
-    required: true,
-    icon: Tag,
-  },
-  {
-    key: "ten_nguoi_tao",
-    label: "Người thiết kế",
-    type: "readonly",
-    icon: User,
-    showInForm: false,
-  },
-];
-
-// 2. CẬP NHẬT BỘ LỌC (Thêm tab lọc File Thiết Kế)
-const filterTabs: FilterTabConfig[] = [
-  // Tab mới: Lọc những mẫu đã có file
-  {
-    id: "has_file",
-    label: "ĐÃ CÓ FILE",
-    filterField: "file_thiet_ke", // Trường này sẽ được xử lý logic riêng ở Controller
-  },
-  {
-    id: "tranhchandunggaoinuv+vemat",
-    label: "CHÂN DUNG UV",
-    filterField: "phan_loai_normalized",
-  },
-  {
-    id: "tranhphongcanhgao-tam-cam",
-    label: "PHONG CẢNH",
-    filterField: "phan_loai_normalized",
-  },
-  { id: "tranhgaoinuv", label: "IN UV", filterField: "phan_loai_normalized" },
-  {
-    id: "diatranhgao",
-    label: "ĐĨA TRANH",
-    filterField: "phan_loai_normalized",
-  },
-  { id: "tranhindeban", label: "ĐỂ BÀN", filterField: "phan_loai_normalized" },
-];
-
-const detailTabs: TabConfig[] = [{ id: "thongtin", label: "CHI TIẾT" }];
-
-const dataSource = {
-  fetchList: async (
-    page: number,
-    limit: number,
-    search: string,
-    filter: string
-  ) => {
-    const res = await getMauThietKeDataAction(page, limit, search, filter);
-    return {
-      success: res.success,
-      data: res.data as MauThietKe[] | undefined,
-      error: res.error,
-    };
-  },
-  create: async (data: Partial<MauThietKe>) => {
-    const res = await createMauThietKeAction(data);
-    return { success: res.success, data: (res as any)?.data, error: res.error };
-  },
-  update: async (id: string, data: Partial<MauThietKe>) => {
-    const res = await updateMauThietKeAction(id, data);
-    return { success: res.success, data: (res as any)?.data, error: res.error };
-  },
-  delete: async (id: string) => {
-    const res = await deleteMauThietKeAction(id);
-    return { success: res.success, error: res.error };
-  },
-};
-
-export function createMauThietKeConfig(
-  permissions: MauThietKePermissions = {}
-): ManagerConfig<MauThietKe> {
-  const {
-    allowView = true,
-    allowEdit = true,
-    allowDelete = false,
-    allowBulk = false,
-  } = permissions;
-
-  return {
-    entityName: "mẫu thiết kế",
-    entityNamePlural: "mẫu thiết kế",
-    idField: "id",
-    fields,
-    cardConfig: {
-      avatarField: "hinh_anh",
-      titleField: "mo_ta",
-      subtitleField: "phan_loai",
-      infoFields: [{ field: "ten_nguoi_tao", icon: User }],
-    },
-    filterTabs,
-    detailTabs,
-    actions: {
-      allowView,
-      allowEdit,
-      allowDelete,
-      allowBulkSelect: allowBulk,
-      allowBulkDelete: allowBulk && allowDelete,
-    },
-    dataSource,
-    searchFields: ["mo_ta"],
-    sortOptions: [
-      {
-        key: "newest",
-        label: "MỚI NHẤT",
-        sortFn: (a: MauThietKe, b: MauThietKe) =>
-          new Date(b.tao_luc).getTime() - new Date(a.tao_luc).getTime(),
-      },
-      {
-        key: "name",
-        label: "TÊN A-Z",
-        sortFn: (a: MauThietKe, b: MauThietKe) =>
-          a.mo_ta.localeCompare(b.mo_ta),
-      },
-    ],
-    defaultSort: "newest",
-    uploadConfig: { bucket: "images", fileNamePrefix: "mau" }, // Đã chuẩn hóa về 'images'
-  };
-}
-</file>
-
-<file path="app/components/cacchucnang/viecmau/index.ts">
-export { default as MauThietKeChucNang } from "./MauThietKeChucNang";
-export { createMauThietKeConfig } from "./config";
-export type { MauThietKe, MauThietKePermissions } from "./config";
-</file>
-
-<file path="app/components/cacchucnang/viecmau/MauThietKeChucNang.tsx">
-"use client";
-
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Trash2 } from "lucide-react";
-import { KhungDanhSach } from "@/app/components/cacchucnang/KhungGiaoDienChucNang";
-import ConfirmDialog from "@/app/components/ConfirmDialog";
-import {
-  MauThietKe,
-  MauThietKePermissions,
-  createMauThietKeConfig,
-} from "./config";
-
-// IMPORT 3 THÀNH PHẦN ĐÃ TÁCH
-import MauThietKeList from "./MauThietKeList";
-import MauThietKeForm from "./MauThietKeForm";
-import MauThietKeDetail from "./MauThietKeDetail";
-
-interface Props {
-  permissions?: MauThietKePermissions;
-  className?: string;
-}
-
-const toNonAccent = (str: string) =>
-  str
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, "")
-    .toLowerCase();
-
-export default function MauThietKeChucNang({
-  permissions = {},
-  className = "",
-}: Props) {
-  const config = createMauThietKeConfig(permissions);
-  const {
-    allowEdit = true,
-    allowDelete = false,
-    allowBulk = false,
-  } = permissions;
-
-  // --- STATE QUẢN LÝ ---
-  const [items, setItems] = useState<MauThietKe[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState("all");
-  const [sortBy, setSortBy] = useState("newest");
-
-  // View State
-  const [viewMode, setViewMode] = useState<"list" | "detail" | "form">("list");
-  const [selectedItem, setSelectedItem] = useState<MauThietKe | null>(null);
-
-  // Action State
-  const [bulkMode, setBulkMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [confirmDelete, setConfirmDelete] = useState<{
-    show: boolean;
-    ids: string[];
-  }>({ show: false, ids: [] });
-  const [saving, setSaving] = useState(false);
-
-  // --- FETCH DATA ---
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      if (config.dataSource?.fetchList) {
-        const res = await config.dataSource.fetchList(1, 100, "", "");
-        if (res.success && res.data) setItems(res.data);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [config.dataSource]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // --- FILTER & SORT LOGIC ---
-  const filteredList = useMemo(() => {
-    let result = items;
-
-    // 1. LOGIC LỌC MỚI (Xử lý tab 'ĐÃ CÓ FILE')
-    if (activeTab === "has_file") {
-      result = result.filter((i) => {
-        // Kiểm tra xem có file thiết kế không (Array hoặc JSON string)
-        const files = i.file_thiet_ke;
-        if (Array.isArray(files) && files.length > 0) return true;
-        if (typeof files === "string") {
-          try {
-            const parsed = JSON.parse(files);
-            return Array.isArray(parsed) && parsed.length > 0;
-          } catch {
-            return false;
-          }
-        }
-        return false;
-      });
-    }
-    // Lọc theo phân loại thông thường
-    else if (activeTab !== "all") {
-      result = result.filter((i) => i.phan_loai_normalized === activeTab);
-    }
-
-    // Tìm kiếm
-    if (searchTerm) {
-      const term = toNonAccent(searchTerm);
-      result = result.filter((i) => toNonAccent(i.mo_ta).includes(term));
-    }
-
-    // Sắp xếp
-    const sortOpt = config.sortOptions?.find((s) => s.key === sortBy);
-    if (sortOpt?.sortFn) {
-      result = [...result].sort(sortOpt.sortFn);
-    }
-    return result;
-  }, [items, activeTab, searchTerm, sortBy, config.sortOptions]);
-
-  const tabs = useMemo(() => {
-    const counts: Record<string, number> = { all: items.length };
-
-    config.filterTabs?.forEach((tab) => {
-      // 2. LOGIC ĐẾM SỐ LƯỢNG MỚI CHO TAB 'HAS_FILE'
-      if (tab.id === "has_file") {
-        counts[tab.id] = items.filter((i) => {
-          const files = i.file_thiet_ke;
-          if (Array.isArray(files) && files.length > 0) return true;
-          if (typeof files === "string") {
-            try {
-              const parsed = JSON.parse(files);
-              return Array.isArray(parsed) && parsed.length > 0;
-            } catch {
-              return false;
-            }
-          }
-          return false;
-        }).length;
-      }
-      // Đếm cho các tab phân loại bình thường
-      else if (tab.id && tab.filterField) {
-        counts[tab.id] = items.filter(
-          (i) => (i as any)[tab.filterField!] === tab.id
-        ).length;
-      }
-    });
-
-    const dynamicTabs =
-      config.filterTabs?.map((t) => ({
-        id: t.id || "",
-        label: t.label,
-        count: t.id ? counts[t.id] || 0 : 0,
-      })) || [];
-    return [{ id: "all", label: "TẤT CẢ", count: counts.all }, ...dynamicTabs];
-  }, [items, config.filterTabs]);
-
-  // --- ACTION HANDLERS ---
-  const handleOpenDetail = (item: MauThietKe) => {
-    setSelectedItem(item);
-    setViewMode("detail");
-  };
-
-  const handleOpenForm = (item?: MauThietKe) => {
-    setSelectedItem(item || null);
-    setViewMode("form");
-  };
-
-  // --- [UPDATED] LOGIC CHECK KẾT QUẢ TRẢ VỀ TỪ BACKEND ---
-  const handleSave = async (formData: any) => {
-    setSaving(true);
-    try {
-      let res; // Biến hứng kết quả
-
-      if (selectedItem?.id) {
-        if (config.dataSource?.update) {
-          res = await config.dataSource.update(selectedItem.id, formData);
-        }
-      } else {
-        if (config.dataSource?.create) {
-          res = await config.dataSource.create(formData);
-        }
-      }
-
-      // KIỂM TRA: Nếu Backend trả về success: false (do không có quyền sửa, lỗi logic...)
-      if (res && !res.success) {
-        // Hiện thông báo lỗi và KHÔNG đóng form
-        alert(
-          res.error || "Thao tác thất bại. Vui lòng kiểm tra lại quyền hạn!"
-        );
-        return; // Dừng hàm tại đây
-      }
-
-      // Nếu thành công -> Tải lại dữ liệu và đóng form
-      await fetchData();
-      setViewMode("list");
-      setSelectedItem(null);
-    } catch (e) {
-      console.error(e);
-      alert("Đã có lỗi hệ thống xảy ra!");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = async (ids: string[]) => {
-    if (config.dataSource?.delete) {
-      // Logic xóa cũng nên có try/catch tương tự nhưng tạm thời giữ nguyên theo code gốc
-      // để tránh ảnh hưởng logic delete hàng loạt
-      for (const id of ids) await config.dataSource.delete(id);
-      await fetchData();
-      setSelectedIds(new Set());
-      setConfirmDelete({ show: false, ids: [] });
-      setViewMode("list");
-    }
-  };
-
-  const handleBulkSelect = (id: string) => {
-    const newSet = new Set(selectedIds);
-    if (newSet.has(id)) newSet.delete(id);
-    else newSet.add(id);
-    setSelectedIds(newSet);
-  };
-
-  // --- RENDER ---
-  return (
-    <div className={`h-full ${className}`}>
-      {/* 1. LIST VIEW */}
-      {viewMode === "list" && (
-        <KhungDanhSach
-          tabs={tabs}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          onSearch={setSearchTerm}
-          sortOptions={
-            config.sortOptions?.map((s) => ({ key: s.key, label: s.label })) ||
-            []
-          }
-          activeSort={sortBy}
-          onSortChange={setSortBy}
-          showAddButton={allowEdit}
-          onAdd={() => handleOpenForm()}
-          bulkMode={bulkMode}
-          onBulkModeToggle={
-            allowBulk ? () => setBulkMode(!bulkMode) : undefined
-          }
-          selectedCount={selectedIds.size}
-          onSelectAll={() =>
-            setSelectedIds(new Set(filteredList.map((i) => i.id)))
-          }
-          onClearSelection={() => setSelectedIds(new Set())}
-          bulkActions={
-            allowDelete
-              ? [
-                  {
-                    id: "delete",
-                    label: "XÓA",
-                    icon: Trash2,
-                    color: "danger",
-                    onClick: () =>
-                      setConfirmDelete({
-                        show: true,
-                        ids: Array.from(selectedIds),
-                      }),
-                  },
-                ]
-              : []
-          }
-          loading={loading}
-        >
-          <MauThietKeList
-            items={filteredList}
-            bulkMode={bulkMode}
-            selectedIds={selectedIds}
-            onToggleSelect={handleBulkSelect}
-            onClickItem={handleOpenDetail}
-          />
-        </KhungDanhSach>
-      )}
-
-      {/* 2. FORM VIEW */}
-      {viewMode === "form" && (
-        <MauThietKeForm
-          data={selectedItem}
-          onClose={() => {
-            setViewMode("list");
-            setSelectedItem(null);
-          }}
-          onSubmit={handleSave}
-          loading={saving}
-        />
-      )}
-
-      {/* 3. DETAIL VIEW */}
-      {viewMode === "detail" && selectedItem && (
-        <MauThietKeDetail
-          data={selectedItem}
-          onClose={() => {
-            setViewMode("list");
-            setSelectedItem(null);
-          }}
-          allowEdit={allowEdit}
-          allowDelete={allowDelete}
-          onEdit={() => handleOpenForm(selectedItem)}
-          onDelete={() =>
-            setConfirmDelete({ show: true, ids: [selectedItem.id] })
-          }
-        />
-      )}
-
-      <ConfirmDialog
-        isOpen={confirmDelete.show}
-        title="XÁC NHẬN XÓA"
-        message={`Bạn có chắc muốn xóa ${confirmDelete.ids.length} mẫu thiết kế?`}
-        onConfirm={() => handleDelete(confirmDelete.ids)}
-        onCancel={() => setConfirmDelete({ show: false, ids: [] })}
-      />
-    </div>
-  );
-}
-</file>
-
-<file path="app/components/cacchucnang/viecmau/MauThietKeDetail.tsx">
-"use client";
-
-import React, { useState } from "react";
-import {
-  Tag,
-  User,
-  Calendar,
-  Link as LinkIcon,
-  Palette,
-  ExternalLink,
-  Clock,
-} from "lucide-react";
-import { KhungChiTiet } from "@/app/components/cacchucnang/KhungGiaoDienChucNang";
-import { MauThietKe, createMauThietKeConfig } from "./config";
-
-interface Props {
-  data: MauThietKe;
-  onClose: () => void;
-  allowEdit: boolean;
-  allowDelete: boolean;
-  onEdit: () => void;
-  onDelete: () => void;
-}
-
-// Interface mở rộng để hứng các trường mới từ backend
-interface FileItem {
-  ten: string;
-  url: string;
-  nguoi_dang?: string; // Tên người upload
-  last_modified?: string; // Thời gian upload
-}
-
-export default function MauThietKeDetail({
-  data,
-  onClose,
-  allowEdit,
-  allowDelete,
-  onEdit,
-  onDelete,
-}: Props) {
-  const config = createMauThietKeConfig();
-  const [activeTab, setActiveTab] = useState("thongtin");
-  const tabs = config.detailTabs.map((t) => ({ ...t, id: t.id || "" }));
-
-  const item = data as any;
-
-  // Helper format thời gian ngắn gọn (VD: 14:30 25/12)
-  const formatTime = (isoString?: string) => {
-    if (!isoString) return "";
-    const date = new Date(isoString);
-    return date.toLocaleString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric", // Có thể bỏ year nếu muốn gọn hơn
-    });
-  };
-
-  const getFileNameFromUrl = (url: string) => {
-    try {
-      return decodeURIComponent(url).split("?")[0].split("/").pop() || url;
-    } catch {
-      return url;
-    }
-  };
-
-  const getDesignFiles = (): FileItem[] => {
-    if (!item || !item.file_thiet_ke) return [];
-    let parsed: any[] = [];
-    const rawData = item.file_thiet_ke;
-
-    try {
-      if (Array.isArray(rawData)) parsed = rawData;
-      else if (typeof rawData === "string" && rawData.trim()) {
-        const result = JSON.parse(rawData);
-        if (Array.isArray(result)) parsed = result;
-      }
-    } catch {
-      return [];
-    }
-
-    return parsed
-      .map((entry: any) => {
-        // Data cũ (String)
-        if (typeof entry === "string") {
-          return { ten: getFileNameFromUrl(entry), url: entry };
-        }
-        // Data mới (Object)
-        if (typeof entry === "object" && entry !== null) {
-          return {
-            ten:
-              entry.ten ||
-              getFileNameFromUrl(entry.url || "") ||
-              "File đính kèm",
-            url: entry.url || "",
-            nguoi_dang: entry.nguoi_dang,
-            last_modified: entry.last_modified,
-          };
-        }
-        return null;
-      })
-      .filter((f): f is FileItem => f !== null && f.url.trim() !== "");
-  };
-
-  const designFiles = getDesignFiles();
-
-  return (
-    <KhungChiTiet
-      data={data}
-      onClose={onClose}
-      avatar={item.hinh_anh}
-      title={item.ten || item.mo_ta || "Chi tiết mẫu"}
-      tabs={tabs}
-      activeTab={activeTab}
-      onTabChange={setActiveTab}
-      showEditButton={allowEdit}
-      showDeleteButton={allowDelete}
-      onEdit={onEdit}
-      onDelete={onDelete}
-    >
-      <div className="p-4 space-y-4">
-        {/* HÌNH ẢNH */}
-        <div className="aspect-video w-full rounded-xl overflow-hidden bg-[#1a1a1a] border border-white/10 relative group">
-          {item.hinh_anh ? (
-            <img
-              src={item.hinh_anh}
-              alt=""
-              className="w-full h-full object-contain"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-white/20">
-              <Palette size={48} />
-            </div>
-          )}
-        </div>
-
-        {/* DANH SÁCH FILE - GIAO DIỆN MỚI */}
-        {designFiles.length > 0 ? (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-[10px] text-white/40 font-bold uppercase">
-                File Thiết Kế Gốc ({designFiles.length})
-              </label>
-            </div>
-
-            <div className="grid gap-2">
-              {designFiles.map((file, idx) => (
-                <a
-                  key={idx}
-                  href={file.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group flex items-center gap-3 p-3 bg-[#151515] hover:bg-[#C69C6D] border border-white/10 hover:border-[#C69C6D] rounded-lg transition-all relative overflow-hidden"
-                  title={file.url}
-                >
-                  {/* Icon File */}
-                  <div className="w-10 h-10 rounded bg-black/20 flex items-center justify-center text-[#C69C6D] group-hover:text-black shrink-0">
-                    <LinkIcon size={18} />
-                  </div>
-
-                  {/* Thông tin chính */}
-                  <div className="flex-1 overflow-hidden">
-                    {/* Tên File */}
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-bold text-[#C69C6D] group-hover:text-black truncate">
-                        {file.ten}
-                      </p>
-                    </div>
-
-                    {/* Metadata: Người đăng - Thời gian */}
-                    <div className="flex items-center gap-2 mt-0.5 text-[10px] text-white/40 group-hover:text-black/70 font-mono">
-                      {file.nguoi_dang && (
-                        <span className="flex items-center gap-1">
-                          <User size={10} /> {file.nguoi_dang}
-                        </span>
-                      )}
-
-                      {file.nguoi_dang && file.last_modified && <span>•</span>}
-
-                      {file.last_modified && (
-                        <span className="flex items-center gap-1">
-                          <Clock size={10} /> {formatTime(file.last_modified)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <ExternalLink
-                    size={14}
-                    className="text-white/20 group-hover:text-black/40"
-                  />
-                </a>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="p-3 rounded-lg border border-dashed border-white/10 flex items-center justify-center gap-2 text-white/20">
-            <LinkIcon size={14} />
-            <span className="text-xs italic">Chưa có file thiết kế nào</span>
-          </div>
-        )}
-
-        {/* THÔNG TIN KHÁC */}
-        <div className="grid gap-3 pt-2 border-t border-white/5">
-          <DetailRow
-            icon={<Tag size={18} />}
-            label="Phân loại"
-            value={item.phan_loai}
-          />
-          <DetailRow
-            icon={<User size={18} />}
-            label="Người tạo mẫu"
-            value={item.ten_nguoi_tao}
-          />
-          <DetailRow
-            icon={<Calendar size={18} />}
-            label="Ngày tạo mẫu"
-            value={
-              item.tao_luc || item.created_at
-                ? new Date(item.tao_luc || item.created_at).toLocaleDateString(
-                    "vi-VN"
-                  )
-                : "---"
-            }
-          />
-        </div>
-      </div>
-    </KhungChiTiet>
-  );
-}
-
-function DetailRow({
-  icon,
-  label,
-  value,
-}: {
-  icon: any;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="p-3 bg-[#151515] rounded-xl border border-white/5 flex items-center gap-3">
-      <div className="text-[#C69C6D]">{icon}</div>
-      <div>
-        <p className="text-[10px] text-white/40 font-bold uppercase">{label}</p>
-        <p className="text-white text-sm">{value || "---"}</p>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="app/components/cacchucnang/viecmau/MauThietKeForm.tsx">
-"use client";
-
-import React, { useState } from "react";
-import { Plus, Link as LinkIcon, Trash2, Type } from "lucide-react";
-import { KhungForm } from "@/app/components/cacchucnang/KhungGiaoDienChucNang";
-import { MauThietKe, createMauThietKeConfig } from "./config";
-
-interface Props {
-  data: MauThietKe | null; // null = Tạo mới
-  onClose: () => void;
-  onSubmit: (formData: any) => Promise<void>;
-  loading: boolean;
-}
-
-// 1. Định nghĩa kiểu dữ liệu cho file thiết kế
-interface FileItem {
-  ten: string;
-  url: string;
-}
-
-// 2. Định nghĩa kiểu State cho Form (Tránh xung đột Type)
-interface FormState extends Omit<Partial<MauThietKe>, "file_thiet_ke"> {
-  file_thiet_ke: FileItem[];
-}
-
-export default function MauThietKeForm({
-  data,
-  onClose,
-  onSubmit,
-  loading,
-}: Props) {
-  const config = createMauThietKeConfig();
-
-  // 3. Khởi tạo state
-  const [formData, setFormData] = useState<FormState>(() => {
-    let files: FileItem[] = [];
-
-    // Logic parse dữ liệu cũ
-    if (data && (data as any).file_thiet_ke) {
-      try {
-        const raw = (data as any).file_thiet_ke;
-        let parsed: any[] = [];
-
-        if (Array.isArray(raw)) {
-          parsed = raw;
-        } else if (typeof raw === "string") {
-          parsed = JSON.parse(raw);
-        }
-
-        // Convert sang chuẩn { ten, url }
-        files = parsed.map((item: any) => {
-          if (typeof item === "string") return { ten: "", url: item };
-          if (typeof item === "object")
-            return { ten: item.ten || "", url: item.url || "" };
-          return { ten: "", url: "" };
-        });
-      } catch {}
-    }
-
-    return data ? { ...data, file_thiet_ke: files } : { file_thiet_ke: [] };
-  });
-
-  // --- HANDLERS ---
-
-  const handleChange = (field: keyof FormState, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleFileChange = (
-    index: number,
-    field: keyof FileItem,
-    value: string
-  ) => {
-    const newFiles = [...formData.file_thiet_ke];
-    if (!newFiles[index]) return;
-    newFiles[index] = { ...newFiles[index], [field]: value };
-    setFormData((prev) => ({ ...prev, file_thiet_ke: newFiles }));
-  };
-
-  const addFileRow = () => {
-    setFormData((prev) => ({
-      ...prev,
-      file_thiet_ke: [...prev.file_thiet_ke, { ten: "", url: "" }],
-    }));
-  };
-
-  const removeFileRow = (index: number) => {
-    const newFiles = [...formData.file_thiet_ke];
-    newFiles.splice(index, 1);
-    setFormData((prev) => ({ ...prev, file_thiet_ke: newFiles }));
-  };
-
-  const handleSubmit = async () => {
-    // 1. Validate thông tin chung
-    if (!formData.mo_ta?.trim()) {
-      alert("Vui lòng nhập Tên mẫu thiết kế!");
-      return;
-    }
-    if (!formData.phan_loai) {
-      alert("Vui lòng chọn Phân loại!");
-      return;
-    }
-
-    // 2. Validate file
-    const validFiles = formData.file_thiet_ke.filter(
-      (f) => f.ten.trim() !== "" || f.url.trim() !== ""
-    );
-    const hasError = validFiles.some(
-      (f) => f.ten.trim() === "" || f.url.trim() === ""
-    );
-
-    if (hasError) {
-      alert(
-        "Vui lòng nhập đầy đủ TÊN HIỂN THỊ và ĐƯỜNG DẪN cho file thiết kế!"
-      );
-      return;
-    }
-
-    // 3. Submit (GỬI MẢNG TRỰC TIẾP - Backend sẽ tự lo Stringify)
-    // 🟢 SỬA: Không JSON.stringify ở đây nữa
-    const finalData = {
-      ...formData,
-      file_thiet_ke: validFiles,
-    };
-
-    await onSubmit(finalData);
-  };
-
-  return (
-    <KhungForm
-      onClose={onClose}
-      title={data ? "SỬA MẪU" : "THÊM MẪU MỚI"}
-      onSubmit={handleSubmit}
-      loading={loading}
-      isDirty={true}
-      showAvatarUpload={true}
-      uploadBucket="images"
-      avatar={formData.hinh_anh}
-      onUploadComplete={(url) => handleChange("hinh_anh", url)}
-    >
-      <div className="space-y-4">
-        {/* Tên mẫu */}
-        <div>
-          <label className="text-xs font-bold text-white/60 mb-2 block uppercase">
-            Tên mẫu thiết kế <span className="text-red-500">*</span>
-          </label>
-          <input
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-[#C69C6D] outline-none placeholder-white/20"
-            value={formData.mo_ta || ""}
-            onChange={(e) => handleChange("mo_ta", e.target.value)}
-            placeholder="Nhập tên mẫu..."
-          />
-        </div>
-
-        {/* Phân loại */}
-        <div>
-          <label className="text-xs font-bold text-white/60 mb-2 block uppercase">
-            Phân loại <span className="text-red-500">*</span>
-          </label>
-          <div className="relative">
-            <select
-              className="w-full bg-[#1a1a1a] text-white border border-white/10 rounded-lg px-4 py-3 focus:border-[#C69C6D] outline-none appearance-none"
-              value={formData.phan_loai || ""}
-              onChange={(e) => handleChange("phan_loai", e.target.value)}
-            >
-              <option value="" className="bg-[#1a1a1a] text-gray-500">
-                -- Chọn loại --
-              </option>
-              {config.fields
-                .find((f) => f.key === "phan_loai")
-                ?.options?.map((opt: any) => (
-                  <option
-                    key={opt}
-                    value={opt}
-                    className="bg-[#1a1a1a] text-white py-2"
-                  >
-                    {opt}
-                  </option>
-                ))}
-            </select>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-white/50 text-xs">
-              ▼
-            </div>
-          </div>
-        </div>
-
-        {/* File Thiết Kế */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-xs font-bold text-white/60 uppercase">
-              File Thiết Kế (Google Drive)
-            </label>
-            <button
-              type="button"
-              onClick={addFileRow}
-              className="flex items-center gap-1 text-[10px] bg-[#C69C6D]/20 text-[#C69C6D] hover:bg-[#C69C6D] hover:text-black px-2 py-1 rounded transition-all font-bold"
-            >
-              <Plus size={12} /> THÊM FILE
-            </button>
-          </div>
-
-          <div className="space-y-2">
-            {formData.file_thiet_ke.map((file, idx) => (
-              <div key={idx} className="flex gap-2 items-start">
-                {/* Tên */}
-                <div className="w-1/3 relative group">
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30">
-                    <Type size={14} />
-                  </div>
-                  <input
-                    className={`w-full bg-white/5 border rounded-lg pl-9 pr-3 py-2.5 text-white text-xs outline-none placeholder-white/20 transition-all ${
-                      file.ten.trim() === "" && file.url.trim() !== ""
-                        ? "border-red-500/50 focus:border-red-500"
-                        : "border-white/10 focus:border-[#C69C6D]"
-                    }`}
-                    placeholder="Tên hiển thị..."
-                    value={file.ten}
-                    onChange={(e) =>
-                      handleFileChange(idx, "ten", e.target.value)
-                    }
-                  />
-                </div>
-                {/* Link */}
-                <div className="flex-1 relative group">
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-[#C69C6D] transition-colors">
-                    <LinkIcon size={14} />
-                  </div>
-                  <input
-                    className={`
-                        w-full bg-white/5 border rounded-lg pl-9 pr-4 py-2.5 text-white text-xs outline-none placeholder-white/20 transition-all
-                        ${
-                          file.url.trim() === "" && file.ten.trim() !== ""
-                            ? "border-red-500/50 focus:border-red-500"
-                            : "border-white/10 focus:border-[#C69C6D]"
-                        }
-                    `}
-                    value={file.url}
-                    onChange={(e) =>
-                      handleFileChange(idx, "url", e.target.value)
-                    }
-                    placeholder="Dán link Google Drive..."
-                  />
-                </div>
-                {/* Xóa */}
-                <button
-                  type="button"
-                  onClick={() => removeFileRow(idx)}
-                  className="p-2 text-white/20 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0 mt-[2px]"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))}
-
-            {formData.file_thiet_ke.length === 0 && (
-              <div
-                onClick={addFileRow}
-                className="text-[10px] text-white/20 italic text-center py-3 border border-dashed border-white/10 rounded-lg cursor-pointer hover:border-white/30 transition-colors"
-              >
-                Chưa có file nào. Nhấn để thêm.
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </KhungForm>
-  );
-}
-</file>
-
-<file path="app/components/cacchucnang/viecmau/MauThietKeList.tsx">
-"use client";
-
-import React from "react";
-import { Palette, User, Link as LinkIcon } from "lucide-react";
-import { MauThietKe } from "./config";
-
-interface Props {
-  items: MauThietKe[];
-  bulkMode: boolean;
-  selectedIds: Set<string>;
-  onToggleSelect: (id: string) => void;
-  onClickItem: (item: MauThietKe) => void;
-}
-
-export default function MauThietKeList({
-  items,
-  bulkMode,
-  selectedIds,
-  onToggleSelect,
-  onClickItem,
-}: Props) {
-  // Helper: Đếm số lượng file thiết kế
-  const getFileCount = (item: MauThietKe) => {
-    const files = item.file_thiet_ke;
-    if (Array.isArray(files))
-      return files.filter((f) => f && f.trim() !== "").length;
-    if (typeof files === "string") {
-      try {
-        const parsed = JSON.parse(files);
-        return Array.isArray(parsed)
-          ? parsed.filter((f: any) => f && f.trim() !== "").length
-          : 0;
-      } catch {
-        return 0;
-      }
-    }
-    return 0;
-  };
-
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 p-2 md:p-4">
-      {items.map((item) => {
-        const fileCount = getFileCount(item);
-
-        return (
-          <div
-            key={item.id}
-            onClick={(e) => {
-              if (bulkMode) {
-                e.stopPropagation();
-                onToggleSelect(item.id);
-              } else {
-                onClickItem(item);
-              }
-            }}
-            className={`
-                group relative bg-[#0f0f0f] border border-white/10 rounded-lg overflow-hidden cursor-pointer 
-                hover:border-[#C69C6D]/50 transition-all 
-                ${
-                  selectedIds.has(item.id)
-                    ? "border-[#C69C6D] bg-[#C69C6D]/10"
-                    : ""
-                }
-            `}
-          >
-            {/* 🟢 HIỂN THỊ SỐ LƯỢNG FILE THIẾT KẾ (Badge) */}
-            {fileCount > 0 && (
-              <div className="absolute top-1 left-1 z-10 flex items-center gap-1 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded text-[9px] font-bold text-[#C69C6D] border border-white/10 shadow-sm">
-                <LinkIcon size={10} />
-                <span>{fileCount}</span>
-              </div>
-            )}
-
-            {/* Checkbox Bulk Mode */}
-            {bulkMode && (
-              <div className="absolute top-1 right-1 z-10 w-5 h-5 border-2 rounded flex items-center justify-center transition-colors border-white/30 bg-black/50">
-                {selectedIds.has(item.id) && (
-                  <span className="text-[#C69C6D] font-bold text-xs">✓</span>
-                )}
-              </div>
-            )}
-
-            {/* Hình ảnh */}
-            <div className="aspect-square w-full bg-[#1a1a1a] relative group-hover:opacity-90 transition-opacity">
-              {item.hinh_anh ? (
-                <img
-                  src={item.hinh_anh}
-                  alt=""
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-white/10">
-                  <Palette size={24} />
-                </div>
-              )}
-            </div>
-
-            {/* Nội dung (Đã căn giữa) */}
-            <div className="p-2 text-center">
-              <h3 className="font-bold text-white truncate text-xs leading-tight">
-                {item.mo_ta}
-              </h3>
-              <p className="text-[9px] text-[#C69C6D] mt-0.5 truncate uppercase opacity-80">
-                {item.phan_loai}
-              </p>
-              <div className="mt-1 flex items-center justify-center gap-1 text-[9px] text-white/30 truncate">
-                <User size={8} />
-                <span className="truncate">{item.ten_nguoi_tao || "---"}</span>
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-</file>
-
 <file path="app/components/ConfirmDialog.tsx">
 'use client';
 
@@ -4420,58 +3158,44 @@ export default function ConfirmDialog({
 }
 </file>
 
-<file path="app/components/ErrorBoundary.tsx">
-'use client';
-import React, { ReactNode } from 'react';
-import { AlertCircle } from 'lucide-react';
+<file path="app/components/IOSInstallGuide.tsx">
+"use client";
+import { useState, useEffect } from "react";
+import { X, Share, PlusSquare } from "lucide-react"; // Hoặc dùng icon svg nào ông có
 
-interface Props {
-  children: ReactNode;
-  fallback?: ReactNode;
-}
+export default function IOSInstallGuide({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  if (!isOpen) return null;
 
-interface State {
-  hasError: boolean;
-  error?: Error;
-}
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center">
+      <div className="w-full max-w-md bg-zinc-900 p-6 rounded-t-2xl sm:rounded-2xl border border-zinc-800 shadow-2xl animate-in slide-in-from-bottom duration-300">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-bold text-white">Cài đặt ứng dụng</h3>
+          <button onClick={onClose} className="p-1 text-zinc-400 hover:text-white">
+            <X size={24} />
+          </button>
+        </div>
+        
+        <div className="space-y-4 text-zinc-300">
+          <p>Để cài đặt ứng dụng lên màn hình chính iPhone/iPad:</p>
+          
+          <div className="flex items-center gap-3 p-3 bg-zinc-800/50 rounded-lg">
+            <Share className="text-blue-500" />
+            <span>1. Bấm vào nút <strong>Chia sẻ</strong> ở thanh dưới cùng.</span>
+          </div>
 
-export default class ErrorBoundary extends React.Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('ErrorBoundary caught:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return this.props.fallback || (
-        <div className="flex items-center justify-center min-h-[100dvh] bg-red-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
-            <div className="flex items-center gap-3 mb-4">
-              <AlertCircle className="text-red-600" size={24} />
-              <h2 className="text-lg font-bold text-red-600">Có Lỗi Xảy Ra</h2>
-            </div>
-            <p className="text-gray-700 mb-4">Ứng dụng gặp sự cố. Vui lòng refresh trang hoặc liên hệ hỗ trợ.</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Reload
-            </button>
+          <div className="flex items-center gap-3 p-3 bg-zinc-800/50 rounded-lg">
+            <PlusSquare className="text-white" />
+            <span>2. Chọn dòng <strong>Thêm vào MH chính</strong> (Add to Home Screen).</span>
           </div>
         </div>
-      );
-    }
-
-    return this.props.children;
-  }
+        
+        <div className="mt-6 text-center text-sm text-zinc-500">
+          Bấm xong nó sẽ hiện icon app ở màn hình chính như app thật.
+        </div>
+      </div>
+    </div>
+  );
 }
 </file>
 
@@ -4745,50 +3469,37 @@ export class AuthService {
 </file>
 
 <file path="app/CongDangNhap/middleware.ts">
-import { createServerClient } from '@supabase/ssr';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { getRedirectUrl, isRouteAllowed } from './RoleRedirectService';
 
-// Route công khai
-const PUBLIC_ROUTES = [
-  '/', 
-  '/trangchu', 
-  '/dathang', 
-  '/CongDangNhap',
-  '/auth/callback',
-  '/login'
-];
+const PUBLIC_ROUTES = ['/trangchu', '/CongDangNhap', '/auth/callback', '/login', '/dathang'];
+const ROOT_PATH = '/';
 
-// Route tĩnh
-const STATIC_PATHS = [
-  '/_next', '/api', '/static', '/favicon.ico', '/manifest.json', 
-  '.png', '.jpg', '.jpeg', '.svg', '.css', '.js', '.mp3'
-];
+const isStaticPath = (path: string): boolean => {
+  return path.startsWith('/_next/') || path.startsWith('/api/') || path.includes('.');
+};
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
-  // 1. Bỏ qua file tĩnh
-  if (STATIC_PATHS.some(p => path.startsWith(p) || path.endsWith(p))) {
+  if (isStaticPath(path)) {
     return NextResponse.next();
   }
 
-  let response = NextResponse.next({
-    request: { headers: request.headers },
-  });
-
-  // Setup Supabase
+  let response = NextResponse.next({ request: { headers: request.headers } });
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) { return request.cookies.get(name)?.value; },
-        set(name: string, value: string, options: any) {
+        get: (name: string) => request.cookies.get(name)?.value,
+        set: (name: string, value: string, options: CookieOptions) => {
           request.cookies.set({ name, value, ...options });
           response = NextResponse.next({ request: { headers: request.headers } });
           response.cookies.set({ name, value, ...options });
         },
-        remove(name: string, options: any) {
+        remove: (name: string, options: CookieOptions) => {
           request.cookies.set({ name, value: '', ...options });
           response = NextResponse.next({ request: { headers: request.headers } });
           response.cookies.set({ name, value: '', ...options });
@@ -4797,112 +3508,53 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // 2. Lấy User
   const { data: { user } } = await supabase.auth.getUser();
 
   // A. CHƯA ĐĂNG NHẬP
   if (!user) {
-    if (!PUBLIC_ROUTES.includes(path)) {
-      return NextResponse.redirect(new URL('/?login=1', request.url));
+    if (PUBLIC_ROUTES.includes(path) || path === ROOT_PATH) {
+      return response; // Cho phép truy cập các trang công khai
     }
-    return response;
+    return NextResponse.redirect(new URL('/CongDangNhap', request.url)); // Chuyển về trang đăng nhập
   }
 
   // B. ĐÃ ĐĂNG NHẬP
-  const email = user.email;
-  if (!email) return response;
-
-  // 3. Xác định Role
-  let userType = '';
-  let roleNormalized = '';
-
-  const { data: nhanSu } = await supabase
-    .from('nhan_su')
-    .select('vi_tri_normalized')
-    .eq('email', email)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('user_type, role_normalized')
+    .eq('id', user.id)
     .single();
 
-  if (nhanSu) {
-    userType = 'nhan_su';
-    roleNormalized = nhanSu.vi_tri_normalized || 'parttime';
-  } else {
-    const { data: khachHang } = await supabase
-      .from('khach_hang')
-      .select('phan_loai_normalized')
-      .eq('email', email)
-      .single();
-
-    if (khachHang) {
-      userType = 'khach_hang';
-      roleNormalized = khachHang.phan_loai_normalized || 'moi';
-    } else {
-      // User rác -> Logout
-      await supabase.auth.signOut();
-      return NextResponse.redirect(new URL('/', request.url));
-    }
+  if (!profile) {
+    await supabase.auth.signOut();
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
-  // 4. Kiểm tra quyền (Có Fallback)
-  if (roleNormalized === 'admin' || roleNormalized === 'boss') {
-    return response; 
+  const { user_type, role_normalized } = profile;
+
+  // 1. LẤY URL ĐIỂM ĐẾN CHUẨN
+  const destinationUrl = await getRedirectUrl(user_type, role_normalized);
+  const absoluteDestinationUrl = new URL(destinationUrl, request.url);
+
+  // 2. NẾU ĐANG Ở TRANG CÔNG KHAI (SAU KHI ĐĂNG NHẬP) -> ĐIỀU HƯỚNG VỀ PHÒNG CHUẨN
+  if (PUBLIC_ROUTES.includes(path) || path === ROOT_PATH) {
+    return NextResponse.redirect(absoluteDestinationUrl);
   }
 
-  // Thử đọc DB
-  const { data: permission } = await supabase
-    .from('routing_permissions')
-    .select('allowed_routes, default_route')
-    .eq('user_type', userType)
-    .eq('role_normalized', roleNormalized)
-    .single();
+  // 3. NẾU CỐ GẮNG VÀO TRANG KHÁC -> KIỂM TRA QUYỀN
+  const allowed = await isRouteAllowed(user_type, role_normalized, path);
 
-  let allowedRoutes: string[] = [];
-  let defaultRoute = '/';
-
-  if (permission) {
-    // Có dữ liệu DB
-    defaultRoute = permission.default_route || '/';
-    if (Array.isArray(permission.allowed_routes)) {
-        allowedRoutes = permission.allowed_routes;
-    } else if (typeof permission.allowed_routes === 'string') {
-        try { allowedRoutes = JSON.parse(permission.allowed_routes); } catch {}
-    }
+  if (allowed) {
+    return response; // Cho phép đi tiếp
   } else {
-    // 🟢 DÙNG FALLBACK TRONG CODE (Quan trọng)
-    if (userType === 'nhan_su') {
-        defaultRoute = `/phong${roleNormalized}`; // VD: /phongparttime
-        allowedRoutes = [defaultRoute, '/dashboard'];
-        
-        // Fix đặc biệt cho trường hợp mapping không đều
-        if (roleNormalized === 'thosanxuat') defaultRoute = '/phongtho';
-        if (roleNormalized === 'congtacvien') defaultRoute = '/phongctv';
-        
-        allowedRoutes.push(defaultRoute);
-    } else {
-        allowedRoutes = ['/trangchu', '/dathang'];
-        defaultRoute = '/trangchu';
-    }
-  }
-
-  // Logic chặn đường
-  const isAllowed = PUBLIC_ROUTES.includes(path) || allowedRoutes.some(route => {
-    return path === route || path.startsWith(`${route}/`);
-  });
-
-  if (isAllowed) {
-    return response;
-  } else {
-    // Redirect về phòng chuẩn
-    if (path === defaultRoute) {
-        // Tránh loop nếu defaultRoute cũng lỗi
-        return NextResponse.redirect(new URL(userType === 'nhan_su' ? '/phongparttime' : '/', request.url));
-    }
-    return NextResponse.redirect(new URL(defaultRoute, request.url));
+    // Nếu không được phép, trả về phòng chuẩn của họ
+    return NextResponse.redirect(absoluteDestinationUrl);
   }
 }
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|sounds/|icons/).*)',
   ],
 };
 </file>
@@ -4945,127 +3597,6 @@ export const Z_INDEX = {
 
 // Export type for TypeScript strict checks
 export type ZIndexKey = keyof typeof Z_INDEX;
-</file>
-
-<file path="app/dashboard/admin/page.tsx">
-'use client';
-
-import React from 'react';
-import { useRouter } from 'next/navigation';
-import { useUser } from '@/app/ThuVien/UserContext';
-import { BarChart3, Users, Settings, AlertCircle } from 'lucide-react';
-
-/**
- * 📊 ADMIN DASHBOARD
- * Route: /dashboard/admin
- */
-export default function AdminDashboardPage() {
-  const router = useRouter();
-  const { user, loading } = useUser();
-
-  // Loading state
-  if (loading) {
-    return (
-      <div className="min-h-[100dvh] bg-[#050505] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C69C6D] mx-auto mb-4" />
-          <p className="text-gray-400">Đang tải...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // No user - redirect
-  if (!user) {
-    router.push('/');
-    return null;
-  }
-
-  return (
-    <div className="min-h-[100dvh] bg-[#050505] p-4 md:p-8">
-      {/* HEADER */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-[#C69C6D] mb-2">📊 Admin Dashboard</h1>
-        <p className="text-white/70">
-          Chào {user.ho_ten} ({user.userType === 'nhan_su' ? user.vi_tri_normalized : user.phan_loai_normalized})
-        </p>
-      </div>
-
-      {/* STATS GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard icon={Users} title="Users" value="1,234" color="blue" />
-        <StatCard icon={BarChart3} title="Analytics" value="85%" color="green" />
-        <StatCard icon={Settings} title="Products" value="567" color="purple" />
-        <StatCard icon={AlertCircle} title="Alerts" value="42" color="red" />
-      </div>
-
-      {/* SECTIONS */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-[#1a120f] border border-[#8B5E3C]/30 rounded-lg p-6">
-          <h2 className="text-xl font-bold text-[#C69C6D] mb-4 flex items-center gap-2">
-            <Users size={20} /> User Management
-          </h2>
-          <p className="text-white/70 mb-4">Manage system users and roles</p>
-          <button className="px-4 py-2 bg-[#C69C6D] text-black rounded font-bold hover:bg-white transition-all">
-            Manage Users
-          </button>
-        </div>
-
-        <div className="bg-[#1a120f] border border-[#8B5E3C]/30 rounded-lg p-6">
-          <h2 className="text-xl font-bold text-[#C69C6D] mb-4 flex items-center gap-2">
-            <Settings size={20} /> System Settings
-          </h2>
-          <p className="text-white/70 mb-4">Configure system settings</p>
-          <button className="px-4 py-2 bg-[#C69C6D] text-black rounded font-bold hover:bg-white transition-all">
-            Settings
-          </button>
-        </div>
-
-        <div className="bg-[#1a120f] border border-[#8B5E3C]/30 rounded-lg p-6">
-          <h2 className="text-xl font-bold text-[#C69C6D] mb-4 flex items-center gap-2">
-            <BarChart3 size={20} /> Analytics
-          </h2>
-          <p className="text-white/70 mb-4">View detailed analytics</p>
-          <button className="px-4 py-2 bg-[#C69C6D] text-black rounded font-bold hover:bg-white transition-all">
-            View Analytics
-          </button>
-        </div>
-
-        <div className="bg-[#1a120f] border border-[#8B5E3C]/30 rounded-lg p-6">
-          <h2 className="text-xl font-bold text-[#C69C6D] mb-4">Content Management</h2>
-          <p className="text-white/70 mb-4">Manage website content</p>
-          <button className="px-4 py-2 bg-[#C69C6D] text-black rounded font-bold hover:bg-white transition-all">
-            Manage Content
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-interface StatCardProps {
-  icon: React.ElementType;
-  title: string;
-  value: string;
-  color: string;
-}
-
-function StatCard({ icon: Icon, title, value, color }: StatCardProps) {
-  const colorClasses: Record<string, string> = {
-    blue: 'text-blue-400 bg-blue-900/20 border-blue-500',
-    green: 'text-green-400 bg-green-900/20 border-green-500',
-    purple: 'text-purple-400 bg-purple-900/20 border-purple-500',
-    red: 'text-red-400 bg-red-900/20 border-red-500',
-  };
-
-  return (
-    <div className={`${colorClasses[color]} border rounded-lg p-6`}>
-      <Icon size={24} />
-      <p className="text-white/70 text-sm mt-2">{title}</p>
-      <p className="text-2xl font-bold mt-2">{value}</p>
-    </div>
-  );
-}
 </file>
 
 <file path="app/DuLieuBackend.md">
@@ -6335,676 +4866,6 @@ export default function GiaoDienChiTiet({ nguoiDung }: Props) {
 }
 </file>
 
-<file path="app/GiaoDienTong/MenuTren/NutCaNhan/ModalProfile.tsx">
-'use client';
-import React, { useState, useEffect, ReactNode } from 'react';
-import { 
-  X, User, Package, Phone, Mail, MapPin, CreditCard, 
-  ChevronRight, LogOut, ChevronLeft, Settings, Trophy,
-  Globe, Moon, Sun, Palette, Check
-} from 'lucide-react';
-import { OrderService, Order } from '@/app/ThuVien/OrderService';
-import { Z_INDEX } from '@/app/constants/zIndex';
-import { LoggerService } from '@/app/ThuVien/LoggerService';
-import { xuLyDangXuat } from './ChucNang';
-import { useAppSettings, ThemeMode, LanguageCode } from '@/app/ThuVien/AppSettingsContext';
-
-// Inline ConfirmDialog component
-interface ConfirmDialogProps {
-  isOpen: boolean;
-  title: string;
-  message: string;
-  icon?: ReactNode;
-  confirmText?: string;
-  cancelText?: string;
-  isDangerous?: boolean;
-  isLoading?: boolean;
-  onConfirm: () => void;
-  onCancel: () => void;
-}
-
-function ConfirmDialog({
-  isOpen,
-  title,
-  message,
-  icon,
-  confirmText = 'Xác nhận',
-  cancelText = 'Hủy',
-  isDangerous = false,
-  isLoading = false,
-  onConfirm,
-  onCancel
-}: ConfirmDialogProps) {
-  if (!isOpen) return null;
-  
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
-        <div className="flex items-center gap-3 mb-4">
-          {icon && <div>{icon}</div>}
-          <h3 className="text-lg font-semibold text-white">{title}</h3>
-        </div>
-        <p className="text-white/70 mb-6">{message}</p>
-        <div className="flex gap-3 justify-end">
-          <button
-            onClick={onCancel}
-            disabled={isLoading}
-            className="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 disabled:opacity-50"
-          >
-            {cancelText}
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={isLoading}
-            className={`px-4 py-2 rounded-lg text-white ${
-              isDangerous ? 'bg-red-600 hover:bg-red-700' : 'bg-[#C69C6D] hover:bg-[#C69C6D]/80'
-            } disabled:opacity-50`}
-          >
-            {isLoading ? 'Đang xử lý...' : confirmText}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-interface ModalProfileProps {
-  isOpen: boolean;
-  onClose: () => void;
-  nguoiDung: any;
-}
-
-// Các màn hình
-type ScreenType = 
-  | 'main'           // Màn chính: Cài Đặt, Hồ Sơ Của Tôi
-  | 'caidat'         // Cài Đặt: Ngôn Ngữ, Giao Diện
-  | 'hosocuatoi'     // Hồ Sơ: Thông Tin, Thành Tích/Đơn Hàng
-  | 'thongtincanhan' // Chi tiết thông tin cá nhân
-  | 'thanhtich'      // Thành tích (nhan_su)
-  | 'donhang'        // Đơn hàng (khach_hang)
-  | 'ngonngu'        // Chọn ngôn ngữ
-  | 'giaodien';      // Chọn giao diện
-
-export default function ModalProfile({ isOpen, onClose, nguoiDung }: ModalProfileProps) {
-  const [currentScreen, setCurrentScreen] = useState<ScreenType>('main');
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [isLoadingOrders, setIsLoadingOrders] = useState(false);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  
-  // 🌐 Hook settings cho theme + language
-  const { t, language } = useAppSettings();
-  
-  // Xác định loại user
-  const isNhanSu = nguoiDung?.userType === 'nhan_su' || nguoiDung?.vi_tri;
-  const isKhachHang = nguoiDung?.userType === 'khach_hang' || nguoiDung?.phan_loai;
-
-  // Reset về màn chính khi mở lại
-  useEffect(() => {
-    if (isOpen) {
-      setCurrentScreen('main');
-    }
-  }, [isOpen]);
-
-  // Load orders khi vào màn đơn hàng
-  useEffect(() => {
-    if (isOpen && currentScreen === 'donhang') {
-      loadOrders();
-    }
-  }, [isOpen, currentScreen]);
-
-  // ✅ ESC KEY HANDLING - Close modal on ESC press
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-      }
-    };
-
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
-
-  const loadOrders = async () => {
-    setIsLoadingOrders(true);
-    try {
-      const { orders: data } = await OrderService.getMyOrders(20);
-      setOrders(data);
-    } catch (error) {
-      LoggerService.error('ModalProfile', 'Error loading orders', error);
-    } finally {
-      setIsLoadingOrders(false);
-    }
-  };
-
-  const handleLogoutConfirm = async () => {
-    setIsLoggingOut(true);
-    try {
-      await xuLyDangXuat();
-    } catch (error) {
-      LoggerService.error('ModalProfile', 'Logout error', error);
-      setIsLoggingOut(false);
-      setShowLogoutConfirm(false);
-    }
-  };
-
-  // Xử lý nút back - quay về màn cha
-  const handleBack = () => {
-    switch (currentScreen) {
-      case 'ngonngu':
-      case 'giaodien':
-        setCurrentScreen('caidat');
-        break;
-      case 'thongtincanhan':
-      case 'thanhtich':
-      case 'donhang':
-        setCurrentScreen('hosocuatoi');
-        break;
-      default:
-        setCurrentScreen('main');
-    }
-  };
-
-  // Lấy tiêu đề màn hình
-  const getScreenTitle = () => {
-    switch (currentScreen) {
-      case 'caidat': return t('profile.settings');
-      case 'hosocuatoi': return t('profile.myProfile');
-      case 'thongtincanhan': return t('profile.personalInfo');
-      case 'thanhtich': return t('profile.achievements');
-      case 'donhang': return t('profile.orders');
-      case 'ngonngu': return t('settings.language');
-      case 'giaodien': return t('settings.theme');
-      default: return t('profile.title');
-    }
-  };
-
-  if (!isOpen) return null;
-
-  // =====================================================
-  // MÀN HÌNH CON (không phải main)
-  // =====================================================
-  if (currentScreen !== 'main') {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center sm:items-start sm:justify-end" style={{ zIndex: Z_INDEX.modal }}>
-        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative w-full h-full sm:h-[100dvh] sm:max-w-md bg-gradient-to-br from-[#0A0A0A] to-[#1A1A1A] border-l border-white/20 shadow-2xl flex flex-col overflow-hidden">
-          
-          {/* Header màn con */}
-          <div className="flex-shrink-0 px-4 py-4 border-b border-white/10 bg-black/40 backdrop-blur-md">
-            <div className="flex items-center gap-3">
-              <button onClick={handleBack} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
-                <ChevronLeft size={24} className="text-white" />
-              </button>
-              <h2 className="text-lg font-bold text-white">{getScreenTitle()}</h2>
-            </div>
-          </div>
-
-          {/* Content màn con */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {currentScreen === 'caidat' && (
-              <ScreenCaiDat 
-                onGoToNgonNgu={() => setCurrentScreen('ngonngu')}
-                onGoToGiaoDien={() => setCurrentScreen('giaodien')}
-              />
-            )}
-            {currentScreen === 'hosocuatoi' && (
-              <ScreenHoSoCuaToi 
-                isNhanSu={isNhanSu}
-                isKhachHang={isKhachHang}
-                onGoToThongTin={() => setCurrentScreen('thongtincanhan')}
-                onGoToThanhTich={() => setCurrentScreen('thanhtich')}
-                onGoToDonHang={() => setCurrentScreen('donhang')}
-              />
-            )}
-            {currentScreen === 'thongtincanhan' && <ScreenThongTinCaNhan nguoiDung={nguoiDung} />}
-            {currentScreen === 'thanhtich' && <ScreenThanhTich nguoiDung={nguoiDung} />}
-            {currentScreen === 'donhang' && <ScreenDonHang orders={orders} isLoading={isLoadingOrders} onReload={loadOrders} />}
-            {currentScreen === 'ngonngu' && <ScreenNgonNgu />}
-            {currentScreen === 'giaodien' && <ScreenGiaoDien />}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // =====================================================
-  // MÀN HÌNH CHÍNH
-  // =====================================================
-  return (
-    <div className="fixed inset-0 flex items-center justify-center sm:items-start sm:justify-end" style={{ zIndex: Z_INDEX.modal }}>
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-
-      <div className="relative w-full h-full sm:h-[100dvh] sm:max-w-md bg-gradient-to-br from-[#0A0A0A] to-[#1A1A1A] border-l border-white/20 shadow-2xl flex flex-col overflow-hidden">
-        
-        {/* Header - Avatar & Tên */}
-        <div className="flex-shrink-0 px-6 py-6 border-b border-white/10 bg-black/40 backdrop-blur-md">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#C69C6D] to-[#F2D3A0] flex items-center justify-center text-black font-bold text-xl">
-                {nguoiDung?.ho_ten?.[0]?.toUpperCase() || nguoiDung?.email?.[0]?.toUpperCase() || 'U'}
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-white">
-                  {nguoiDung?.ho_ten || (language === 'vi' ? 'Người dùng' : 'User')}
-                </h2>
-                <p className="text-white/60 text-sm">{nguoiDung?.email}</p>
-              </div>
-            </div>
-            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white">
-              <X size={24} />
-            </button>
-          </div>
-
-          {/* Nút Đăng xuất */}
-          <button
-            onClick={() => setShowLogoutConfirm(true)}
-            disabled={isLoggingOut}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white/5 border border-white/10 text-white rounded-lg font-medium text-sm transition-all hover:bg-white/10"
-          >
-            <LogOut size={18} />
-            <span>{isLoggingOut ? t('auth.loggingOut') : t('auth.logout')}</span>
-          </button>
-        </div>
-
-        {/* Content - 2 mục chính */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          
-          {/* KHỐI MENU CHÍNH */}
-          <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-            <KhoiMenuChon 
-              icon={<Settings size={20} className="text-[#C69C6D]" />}
-              label={t('profile.settings')}
-              subtitle={t('profile.settingsDesc')}
-              onClick={() => setCurrentScreen('caidat')}
-            />
-            <KhoiMenuChon 
-              icon={<User size={20} className="text-[#C69C6D]" />}
-              label={t('profile.myProfile')}
-              subtitle={isNhanSu ? t('profile.myProfileDescStaff') : t('profile.myProfileDescCustomer')}
-              onClick={() => setCurrentScreen('hosocuatoi')}
-              isLast
-            />
-          </div>
-
-        </div>
-      </div>
-
-      {/* Logout Confirmation Dialog */}
-      <ConfirmDialog
-        isOpen={showLogoutConfirm}
-        title={t('auth.logout')}
-        message={t('auth.logoutConfirm')}
-        icon={<LogOut className="text-[#C69C6D]" size={24} />}
-        confirmText={t('auth.logout')}
-        cancelText={t('app.cancel')}
-        isDangerous={false}
-        isLoading={isLoggingOut}
-        onConfirm={handleLogoutConfirm}
-        onCancel={() => !isLoggingOut && setShowLogoutConfirm(false)}
-      />
-    </div>
-  );
-}
-
-// =====================================================
-// COMPONENT: KHỐI MENU CHỌN
-// =====================================================
-function KhoiMenuChon({ 
-  icon, 
-  label, 
-  subtitle,
-  onClick, 
-  isLast = false 
-}: { 
-  icon: ReactNode; 
-  label: string; 
-  subtitle?: string;
-  onClick?: () => void; 
-  isLast?: boolean;
-}) {
-  return (
-    <button 
-      onClick={onClick}
-      className={`w-full px-4 py-4 flex items-center gap-3 hover:bg-white/5 transition-colors ${!isLast ? 'border-b border-white/5' : ''}`}
-    >
-      <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
-        {icon}
-      </div>
-      <div className="flex-1 text-left">
-        <p className="text-white font-medium">{label}</p>
-        {subtitle && <p className="text-white/50 text-sm">{subtitle}</p>}
-      </div>
-      {onClick && <ChevronRight size={20} className="text-white/30" />}
-    </button>
-  );
-}
-
-// =====================================================
-// MÀN HÌNH: CÀI ĐẶT
-// =====================================================
-function ScreenCaiDat({ 
-  onGoToNgonNgu, 
-  onGoToGiaoDien 
-}: { 
-  onGoToNgonNgu: () => void;
-  onGoToGiaoDien: () => void;
-}) {
-  const { language, theme, t } = useAppSettings();
-  
-  const languageDisplay = language === 'vi' ? 'Tiếng Việt' : 'English';
-  const themeDisplay = theme === 'dark' 
-    ? (language === 'vi' ? 'Tối' : 'Dark')
-    : (language === 'vi' ? 'Sáng' : 'Light');
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden">
-        <KhoiMenuChon 
-          icon={<Globe size={20} className="text-blue-400" />}
-          label={t('settings.language')}
-          subtitle={languageDisplay}
-          onClick={onGoToNgonNgu}
-        />
-        <KhoiMenuChon 
-          icon={<Palette size={20} className="text-purple-400" />}
-          label={t('settings.theme')}
-          subtitle={themeDisplay}
-          onClick={onGoToGiaoDien}
-          isLast
-        />
-      </div>
-    </div>
-  );
-}
-
-// =====================================================
-// MÀN HÌNH: HỒ SƠ CỦA TÔI
-// =====================================================
-function ScreenHoSoCuaToi({ 
-  isNhanSu,
-  isKhachHang,
-  onGoToThongTin, 
-  onGoToThanhTich,
-  onGoToDonHang
-}: { 
-  isNhanSu: boolean;
-  isKhachHang: boolean;
-  onGoToThongTin: () => void;
-  onGoToThanhTich: () => void;
-  onGoToDonHang: () => void;
-}) {
-  const { t } = useAppSettings();
-  
-  return (
-    <div className="space-y-4">
-      <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-        <KhoiMenuChon 
-          icon={<User size={20} className="text-[#C69C6D]" />}
-          label={t('profile.personalInfo')}
-          subtitle={t('profile.personalInfoDesc')}
-          onClick={onGoToThongTin}
-        />
-        
-        {/* Thành Tích - chỉ hiện cho nhân sự */}
-        {isNhanSu && (
-          <KhoiMenuChon 
-            icon={<Trophy size={20} className="text-yellow-400" />}
-            label={t('profile.achievements')}
-            subtitle={t('profile.achievementsDesc')}
-            onClick={onGoToThanhTich}
-          />
-        )}
-        
-        {/* Đơn Hàng - chỉ hiện cho khách hàng */}
-        {isKhachHang && (
-          <KhoiMenuChon 
-            icon={<Package size={20} className="text-green-400" />}
-            label={t('profile.orders')}
-            subtitle={t('profile.ordersDesc')}
-            onClick={onGoToDonHang}
-            isLast
-          />
-        )}
-        
-        {/* Nếu là nhân sự thì Thành Tích là last */}
-        {isNhanSu && !isKhachHang && (
-          <div className="hidden" /> // Placeholder để isLast hoạt động đúng
-        )}
-      </div>
-    </div>
-  );
-}
-
-// =====================================================
-// MÀN HÌNH: THÔNG TIN CÁ NHÂN
-// =====================================================
-function ScreenThongTinCaNhan({ nguoiDung }: { nguoiDung: any }) {
-  const { t } = useAppSettings();
-  
-  const fields = [
-    { icon: User, label: t('field.fullName'), value: nguoiDung?.ho_ten },
-    { icon: Mail, label: t('field.email'), value: nguoiDung?.email },
-    { icon: Phone, label: t('field.phone'), value: nguoiDung?.so_dien_thoai },
-    { icon: MapPin, label: t('field.address'), value: nguoiDung?.dia_chi },
-    { icon: CreditCard, label: t('field.idCard'), value: nguoiDung?.cccd },
-  ];
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-        {fields.map((field, idx) => {
-          const Icon = field.icon;
-          const isLast = idx === fields.length - 1;
-          return (
-            <div key={idx} className={`px-4 py-4 ${!isLast ? 'border-b border-white/5' : ''}`}>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
-                  <Icon size={20} className="text-[#C69C6D]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white/50 text-xs">{field.label}</p>
-                  <p className="text-white font-medium truncate">
-                    {field.value || <span className="text-white/30 italic">{t('field.notUpdated')}</span>}
-                  </p>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <button className="w-full py-4 bg-gradient-to-r from-[#C69C6D] to-[#F2D3A0] text-black rounded-2xl font-bold">
-        {t('profile.editInfo')}
-      </button>
-    </div>
-  );
-}
-
-// =====================================================
-// MÀN HÌNH: THÀNH TÍCH (nhan_su)
-// =====================================================
-function ScreenThanhTich({ nguoiDung }: { nguoiDung: any }) {
-  const { t } = useAppSettings();
-  
-  return (
-    <div className="space-y-4">
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-6 text-center">
-        <Trophy size={48} className="text-yellow-400 mx-auto mb-4" />
-        <h3 className="text-lg font-bold text-white mb-2">{t('achievements.title')}</h3>
-        <p className="text-white/60 text-sm">{t('achievements.developing')}</p>
-      </div>
-      
-      {/* Placeholder cho các thành tích */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-        <div className="px-4 py-4 border-b border-white/5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-yellow-500/20 flex items-center justify-center">
-              <Trophy size={20} className="text-yellow-400" />
-            </div>
-            <div className="flex-1">
-              <p className="text-white font-medium">{t('achievements.points')}</p>
-              <p className="text-white/50 text-sm">0</p>
-            </div>
-          </div>
-        </div>
-        <div className="px-4 py-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
-              <Trophy size={20} className="text-purple-400" />
-            </div>
-            <div className="flex-1">
-              <p className="text-white font-medium">{t('achievements.badges')}</p>
-              <p className="text-white/50 text-sm">{t('achievements.noBadges')}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// =====================================================
-// MÀN HÌNH: ĐƠN HÀNG (khach_hang)
-// =====================================================
-function ScreenDonHang({ orders, isLoading, onReload }: { orders: Order[]; isLoading: boolean; onReload: () => void }) {
-  const { t, language } = useAppSettings();
-  
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-12 h-12 border-4 border-[#C69C6D]/30 border-t-[#C69C6D] rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  if (orders.length === 0) {
-    return (
-      <div className="text-center py-20">
-        <Package size={48} className="text-white/20 mx-auto mb-4" />
-        <h3 className="text-lg font-bold text-white mb-2">{t('orders.empty')}</h3>
-        <p className="text-white/60 text-sm mb-4">{t('orders.emptyDesc')}</p>
-        <button onClick={onReload} className="px-4 py-2 bg-[#C69C6D] text-black rounded-lg font-medium">
-          {t('app.refresh')}
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {orders.map((order) => (
-        <div key={order.id} className="bg-white/5 border border-white/10 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[#C69C6D] font-bold">{order.ma_don}</span>
-            <span className="text-xs px-2 py-1 bg-white/10 rounded-full text-white/80">
-              {OrderService.formatStatus(order.trang_thai)}
-            </span>
-          </div>
-          <p className="text-white/60 text-sm">{new Date(order.tao_luc).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US')}</p>
-          <p className="text-white font-bold mt-2">{OrderService.formatMoney(order.tong_tien)}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// =====================================================
-// MÀN HÌNH: NGÔN NGỮ
-// =====================================================
-function ScreenNgonNgu() {
-  const { language, setLanguage, t } = useAppSettings();
-  
-  const languages: { code: LanguageCode; name: string; flag: string }[] = [
-    { code: 'vi', name: 'Tiếng Việt', flag: '🇻🇳' },
-    { code: 'en', name: 'English', flag: '🇺🇸' },
-  ];
-
-  const handleSelect = (code: LanguageCode) => {
-    setLanguage(code);
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden">
-        {languages.map((lang, idx) => (
-          <button
-            key={lang.code}
-            onClick={() => handleSelect(lang.code)}
-            className={`w-full px-4 py-4 flex items-center gap-3 hover:bg-[var(--hover-bg)] transition-colors ${idx < languages.length - 1 ? 'border-b border-[var(--border-light)]' : ''}`}
-          >
-            <span className="text-2xl">{lang.flag}</span>
-            <span className="flex-1 text-left text-[var(--text-primary)] font-medium">{lang.name}</span>
-            {language === lang.code && (
-              <div className="w-6 h-6 rounded-full bg-[var(--accent)] flex items-center justify-center">
-                <Check size={14} className="text-black" />
-              </div>
-            )}
-          </button>
-        ))}
-      </div>
-      
-      <p className="text-[var(--text-muted)] text-xs text-center">
-        {language === 'vi' ? 'Thay đổi ngôn ngữ sẽ được áp dụng ngay lập tức' : 'Language change will be applied immediately'}
-      </p>
-    </div>
-  );
-}
-
-// =====================================================
-// MÀN HÌNH: GIAO DIỆN
-// =====================================================
-function ScreenGiaoDien() {
-  const { theme, setTheme, t } = useAppSettings();
-  
-  const themes: { code: ThemeMode; name: string; icon: typeof Moon; desc: string }[] = [
-    { code: 'dark', name: t('settings.themeDark'), icon: Moon, desc: t('settings.themeDarkDesc') },
-    { code: 'light', name: t('settings.themeLight'), icon: Sun, desc: t('settings.themeLightDesc') },
-  ];
-
-  const handleSelect = (code: ThemeMode) => {
-    setTheme(code);
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden">
-        {themes.map((themeOption, idx) => {
-          const Icon = themeOption.icon;
-          return (
-            <button
-              key={themeOption.code}
-              onClick={() => handleSelect(themeOption.code)}
-              className={`w-full px-4 py-4 flex items-center gap-3 hover:bg-[var(--hover-bg)] transition-colors ${idx < themes.length - 1 ? 'border-b border-[var(--border-light)]' : ''}`}
-            >
-              <div className="w-10 h-10 rounded-xl bg-[var(--bg-card)] flex items-center justify-center">
-                <Icon size={20} className={themeOption.code === 'dark' ? 'text-purple-400' : 'text-yellow-400'} />
-              </div>
-              <div className="flex-1 text-left">
-                <p className="text-[var(--text-primary)] font-medium">{themeOption.name}</p>
-                <p className="text-[var(--text-secondary)] text-sm">{themeOption.desc}</p>
-              </div>
-              {theme === themeOption.code && (
-                <div className="w-6 h-6 rounded-full bg-[var(--accent)] flex items-center justify-center">
-                  <Check size={14} className="text-black" />
-                </div>
-              )}
-            </button>
-          );
-        })}
-      </div>
-      
-      <p className="text-[var(--text-muted)] text-xs text-center">
-        {t('settings.language') === 'Ngôn Ngữ' ? 'Thay đổi giao diện sẽ được áp dụng ngay lập tức' : 'Theme change will be applied immediately'}
-      </p>
-    </div>
-  );
-}
-</file>
-
 <file path="app/QueryProvider.tsx">
 'use client';
 
@@ -7977,6 +5838,54 @@ export interface FormExtensions {
 }
 </file>
 
+<file path=".gitignore">
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+node_modules
+.env
+.env.local
+.next
+</file>
+
 <file path="app/actions/QuyenHanAdmin.ts">
 'use server';
 
@@ -8910,6 +6819,76 @@ export {
 export { MauThietKeChucNang } from "./mauthietke";
 </file>
 
+<file path="app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan.tsx">
+"use client";
+
+import React, { ReactNode } from "react";
+import MenuTren from "@/app/GiaoDienTong/MenuTren/MenuTren";
+
+import { Z_INDEX } from "@/app/constants/zIndex";
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const BASE_IMG_URL = `${SUPABASE_URL}/storage/v1/object/public/hinh-nen`;
+
+interface Props {
+  children: ReactNode;
+  nguoiDung: any;
+  loiChao?: string;
+  contentClassName?: string;
+}
+
+export default function KhungTrangChuan({
+  children,
+  nguoiDung,
+  loiChao,
+  contentClassName = "max-w-[1920px] mx-auto p-3 pb-24 md:p-6 md:pb-24 pt-24",
+}: Props) {
+  const bgUrlMobile = `${BASE_IMG_URL}/trangchu-mobile.jpg`;
+  const bgUrlTablet = `${BASE_IMG_URL}/trangchu-tablet.jpg`;
+  const bgUrlDesktop = `${BASE_IMG_URL}/trangchu-desktop.jpg`;
+
+  const displayLoiChao = loiChao || `Xin chào, ${nguoiDung?.ho_ten || "User"}`;
+
+  return (
+    <div className="relative w-full min-h-[100dvh] bg-[#050505] text-[#F5F5F5] font-sans overflow-x-hidden selection:bg-[#C69C6D] selection:text-black text-[14px]">
+      {/* LAYER 0: HÌNH NỀN CHUẨN */}
+      <div className="fixed inset-0 w-full h-full z-0 pointer-events-none select-none bg-black">
+        <img
+          src={bgUrlMobile}
+          alt="BG"
+          className="absolute inset-0 w-full h-full object-cover md:hidden opacity-100"
+        />
+        <img
+          src={bgUrlTablet}
+          alt="BG"
+          className="absolute inset-0 w-full h-full object-cover hidden md:block lg:hidden opacity-100"
+        />
+        <img
+          src={bgUrlDesktop}
+          alt="BG"
+          className="absolute inset-0 w-full h-full object-cover hidden lg:block opacity-100"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/40" />
+      </div>
+
+      {/* LAYER 1: NỘI DUNG CHÍNH */}
+      <main
+        className={`relative z-[10] w-full min-h-[100dvh] flex flex-col ${contentClassName}`}
+      >
+        {children}
+      </main>
+
+      {/* LAYER 2: GRADIENT BẢO VỆ MENU */}
+      <div className="fixed top-0 left-0 right-0 h-28 bg-gradient-to-b from-black to-transparent z-[4900] pointer-events-none"></div>
+      <div className="fixed bottom-0 left-0 right-0 h-28 bg-gradient-to-t from-black to-transparent z-[4900] pointer-events-none"></div>
+
+      {/* LAYER 3: HỆ THỐNG MENU */}
+      <MenuTren nguoiDung={nguoiDung} loiChao={displayLoiChao} />
+    </div>
+  );
+}
+</file>
+
 <file path="app/components/cacchucnang/mauthietke/MauThietKeChucNang.tsx">
 "use client";
 
@@ -9757,6 +7736,61 @@ export default function MauThietKeForm({
 }
 </file>
 
+<file path="app/components/ErrorBoundary.tsx">
+'use client';
+import React, { ReactNode } from 'react';
+import { AlertCircle } from 'lucide-react';
+
+interface Props {
+  children: ReactNode;
+  fallback?: ReactNode;
+}
+
+interface State {
+  hasError: boolean;
+  error?: Error;
+}
+
+export default class ErrorBoundary extends React.Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('ErrorBoundary caught:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || (
+        <div className="flex items-center justify-center min-h-[100dvh] bg-red-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
+            <div className="flex items-center gap-3 mb-4">
+              <AlertCircle className="text-red-600" size={24} />
+              <h2 className="text-lg font-bold text-red-600">Có Lỗi Xảy Ra</h2>
+            </div>
+            <p className="text-gray-700 mb-4">Ứng dụng gặp sự cố. Vui lòng refresh trang hoặc liên hệ hỗ trợ.</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Reload
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+</file>
+
 <file path="app/components/StaffPresence.tsx">
 "use client";
 import { useEffect } from "react";
@@ -10168,6 +8202,127 @@ export const getModalIdFromPosition = RoleRedirectService.getModalIdFromPosition
 export const getModalDisplayName = RoleRedirectService.getModalDisplayName;
 </file>
 
+<file path="app/dashboard/admin/page.tsx">
+'use client';
+
+import React from 'react';
+import { useRouter } from 'next/navigation';
+import { useUser } from '@/app/ThuVien/UserContext';
+import { BarChart3, Users, Settings, AlertCircle } from 'lucide-react';
+
+/**
+ * 📊 ADMIN DASHBOARD
+ * Route: /dashboard/admin
+ */
+export default function AdminDashboardPage() {
+  const router = useRouter();
+  const { user, loading } = useUser();
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-[100dvh] bg-[#050505] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C69C6D] mx-auto mb-4" />
+          <p className="text-gray-400">Đang tải...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // No user - redirect
+  if (!user) {
+    router.push('/');
+    return null;
+  }
+
+  return (
+    <div className="min-h-[100dvh] bg-[#050505] p-4 md:p-8">
+      {/* HEADER */}
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold text-[#C69C6D] mb-2">📊 Admin Dashboard</h1>
+        <p className="text-white/70">
+          Chào {user.ho_ten} ({user.userType === 'nhan_su' ? user.vi_tri_normalized : user.phan_loai_normalized})
+        </p>
+      </div>
+
+      {/* STATS GRID */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <StatCard icon={Users} title="Users" value="1,234" color="blue" />
+        <StatCard icon={BarChart3} title="Analytics" value="85%" color="green" />
+        <StatCard icon={Settings} title="Products" value="567" color="purple" />
+        <StatCard icon={AlertCircle} title="Alerts" value="42" color="red" />
+      </div>
+
+      {/* SECTIONS */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-[#1a120f] border border-[#8B5E3C]/30 rounded-lg p-6">
+          <h2 className="text-xl font-bold text-[#C69C6D] mb-4 flex items-center gap-2">
+            <Users size={20} /> User Management
+          </h2>
+          <p className="text-white/70 mb-4">Manage system users and roles</p>
+          <button className="px-4 py-2 bg-[#C69C6D] text-black rounded font-bold hover:bg-white transition-all">
+            Manage Users
+          </button>
+        </div>
+
+        <div className="bg-[#1a120f] border border-[#8B5E3C]/30 rounded-lg p-6">
+          <h2 className="text-xl font-bold text-[#C69C6D] mb-4 flex items-center gap-2">
+            <Settings size={20} /> System Settings
+          </h2>
+          <p className="text-white/70 mb-4">Configure system settings</p>
+          <button className="px-4 py-2 bg-[#C69C6D] text-black rounded font-bold hover:bg-white transition-all">
+            Settings
+          </button>
+        </div>
+
+        <div className="bg-[#1a120f] border border-[#8B5E3C]/30 rounded-lg p-6">
+          <h2 className="text-xl font-bold text-[#C69C6D] mb-4 flex items-center gap-2">
+            <BarChart3 size={20} /> Analytics
+          </h2>
+          <p className="text-white/70 mb-4">View detailed analytics</p>
+          <button className="px-4 py-2 bg-[#C69C6D] text-black rounded font-bold hover:bg-white transition-all">
+            View Analytics
+          </button>
+        </div>
+
+        <div className="bg-[#1a120f] border border-[#8B5E3C]/30 rounded-lg p-6">
+          <h2 className="text-xl font-bold text-[#C69C6D] mb-4">Content Management</h2>
+          <p className="text-white/70 mb-4">Manage website content</p>
+          <button className="px-4 py-2 bg-[#C69C6D] text-black rounded font-bold hover:bg-white transition-all">
+            Manage Content
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface StatCardProps {
+  icon: React.ElementType;
+  title: string;
+  value: string;
+  color: string;
+}
+
+function StatCard({ icon: Icon, title, value, color }: StatCardProps) {
+  const colorClasses: Record<string, string> = {
+    blue: 'text-blue-400 bg-blue-900/20 border-blue-500',
+    green: 'text-green-400 bg-green-900/20 border-green-500',
+    purple: 'text-purple-400 bg-purple-900/20 border-purple-500',
+    red: 'text-red-400 bg-red-900/20 border-red-500',
+  };
+
+  return (
+    <div className={`${colorClasses[color]} border rounded-lg p-6`}>
+      <Icon size={24} />
+      <p className="text-white/70 text-sm mt-2">{title}</p>
+      <p className="text-2xl font-bold mt-2">{value}</p>
+    </div>
+  );
+}
+</file>
+
 <file path="app/dathang/page.tsx">
 'use client';
 
@@ -10434,6 +8589,676 @@ export class NotificationService {
       },
     };
   }
+}
+</file>
+
+<file path="app/GiaoDienTong/MenuTren/NutCaNhan/ModalProfile.tsx">
+'use client';
+import React, { useState, useEffect, ReactNode } from 'react';
+import { 
+  X, User, Package, Phone, Mail, MapPin, CreditCard, 
+  ChevronRight, LogOut, ChevronLeft, Settings, Trophy,
+  Globe, Moon, Sun, Palette, Check
+} from 'lucide-react';
+import { OrderService, Order } from '@/app/ThuVien/OrderService';
+import { Z_INDEX } from '@/app/constants/zIndex';
+import { LoggerService } from '@/app/ThuVien/LoggerService';
+import { xuLyDangXuat } from './ChucNang';
+import { useAppSettings, ThemeMode, LanguageCode } from '@/app/ThuVien/AppSettingsContext';
+
+// Inline ConfirmDialog component
+interface ConfirmDialogProps {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  icon?: ReactNode;
+  confirmText?: string;
+  cancelText?: string;
+  isDangerous?: boolean;
+  isLoading?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function ConfirmDialog({
+  isOpen,
+  title,
+  message,
+  icon,
+  confirmText = 'Xác nhận',
+  cancelText = 'Hủy',
+  isDangerous = false,
+  isLoading = false,
+  onConfirm,
+  onCancel
+}: ConfirmDialogProps) {
+  if (!isOpen) return null;
+  
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+        <div className="flex items-center gap-3 mb-4">
+          {icon && <div>{icon}</div>}
+          <h3 className="text-lg font-semibold text-white">{title}</h3>
+        </div>
+        <p className="text-white/70 mb-6">{message}</p>
+        <div className="flex gap-3 justify-end">
+          <button
+            onClick={onCancel}
+            disabled={isLoading}
+            className="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 disabled:opacity-50"
+          >
+            {cancelText}
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isLoading}
+            className={`px-4 py-2 rounded-lg text-white ${
+              isDangerous ? 'bg-red-600 hover:bg-red-700' : 'bg-[#C69C6D] hover:bg-[#C69C6D]/80'
+            } disabled:opacity-50`}
+          >
+            {isLoading ? 'Đang xử lý...' : confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ModalProfileProps {
+  isOpen: boolean;
+  onClose: () => void;
+  nguoiDung: any;
+}
+
+// Các màn hình
+type ScreenType = 
+  | 'main'           // Màn chính: Cài Đặt, Hồ Sơ Của Tôi
+  | 'caidat'         // Cài Đặt: Ngôn Ngữ, Giao Diện
+  | 'hosocuatoi'     // Hồ Sơ: Thông Tin, Thành Tích/Đơn Hàng
+  | 'thongtincanhan' // Chi tiết thông tin cá nhân
+  | 'thanhtich'      // Thành tích (nhan_su)
+  | 'donhang'        // Đơn hàng (khach_hang)
+  | 'ngonngu'        // Chọn ngôn ngữ
+  | 'giaodien';      // Chọn giao diện
+
+export default function ModalProfile({ isOpen, onClose, nguoiDung }: ModalProfileProps) {
+  const [currentScreen, setCurrentScreen] = useState<ScreenType>('main');
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  
+  // 🌐 Hook settings cho theme + language
+  const { t, language } = useAppSettings();
+  
+  // Xác định loại user
+  const isNhanSu = nguoiDung?.userType === 'nhan_su' || nguoiDung?.vi_tri;
+  const isKhachHang = nguoiDung?.userType === 'khach_hang' || nguoiDung?.phan_loai;
+
+  // Reset về màn chính khi mở lại
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentScreen('main');
+    }
+  }, [isOpen]);
+
+  // Load orders khi vào màn đơn hàng
+  useEffect(() => {
+    if (isOpen && currentScreen === 'donhang') {
+      loadOrders();
+    }
+  }, [isOpen, currentScreen]);
+
+  // ✅ ESC KEY HANDLING - Close modal on ESC press
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose]);
+
+  const loadOrders = async () => {
+    setIsLoadingOrders(true);
+    try {
+      const { orders: data } = await OrderService.getMyOrders(20);
+      setOrders(data);
+    } catch (error) {
+      LoggerService.error('ModalProfile', 'Error loading orders', error);
+    } finally {
+      setIsLoadingOrders(false);
+    }
+  };
+
+  const handleLogoutConfirm = async () => {
+    setIsLoggingOut(true);
+    try {
+      await xuLyDangXuat();
+    } catch (error) {
+      LoggerService.error('ModalProfile', 'Logout error', error);
+      setIsLoggingOut(false);
+      setShowLogoutConfirm(false);
+    }
+  };
+
+  // Xử lý nút back - quay về màn cha
+  const handleBack = () => {
+    switch (currentScreen) {
+      case 'ngonngu':
+      case 'giaodien':
+        setCurrentScreen('caidat');
+        break;
+      case 'thongtincanhan':
+      case 'thanhtich':
+      case 'donhang':
+        setCurrentScreen('hosocuatoi');
+        break;
+      default:
+        setCurrentScreen('main');
+    }
+  };
+
+  // Lấy tiêu đề màn hình
+  const getScreenTitle = () => {
+    switch (currentScreen) {
+      case 'caidat': return t('profile.settings');
+      case 'hosocuatoi': return t('profile.myProfile');
+      case 'thongtincanhan': return t('profile.personalInfo');
+      case 'thanhtich': return t('profile.achievements');
+      case 'donhang': return t('profile.orders');
+      case 'ngonngu': return t('settings.language');
+      case 'giaodien': return t('settings.theme');
+      default: return t('profile.title');
+    }
+  };
+
+  if (!isOpen) return null;
+
+  // =====================================================
+  // MÀN HÌNH CON (không phải main)
+  // =====================================================
+  if (currentScreen !== 'main') {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center sm:items-start sm:justify-end" style={{ zIndex: Z_INDEX.modal }}>
+        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+        <div className="relative w-full h-full sm:h-[100dvh] sm:max-w-md bg-gradient-to-br from-[#0A0A0A] to-[#1A1A1A] border-l border-white/20 shadow-2xl flex flex-col overflow-hidden">
+          
+          {/* Header màn con */}
+          <div className="flex-shrink-0 px-4 py-4 border-b border-white/10 bg-black/40 backdrop-blur-md">
+            <div className="flex items-center gap-3">
+              <button onClick={handleBack} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                <ChevronLeft size={24} className="text-white" />
+              </button>
+              <h2 className="text-lg font-bold text-white">{getScreenTitle()}</h2>
+            </div>
+          </div>
+
+          {/* Content màn con */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {currentScreen === 'caidat' && (
+              <ScreenCaiDat 
+                onGoToNgonNgu={() => setCurrentScreen('ngonngu')}
+                onGoToGiaoDien={() => setCurrentScreen('giaodien')}
+              />
+            )}
+            {currentScreen === 'hosocuatoi' && (
+              <ScreenHoSoCuaToi 
+                isNhanSu={isNhanSu}
+                isKhachHang={isKhachHang}
+                onGoToThongTin={() => setCurrentScreen('thongtincanhan')}
+                onGoToThanhTich={() => setCurrentScreen('thanhtich')}
+                onGoToDonHang={() => setCurrentScreen('donhang')}
+              />
+            )}
+            {currentScreen === 'thongtincanhan' && <ScreenThongTinCaNhan nguoiDung={nguoiDung} />}
+            {currentScreen === 'thanhtich' && <ScreenThanhTich nguoiDung={nguoiDung} />}
+            {currentScreen === 'donhang' && <ScreenDonHang orders={orders} isLoading={isLoadingOrders} onReload={loadOrders} />}
+            {currentScreen === 'ngonngu' && <ScreenNgonNgu />}
+            {currentScreen === 'giaodien' && <ScreenGiaoDien />}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // =====================================================
+  // MÀN HÌNH CHÍNH
+  // =====================================================
+  return (
+    <div className="fixed inset-0 flex items-center justify-center sm:items-start sm:justify-end" style={{ zIndex: Z_INDEX.modal }}>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+
+      <div className="relative w-full h-full sm:h-[100dvh] sm:max-w-md bg-gradient-to-br from-[#0A0A0A] to-[#1A1A1A] border-l border-white/20 shadow-2xl flex flex-col overflow-hidden">
+        
+        {/* Header - Avatar & Tên */}
+        <div className="flex-shrink-0 px-6 py-6 border-b border-white/10 bg-black/40 backdrop-blur-md">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#C69C6D] to-[#F2D3A0] flex items-center justify-center text-black font-bold text-xl">
+                {nguoiDung?.ho_ten?.[0]?.toUpperCase() || nguoiDung?.email?.[0]?.toUpperCase() || 'U'}
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white">
+                  {nguoiDung?.ho_ten || (language === 'vi' ? 'Người dùng' : 'User')}
+                </h2>
+                <p className="text-white/60 text-sm">{nguoiDung?.email}</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white">
+              <X size={24} />
+            </button>
+          </div>
+
+          {/* Nút Đăng xuất */}
+          <button
+            onClick={() => setShowLogoutConfirm(true)}
+            disabled={isLoggingOut}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white/5 border border-white/10 text-white rounded-lg font-medium text-sm transition-all hover:bg-white/10"
+          >
+            <LogOut size={18} />
+            <span>{isLoggingOut ? t('auth.loggingOut') : t('auth.logout')}</span>
+          </button>
+        </div>
+
+        {/* Content - 2 mục chính */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          
+          {/* KHỐI MENU CHÍNH */}
+          <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+            <KhoiMenuChon 
+              icon={<Settings size={20} className="text-[#C69C6D]" />}
+              label={t('profile.settings')}
+              subtitle={t('profile.settingsDesc')}
+              onClick={() => setCurrentScreen('caidat')}
+            />
+            <KhoiMenuChon 
+              icon={<User size={20} className="text-[#C69C6D]" />}
+              label={t('profile.myProfile')}
+              subtitle={isNhanSu ? t('profile.myProfileDescStaff') : t('profile.myProfileDescCustomer')}
+              onClick={() => setCurrentScreen('hosocuatoi')}
+              isLast
+            />
+          </div>
+
+        </div>
+      </div>
+
+      {/* Logout Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showLogoutConfirm}
+        title={t('auth.logout')}
+        message={t('auth.logoutConfirm')}
+        icon={<LogOut className="text-[#C69C6D]" size={24} />}
+        confirmText={t('auth.logout')}
+        cancelText={t('app.cancel')}
+        isDangerous={false}
+        isLoading={isLoggingOut}
+        onConfirm={handleLogoutConfirm}
+        onCancel={() => !isLoggingOut && setShowLogoutConfirm(false)}
+      />
+    </div>
+  );
+}
+
+// =====================================================
+// COMPONENT: KHỐI MENU CHỌN
+// =====================================================
+function KhoiMenuChon({ 
+  icon, 
+  label, 
+  subtitle,
+  onClick, 
+  isLast = false 
+}: { 
+  icon: ReactNode; 
+  label: string; 
+  subtitle?: string;
+  onClick?: () => void; 
+  isLast?: boolean;
+}) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`w-full px-4 py-4 flex items-center gap-3 hover:bg-white/5 transition-colors ${!isLast ? 'border-b border-white/5' : ''}`}
+    >
+      <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
+        {icon}
+      </div>
+      <div className="flex-1 text-left">
+        <p className="text-white font-medium">{label}</p>
+        {subtitle && <p className="text-white/50 text-sm">{subtitle}</p>}
+      </div>
+      {onClick && <ChevronRight size={20} className="text-white/30" />}
+    </button>
+  );
+}
+
+// =====================================================
+// MÀN HÌNH: CÀI ĐẶT
+// =====================================================
+function ScreenCaiDat({ 
+  onGoToNgonNgu, 
+  onGoToGiaoDien 
+}: { 
+  onGoToNgonNgu: () => void;
+  onGoToGiaoDien: () => void;
+}) {
+  const { language, theme, t } = useAppSettings();
+  
+  const languageDisplay = language === 'vi' ? 'Tiếng Việt' : 'English';
+  const themeDisplay = theme === 'dark' 
+    ? (language === 'vi' ? 'Tối' : 'Dark')
+    : (language === 'vi' ? 'Sáng' : 'Light');
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden">
+        <KhoiMenuChon 
+          icon={<Globe size={20} className="text-blue-400" />}
+          label={t('settings.language')}
+          subtitle={languageDisplay}
+          onClick={onGoToNgonNgu}
+        />
+        <KhoiMenuChon 
+          icon={<Palette size={20} className="text-purple-400" />}
+          label={t('settings.theme')}
+          subtitle={themeDisplay}
+          onClick={onGoToGiaoDien}
+          isLast
+        />
+      </div>
+    </div>
+  );
+}
+
+// =====================================================
+// MÀN HÌNH: HỒ SƠ CỦA TÔI
+// =====================================================
+function ScreenHoSoCuaToi({ 
+  isNhanSu,
+  isKhachHang,
+  onGoToThongTin, 
+  onGoToThanhTich,
+  onGoToDonHang
+}: { 
+  isNhanSu: boolean;
+  isKhachHang: boolean;
+  onGoToThongTin: () => void;
+  onGoToThanhTich: () => void;
+  onGoToDonHang: () => void;
+}) {
+  const { t } = useAppSettings();
+  
+  return (
+    <div className="space-y-4">
+      <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+        <KhoiMenuChon 
+          icon={<User size={20} className="text-[#C69C6D]" />}
+          label={t('profile.personalInfo')}
+          subtitle={t('profile.personalInfoDesc')}
+          onClick={onGoToThongTin}
+        />
+        
+        {/* Thành Tích - chỉ hiện cho nhân sự */}
+        {isNhanSu && (
+          <KhoiMenuChon 
+            icon={<Trophy size={20} className="text-yellow-400" />}
+            label={t('profile.achievements')}
+            subtitle={t('profile.achievementsDesc')}
+            onClick={onGoToThanhTich}
+          />
+        )}
+        
+        {/* Đơn Hàng - chỉ hiện cho khách hàng */}
+        {isKhachHang && (
+          <KhoiMenuChon 
+            icon={<Package size={20} className="text-green-400" />}
+            label={t('profile.orders')}
+            subtitle={t('profile.ordersDesc')}
+            onClick={onGoToDonHang}
+            isLast
+          />
+        )}
+        
+        {/* Nếu là nhân sự thì Thành Tích là last */}
+        {isNhanSu && !isKhachHang && (
+          <div className="hidden" /> // Placeholder để isLast hoạt động đúng
+        )}
+      </div>
+    </div>
+  );
+}
+
+// =====================================================
+// MÀN HÌNH: THÔNG TIN CÁ NHÂN
+// =====================================================
+function ScreenThongTinCaNhan({ nguoiDung }: { nguoiDung: any }) {
+  const { t } = useAppSettings();
+  
+  const fields = [
+    { icon: User, label: t('field.fullName'), value: nguoiDung?.ho_ten },
+    { icon: Mail, label: t('field.email'), value: nguoiDung?.email },
+    { icon: Phone, label: t('field.phone'), value: nguoiDung?.so_dien_thoai },
+    { icon: MapPin, label: t('field.address'), value: nguoiDung?.dia_chi },
+    { icon: CreditCard, label: t('field.idCard'), value: nguoiDung?.cccd },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+        {fields.map((field, idx) => {
+          const Icon = field.icon;
+          const isLast = idx === fields.length - 1;
+          return (
+            <div key={idx} className={`px-4 py-4 ${!isLast ? 'border-b border-white/5' : ''}`}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
+                  <Icon size={20} className="text-[#C69C6D]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white/50 text-xs">{field.label}</p>
+                  <p className="text-white font-medium truncate">
+                    {field.value || <span className="text-white/30 italic">{t('field.notUpdated')}</span>}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <button className="w-full py-4 bg-gradient-to-r from-[#C69C6D] to-[#F2D3A0] text-black rounded-2xl font-bold">
+        {t('profile.editInfo')}
+      </button>
+    </div>
+  );
+}
+
+// =====================================================
+// MÀN HÌNH: THÀNH TÍCH (nhan_su)
+// =====================================================
+function ScreenThanhTich({ nguoiDung }: { nguoiDung: any }) {
+  const { t } = useAppSettings();
+  
+  return (
+    <div className="space-y-4">
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-6 text-center">
+        <Trophy size={48} className="text-yellow-400 mx-auto mb-4" />
+        <h3 className="text-lg font-bold text-white mb-2">{t('achievements.title')}</h3>
+        <p className="text-white/60 text-sm">{t('achievements.developing')}</p>
+      </div>
+      
+      {/* Placeholder cho các thành tích */}
+      <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+        <div className="px-4 py-4 border-b border-white/5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-yellow-500/20 flex items-center justify-center">
+              <Trophy size={20} className="text-yellow-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-white font-medium">{t('achievements.points')}</p>
+              <p className="text-white/50 text-sm">0</p>
+            </div>
+          </div>
+        </div>
+        <div className="px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+              <Trophy size={20} className="text-purple-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-white font-medium">{t('achievements.badges')}</p>
+              <p className="text-white/50 text-sm">{t('achievements.noBadges')}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =====================================================
+// MÀN HÌNH: ĐƠN HÀNG (khach_hang)
+// =====================================================
+function ScreenDonHang({ orders, isLoading, onReload }: { orders: Order[]; isLoading: boolean; onReload: () => void }) {
+  const { t, language } = useAppSettings();
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="w-12 h-12 border-4 border-[#C69C6D]/30 border-t-[#C69C6D] rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (orders.length === 0) {
+    return (
+      <div className="text-center py-20">
+        <Package size={48} className="text-white/20 mx-auto mb-4" />
+        <h3 className="text-lg font-bold text-white mb-2">{t('orders.empty')}</h3>
+        <p className="text-white/60 text-sm mb-4">{t('orders.emptyDesc')}</p>
+        <button onClick={onReload} className="px-4 py-2 bg-[#C69C6D] text-black rounded-lg font-medium">
+          {t('app.refresh')}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {orders.map((order) => (
+        <div key={order.id} className="bg-white/5 border border-white/10 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[#C69C6D] font-bold">{order.ma_don}</span>
+            <span className="text-xs px-2 py-1 bg-white/10 rounded-full text-white/80">
+              {OrderService.formatStatus(order.trang_thai)}
+            </span>
+          </div>
+          <p className="text-white/60 text-sm">{new Date(order.tao_luc).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US')}</p>
+          <p className="text-white font-bold mt-2">{OrderService.formatMoney(order.tong_tien)}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// =====================================================
+// MÀN HÌNH: NGÔN NGỮ
+// =====================================================
+function ScreenNgonNgu() {
+  const { language, setLanguage, t } = useAppSettings();
+  
+  const languages: { code: LanguageCode; name: string; flag: string }[] = [
+    { code: 'vi', name: 'Tiếng Việt', flag: '🇻🇳' },
+    { code: 'en', name: 'English', flag: '🇺🇸' },
+  ];
+
+  const handleSelect = (code: LanguageCode) => {
+    setLanguage(code);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden">
+        {languages.map((lang, idx) => (
+          <button
+            key={lang.code}
+            onClick={() => handleSelect(lang.code)}
+            className={`w-full px-4 py-4 flex items-center gap-3 hover:bg-[var(--hover-bg)] transition-colors ${idx < languages.length - 1 ? 'border-b border-[var(--border-light)]' : ''}`}
+          >
+            <span className="text-2xl">{lang.flag}</span>
+            <span className="flex-1 text-left text-[var(--text-primary)] font-medium">{lang.name}</span>
+            {language === lang.code && (
+              <div className="w-6 h-6 rounded-full bg-[var(--accent)] flex items-center justify-center">
+                <Check size={14} className="text-black" />
+              </div>
+            )}
+          </button>
+        ))}
+      </div>
+      
+      <p className="text-[var(--text-muted)] text-xs text-center">
+        {language === 'vi' ? 'Thay đổi ngôn ngữ sẽ được áp dụng ngay lập tức' : 'Language change will be applied immediately'}
+      </p>
+    </div>
+  );
+}
+
+// =====================================================
+// MÀN HÌNH: GIAO DIỆN
+// =====================================================
+function ScreenGiaoDien() {
+  const { theme, setTheme, t } = useAppSettings();
+  
+  const themes: { code: ThemeMode; name: string; icon: typeof Moon; desc: string }[] = [
+    { code: 'dark', name: t('settings.themeDark'), icon: Moon, desc: t('settings.themeDarkDesc') },
+    { code: 'light', name: t('settings.themeLight'), icon: Sun, desc: t('settings.themeLightDesc') },
+  ];
+
+  const handleSelect = (code: ThemeMode) => {
+    setTheme(code);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden">
+        {themes.map((themeOption, idx) => {
+          const Icon = themeOption.icon;
+          return (
+            <button
+              key={themeOption.code}
+              onClick={() => handleSelect(themeOption.code)}
+              className={`w-full px-4 py-4 flex items-center gap-3 hover:bg-[var(--hover-bg)] transition-colors ${idx < themes.length - 1 ? 'border-b border-[var(--border-light)]' : ''}`}
+            >
+              <div className="w-10 h-10 rounded-xl bg-[var(--bg-card)] flex items-center justify-center">
+                <Icon size={20} className={themeOption.code === 'dark' ? 'text-purple-400' : 'text-yellow-400'} />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-[var(--text-primary)] font-medium">{themeOption.name}</p>
+                <p className="text-[var(--text-secondary)] text-sm">{themeOption.desc}</p>
+              </div>
+              {theme === themeOption.code && (
+                <div className="w-6 h-6 rounded-full bg-[var(--accent)] flex items-center justify-center">
+                  <Check size={14} className="text-black" />
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      
+      <p className="text-[var(--text-muted)] text-xs text-center">
+        {t('settings.language') === 'Ngôn Ngữ' ? 'Thay đổi giao diện sẽ được áp dụng ngay lập tức' : 'Theme change will be applied immediately'}
+      </p>
+    </div>
+  );
 }
 </file>
 
@@ -14110,318 +12935,6 @@ export const xuLyDangXuat = async () => {
 };
 </file>
 
-<file path="app/phongctv/page.tsx">
-'use client';
-
-import React, { useState, useEffect } from 'react';
-import { useUser } from '@/app/ThuVien/UserContext';
-import KhungTrangChuan from '@/app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan';
-import ThanhPhongChucNang from '@/app/components/ThanhPhongChucNang';
-import { KhachHangChucNang } from '@/app/components/cacchucnang/khachhang';
-import { UserCheck } from 'lucide-react';
-
-// Quyền của CTV: chỉ xem
-const CTV_PERMISSIONS = {
-    allowView: true,
-    allowEdit: false,
-    allowDelete: false,
-    allowBulk: false,
-};
-
-const CTV_FUNCTIONS = [
-    { id: 'khachhang', label: 'KHÁCH HÀNG', icon: UserCheck },
-];
-
-export default function PhongCTV() {
-    const { user: contextUser, loading: contextLoading } = useUser();
-    const [authLoading, setAuthLoading] = useState(true);
-    const [activeFunction, setActiveFunction] = useState<string>('khachhang');
-
-    useEffect(() => {
-        if (!contextLoading) setAuthLoading(false);
-    }, [contextLoading]);
-
-    if (authLoading) {
-        return (
-            <div className="min-h-[100dvh] bg-black flex items-center justify-center">
-                <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
-            </div>
-        );
-    }
-
-    let displayUser = contextUser;
-    if (!displayUser && typeof window !== 'undefined') {
-        try {
-            const stored = localStorage.getItem('USER_INFO');
-            displayUser = stored ? JSON.parse(stored) : null;
-        } catch (e) {
-            displayUser = null;
-        }
-    }
-
-    return (
-        <KhungTrangChuan
-            nguoiDung={displayUser}
-            loiChao="PHÒNG CTV"
-            contentClassName="flex flex-col h-[100dvh] pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
-        >
-            <ThanhPhongChucNang
-                tenPhong="PHÒNG CTV"
-                functions={CTV_FUNCTIONS}
-                activeFunction={activeFunction}
-                onFunctionChange={setActiveFunction}
-            />
-
-            <div className="flex-1 w-full relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-[#050505]">
-                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none" />
-                
-                <div className="absolute inset-0 z-10">
-                    <div className="w-full h-full flex flex-col relative">
-                        {activeFunction === 'khachhang' && (
-                            <KhachHangChucNang permissions={CTV_PERMISSIONS} />
-                        )}
-                    </div>
-                </div>
-            </div>
-        </KhungTrangChuan>
-    );
-}
-</file>
-
-<file path="app/phongketoan/page.tsx">
-'use client';
-
-import React, { useState, useEffect } from 'react';
-import { useUser } from '@/app/ThuVien/UserContext';
-import KhungTrangChuan from '@/app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan';
-import ThanhPhongChucNang from '@/app/components/ThanhPhongChucNang';
-import { NhanSuChucNang } from '@/app/components/cacchucnang/nhansu';
-import { Users } from 'lucide-react';
-
-// Quyền của Kế toán: xem - KHÔNG sửa, KHÔNG xóa
-const KETOAN_PERMISSIONS = {
-    allowView: true,
-    allowEdit: false,
-    allowDelete: false,
-    allowBulk: false,
-};
-
-const KETOAN_FUNCTIONS = [
-    { id: 'nhansu', label: 'NHÂN SỰ', icon: Users },
-];
-
-export default function PhongKeToan() {
-    const { user: contextUser, loading: contextLoading } = useUser();
-    const [authLoading, setAuthLoading] = useState(true);
-    const [activeFunction, setActiveFunction] = useState<string>('nhansu');
-
-    useEffect(() => {
-        if (!contextLoading) setAuthLoading(false);
-    }, [contextLoading]);
-
-    if (authLoading) {
-        return (
-            <div className="min-h-[100dvh] bg-black flex items-center justify-center">
-                <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
-            </div>
-        );
-    }
-
-    let displayUser = contextUser;
-    if (!displayUser && typeof window !== 'undefined') {
-        try {
-            const stored = localStorage.getItem('USER_INFO');
-            displayUser = stored ? JSON.parse(stored) : null;
-        } catch (e) {
-            displayUser = null;
-        }
-    }
-
-    return (
-        <KhungTrangChuan
-            nguoiDung={displayUser}
-            loiChao="PHÒNG KẾ TOÁN"
-            contentClassName="flex flex-col h-[100dvh] pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
-        >
-            <ThanhPhongChucNang
-                tenPhong="PHÒNG KẾ TOÁN"
-                functions={KETOAN_FUNCTIONS}
-                activeFunction={activeFunction}
-                onFunctionChange={setActiveFunction}
-            />
-
-            <div className="flex-1 w-full relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-[#050505]">
-                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none" />
-                
-                <div className="absolute inset-0 z-10">
-                    <div className="w-full h-full flex flex-col relative">
-                        {activeFunction === 'nhansu' && (
-                            <NhanSuChucNang permissions={KETOAN_PERMISSIONS} />
-                        )}
-                    </div>
-                </div>
-            </div>
-        </KhungTrangChuan>
-    );
-}
-</file>
-
-<file path="app/phongkhachhang/page.tsx">
-'use client';
-
-import React, { useState, useEffect } from 'react';
-import { useUser } from '@/app/ThuVien/UserContext';
-import KhungTrangChuan from '@/app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan';
-import ThanhPhongChucNang from '@/app/components/ThanhPhongChucNang';
-import { KhachHangChucNang } from '@/app/components/cacchucnang/khachhang';
-import { UserCheck } from 'lucide-react';
-
-// Quyền của Khách VIP: chỉ xem thông tin cá nhân
-const KHACHHANG_PERMISSIONS = {
-    allowView: true,
-    allowEdit: false,
-    allowDelete: false,
-    allowBulk: false,
-};
-
-const KHACHHANG_FUNCTIONS = [
-    { id: 'khachhang', label: 'THÔNG TIN', icon: UserCheck },
-];
-
-export default function PhongKhachHang() {
-    const { user: contextUser, loading: contextLoading } = useUser();
-    const [authLoading, setAuthLoading] = useState(true);
-    const [activeFunction, setActiveFunction] = useState<string>('khachhang');
-
-    useEffect(() => {
-        if (!contextLoading) setAuthLoading(false);
-    }, [contextLoading]);
-
-    if (authLoading) {
-        return (
-            <div className="min-h-[100dvh] bg-black flex items-center justify-center">
-                <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
-            </div>
-        );
-    }
-
-    let displayUser = contextUser;
-    if (!displayUser && typeof window !== 'undefined') {
-        try {
-            const stored = localStorage.getItem('USER_INFO');
-            displayUser = stored ? JSON.parse(stored) : null;
-        } catch (e) {
-            displayUser = null;
-        }
-    }
-
-    return (
-        <KhungTrangChuan
-            nguoiDung={displayUser}
-            loiChao="PHÒNG KHÁCH VIP"
-            contentClassName="flex flex-col h-[100dvh] pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
-        >
-            <ThanhPhongChucNang
-                tenPhong="PHÒNG KHÁCH VIP"
-                functions={KHACHHANG_FUNCTIONS}
-                activeFunction={activeFunction}
-                onFunctionChange={setActiveFunction}
-            />
-
-            <div className="flex-1 w-full relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-[#050505]">
-                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none" />
-                
-                <div className="absolute inset-0 z-10">
-                    <div className="w-full h-full flex flex-col relative">
-                        {activeFunction === 'khachhang' && (
-                            <KhachHangChucNang permissions={KHACHHANG_PERMISSIONS} />
-                        )}
-                    </div>
-                </div>
-            </div>
-        </KhungTrangChuan>
-    );
-}
-</file>
-
-<file path="app/phongkho/page.tsx">
-'use client';
-
-import React, { useState, useEffect } from 'react';
-import { useUser } from '@/app/ThuVien/UserContext';
-import KhungTrangChuan from '@/app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan';
-import ThanhPhongChucNang from '@/app/components/ThanhPhongChucNang';
-import { NhanSuChucNang } from '@/app/components/cacchucnang/nhansu';
-import { Users } from 'lucide-react';
-
-// Quyền của Kho: xem - KHÔNG sửa, KHÔNG xóa
-const KHO_PERMISSIONS = {
-    allowView: true,
-    allowEdit: false,
-    allowDelete: false,
-    allowBulk: false,
-};
-
-const KHO_FUNCTIONS = [
-    { id: 'nhansu', label: 'NHÂN SỰ', icon: Users },
-];
-
-export default function PhongKho() {
-    const { user: contextUser, loading: contextLoading } = useUser();
-    const [authLoading, setAuthLoading] = useState(true);
-    const [activeFunction, setActiveFunction] = useState<string>('nhansu');
-
-    useEffect(() => {
-        if (!contextLoading) setAuthLoading(false);
-    }, [contextLoading]);
-
-    if (authLoading) {
-        return (
-            <div className="min-h-[100dvh] bg-black flex items-center justify-center">
-                <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
-            </div>
-        );
-    }
-
-    let displayUser = contextUser;
-    if (!displayUser && typeof window !== 'undefined') {
-        try {
-            const stored = localStorage.getItem('USER_INFO');
-            displayUser = stored ? JSON.parse(stored) : null;
-        } catch (e) {
-            displayUser = null;
-        }
-    }
-
-    return (
-        <KhungTrangChuan
-            nguoiDung={displayUser}
-            loiChao="PHÒNG KHO"
-            contentClassName="flex flex-col h-[100dvh] pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
-        >
-            <ThanhPhongChucNang
-                tenPhong="PHÒNG KHO"
-                functions={KHO_FUNCTIONS}
-                activeFunction={activeFunction}
-                onFunctionChange={setActiveFunction}
-            />
-
-            <div className="flex-1 w-full relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-[#050505]">
-                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none" />
-                
-                <div className="absolute inset-0 z-10">
-                    <div className="w-full h-full flex flex-col relative">
-                        {activeFunction === 'nhansu' && (
-                            <NhanSuChucNang permissions={KHO_PERMISSIONS} />
-                        )}
-                    </div>
-                </div>
-            </div>
-        </KhungTrangChuan>
-    );
-}
-</file>
-
 <file path="app/ThuVien/UserContext.tsx">
 "use client";
 
@@ -15636,6 +14149,318 @@ function InputGroup({ label, icon: Icon, required, children }: any) {
       </div>
     </div>
   );
+}
+</file>
+
+<file path="app/phongctv/page.tsx">
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useUser } from '@/app/ThuVien/UserContext';
+import KhungTrangChuan from '@/app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan';
+import ThanhPhongChucNang from '@/app/components/ThanhPhongChucNang';
+import { KhachHangChucNang } from '@/app/components/cacchucnang/khachhang';
+import { UserCheck } from 'lucide-react';
+
+// Quyền của CTV: chỉ xem
+const CTV_PERMISSIONS = {
+    allowView: true,
+    allowEdit: false,
+    allowDelete: false,
+    allowBulk: false,
+};
+
+const CTV_FUNCTIONS = [
+    { id: 'khachhang', label: 'KHÁCH HÀNG', icon: UserCheck },
+];
+
+export default function PhongCTV() {
+    const { user: contextUser, loading: contextLoading } = useUser();
+    const [authLoading, setAuthLoading] = useState(true);
+    const [activeFunction, setActiveFunction] = useState<string>('khachhang');
+
+    useEffect(() => {
+        if (!contextLoading) setAuthLoading(false);
+    }, [contextLoading]);
+
+    if (authLoading) {
+        return (
+            <div className="min-h-[100dvh] bg-black flex items-center justify-center">
+                <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
+
+    let displayUser = contextUser;
+    if (!displayUser && typeof window !== 'undefined') {
+        try {
+            const stored = localStorage.getItem('USER_INFO');
+            displayUser = stored ? JSON.parse(stored) : null;
+        } catch (e) {
+            displayUser = null;
+        }
+    }
+
+    return (
+        <KhungTrangChuan
+            nguoiDung={displayUser}
+            loiChao="PHÒNG CTV"
+            contentClassName="flex flex-col h-[100dvh] pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
+        >
+            <ThanhPhongChucNang
+                tenPhong="PHÒNG CTV"
+                functions={CTV_FUNCTIONS}
+                activeFunction={activeFunction}
+                onFunctionChange={setActiveFunction}
+            />
+
+            <div className="flex-1 w-full relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-[#050505]">
+                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none" />
+                
+                <div className="absolute inset-0 z-10">
+                    <div className="w-full h-full flex flex-col relative">
+                        {activeFunction === 'khachhang' && (
+                            <KhachHangChucNang permissions={CTV_PERMISSIONS} />
+                        )}
+                    </div>
+                </div>
+            </div>
+        </KhungTrangChuan>
+    );
+}
+</file>
+
+<file path="app/phongketoan/page.tsx">
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useUser } from '@/app/ThuVien/UserContext';
+import KhungTrangChuan from '@/app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan';
+import ThanhPhongChucNang from '@/app/components/ThanhPhongChucNang';
+import { NhanSuChucNang } from '@/app/components/cacchucnang/nhansu';
+import { Users } from 'lucide-react';
+
+// Quyền của Kế toán: xem - KHÔNG sửa, KHÔNG xóa
+const KETOAN_PERMISSIONS = {
+    allowView: true,
+    allowEdit: false,
+    allowDelete: false,
+    allowBulk: false,
+};
+
+const KETOAN_FUNCTIONS = [
+    { id: 'nhansu', label: 'NHÂN SỰ', icon: Users },
+];
+
+export default function PhongKeToan() {
+    const { user: contextUser, loading: contextLoading } = useUser();
+    const [authLoading, setAuthLoading] = useState(true);
+    const [activeFunction, setActiveFunction] = useState<string>('nhansu');
+
+    useEffect(() => {
+        if (!contextLoading) setAuthLoading(false);
+    }, [contextLoading]);
+
+    if (authLoading) {
+        return (
+            <div className="min-h-[100dvh] bg-black flex items-center justify-center">
+                <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
+
+    let displayUser = contextUser;
+    if (!displayUser && typeof window !== 'undefined') {
+        try {
+            const stored = localStorage.getItem('USER_INFO');
+            displayUser = stored ? JSON.parse(stored) : null;
+        } catch (e) {
+            displayUser = null;
+        }
+    }
+
+    return (
+        <KhungTrangChuan
+            nguoiDung={displayUser}
+            loiChao="PHÒNG KẾ TOÁN"
+            contentClassName="flex flex-col h-[100dvh] pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
+        >
+            <ThanhPhongChucNang
+                tenPhong="PHÒNG KẾ TOÁN"
+                functions={KETOAN_FUNCTIONS}
+                activeFunction={activeFunction}
+                onFunctionChange={setActiveFunction}
+            />
+
+            <div className="flex-1 w-full relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-[#050505]">
+                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none" />
+                
+                <div className="absolute inset-0 z-10">
+                    <div className="w-full h-full flex flex-col relative">
+                        {activeFunction === 'nhansu' && (
+                            <NhanSuChucNang permissions={KETOAN_PERMISSIONS} />
+                        )}
+                    </div>
+                </div>
+            </div>
+        </KhungTrangChuan>
+    );
+}
+</file>
+
+<file path="app/phongkhachhang/page.tsx">
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useUser } from '@/app/ThuVien/UserContext';
+import KhungTrangChuan from '@/app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan';
+import ThanhPhongChucNang from '@/app/components/ThanhPhongChucNang';
+import { KhachHangChucNang } from '@/app/components/cacchucnang/khachhang';
+import { UserCheck } from 'lucide-react';
+
+// Quyền của Khách VIP: chỉ xem thông tin cá nhân
+const KHACHHANG_PERMISSIONS = {
+    allowView: true,
+    allowEdit: false,
+    allowDelete: false,
+    allowBulk: false,
+};
+
+const KHACHHANG_FUNCTIONS = [
+    { id: 'khachhang', label: 'THÔNG TIN', icon: UserCheck },
+];
+
+export default function PhongKhachHang() {
+    const { user: contextUser, loading: contextLoading } = useUser();
+    const [authLoading, setAuthLoading] = useState(true);
+    const [activeFunction, setActiveFunction] = useState<string>('khachhang');
+
+    useEffect(() => {
+        if (!contextLoading) setAuthLoading(false);
+    }, [contextLoading]);
+
+    if (authLoading) {
+        return (
+            <div className="min-h-[100dvh] bg-black flex items-center justify-center">
+                <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
+
+    let displayUser = contextUser;
+    if (!displayUser && typeof window !== 'undefined') {
+        try {
+            const stored = localStorage.getItem('USER_INFO');
+            displayUser = stored ? JSON.parse(stored) : null;
+        } catch (e) {
+            displayUser = null;
+        }
+    }
+
+    return (
+        <KhungTrangChuan
+            nguoiDung={displayUser}
+            loiChao="PHÒNG KHÁCH VIP"
+            contentClassName="flex flex-col h-[100dvh] pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
+        >
+            <ThanhPhongChucNang
+                tenPhong="PHÒNG KHÁCH VIP"
+                functions={KHACHHANG_FUNCTIONS}
+                activeFunction={activeFunction}
+                onFunctionChange={setActiveFunction}
+            />
+
+            <div className="flex-1 w-full relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-[#050505]">
+                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none" />
+                
+                <div className="absolute inset-0 z-10">
+                    <div className="w-full h-full flex flex-col relative">
+                        {activeFunction === 'khachhang' && (
+                            <KhachHangChucNang permissions={KHACHHANG_PERMISSIONS} />
+                        )}
+                    </div>
+                </div>
+            </div>
+        </KhungTrangChuan>
+    );
+}
+</file>
+
+<file path="app/phongkho/page.tsx">
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useUser } from '@/app/ThuVien/UserContext';
+import KhungTrangChuan from '@/app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan';
+import ThanhPhongChucNang from '@/app/components/ThanhPhongChucNang';
+import { NhanSuChucNang } from '@/app/components/cacchucnang/nhansu';
+import { Users } from 'lucide-react';
+
+// Quyền của Kho: xem - KHÔNG sửa, KHÔNG xóa
+const KHO_PERMISSIONS = {
+    allowView: true,
+    allowEdit: false,
+    allowDelete: false,
+    allowBulk: false,
+};
+
+const KHO_FUNCTIONS = [
+    { id: 'nhansu', label: 'NHÂN SỰ', icon: Users },
+];
+
+export default function PhongKho() {
+    const { user: contextUser, loading: contextLoading } = useUser();
+    const [authLoading, setAuthLoading] = useState(true);
+    const [activeFunction, setActiveFunction] = useState<string>('nhansu');
+
+    useEffect(() => {
+        if (!contextLoading) setAuthLoading(false);
+    }, [contextLoading]);
+
+    if (authLoading) {
+        return (
+            <div className="min-h-[100dvh] bg-black flex items-center justify-center">
+                <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
+
+    let displayUser = contextUser;
+    if (!displayUser && typeof window !== 'undefined') {
+        try {
+            const stored = localStorage.getItem('USER_INFO');
+            displayUser = stored ? JSON.parse(stored) : null;
+        } catch (e) {
+            displayUser = null;
+        }
+    }
+
+    return (
+        <KhungTrangChuan
+            nguoiDung={displayUser}
+            loiChao="PHÒNG KHO"
+            contentClassName="flex flex-col h-[100dvh] pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
+        >
+            <ThanhPhongChucNang
+                tenPhong="PHÒNG KHO"
+                functions={KHO_FUNCTIONS}
+                activeFunction={activeFunction}
+                onFunctionChange={setActiveFunction}
+            />
+
+            <div className="flex-1 w-full relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-[#050505]">
+                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none" />
+                
+                <div className="absolute inset-0 z-10">
+                    <div className="w-full h-full flex flex-col relative">
+                        {activeFunction === 'nhansu' && (
+                            <NhanSuChucNang permissions={KHO_PERMISSIONS} />
+                        )}
+                    </div>
+                </div>
+            </div>
+        </KhungTrangChuan>
+    );
 }
 </file>
 
@@ -17581,240 +16406,6 @@ export default function TuVanKhachHang() {
 }
 </file>
 
-<file path="app/phongparttime/page.tsx">
-'use client';
-
-import React, { useState, useEffect } from 'react';
-import { useUser } from '@/app/ThuVien/UserContext';
-import KhungTrangChuan from '@/app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan';
-import ThanhPhongChucNang from '@/app/components/ThanhPhongChucNang';
-import { KhachHangChucNang } from '@/app/components/cacchucnang/khachhang';
-import { UserCheck } from 'lucide-react';
-
-// Quyền của Part-time: chỉ xem
-const PARTTIME_PERMISSIONS = {
-    allowView: true,
-    allowEdit: false,
-    allowDelete: false,
-    allowBulk: false,
-};
-
-const PARTTIME_FUNCTIONS = [
-    { id: 'khachhang', label: 'KHÁCH HÀNG', icon: UserCheck },
-];
-
-export default function PhongPartTime() {
-    const { user: contextUser, loading: contextLoading } = useUser();
-    const [authLoading, setAuthLoading] = useState(true);
-    const [activeFunction, setActiveFunction] = useState<string>('khachhang');
-
-    useEffect(() => {
-        if (!contextLoading) setAuthLoading(false);
-    }, [contextLoading]);
-
-    if (authLoading) {
-        return (
-            <div className="min-h-[100dvh] bg-black flex items-center justify-center">
-                <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
-            </div>
-        );
-    }
-
-    let displayUser = contextUser;
-    if (!displayUser && typeof window !== 'undefined') {
-        try {
-            const stored = localStorage.getItem('USER_INFO');
-            displayUser = stored ? JSON.parse(stored) : null;
-        } catch (e) {
-            displayUser = null;
-        }
-    }
-
-    return (
-        <KhungTrangChuan
-            nguoiDung={displayUser}
-            loiChao="PHÒNG PART-TIME"
-            contentClassName="flex flex-col h-[100dvh] pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
-        >
-            <ThanhPhongChucNang
-                tenPhong="PHÒNG PART-TIME"
-                functions={PARTTIME_FUNCTIONS}
-                activeFunction={activeFunction}
-                onFunctionChange={setActiveFunction}
-            />
-
-            <div className="flex-1 w-full relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-[#050505]">
-                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none" />
-                
-                <div className="absolute inset-0 z-10">
-                    <div className="w-full h-full flex flex-col relative">
-                        {activeFunction === 'khachhang' && (
-                            <KhachHangChucNang permissions={PARTTIME_PERMISSIONS} />
-                        )}
-                    </div>
-                </div>
-            </div>
-        </KhungTrangChuan>
-    );
-}
-</file>
-
-<file path="app/phongsales/page.tsx">
-'use client';
-
-import React, { useState, useEffect } from 'react';
-import { useUser } from '@/app/ThuVien/UserContext';
-import KhungTrangChuan from '@/app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan';
-import ThanhPhongChucNang from '@/app/components/ThanhPhongChucNang';
-import { KhachHangChucNang } from '@/app/components/cacchucnang/khachhang';
-import { UserCheck } from 'lucide-react';
-
-// Quyền của Sales: xem, sửa - KHÔNG xóa, KHÔNG bulk
-const SALES_PERMISSIONS = {
-    allowView: true,
-    allowEdit: true,
-    allowDelete: false,
-    allowBulk: false,
-};
-
-const SALES_FUNCTIONS = [
-    { id: 'khachhang', label: 'KHÁCH HÀNG', icon: UserCheck },
-];
-
-export default function PhongSales() {
-    const { user: contextUser, loading: contextLoading } = useUser();
-    const [authLoading, setAuthLoading] = useState(true);
-    const [activeFunction, setActiveFunction] = useState<string>('khachhang');
-
-    useEffect(() => {
-        if (!contextLoading) setAuthLoading(false);
-    }, [contextLoading]);
-
-    if (authLoading) {
-        return (
-            <div className="min-h-[100dvh] bg-black flex items-center justify-center">
-                <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
-            </div>
-        );
-    }
-
-    let displayUser = contextUser;
-    if (!displayUser && typeof window !== 'undefined') {
-        try {
-            const stored = localStorage.getItem('USER_INFO');
-            displayUser = stored ? JSON.parse(stored) : null;
-        } catch (e) {
-            displayUser = null;
-        }
-    }
-
-    return (
-        <KhungTrangChuan
-            nguoiDung={displayUser}
-            loiChao="PHÒNG SALES"
-            contentClassName="flex flex-col h-[100dvh] pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
-        >
-            <ThanhPhongChucNang
-                tenPhong="PHÒNG SALES"
-                functions={SALES_FUNCTIONS}
-                activeFunction={activeFunction}
-                onFunctionChange={setActiveFunction}
-            />
-
-            <div className="flex-1 w-full relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-[#050505]">
-                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none" />
-                
-                <div className="absolute inset-0 z-10">
-                    <div className="w-full h-full flex flex-col relative">
-                        {activeFunction === 'khachhang' && (
-                            <KhachHangChucNang permissions={SALES_PERMISSIONS} />
-                        )}
-                    </div>
-                </div>
-            </div>
-        </KhungTrangChuan>
-    );
-}
-</file>
-
-<file path="app/phongtrungbay/page.tsx">
-'use client';
-
-import React, { useState, useEffect } from 'react';
-import { useUser } from '@/app/ThuVien/UserContext';
-import KhungTrangChuan from '@/app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan';
-import ThanhPhongChucNang from '@/app/components/ThanhPhongChucNang';
-import { KhachHangChucNang } from '@/app/components/cacchucnang/khachhang';
-import { UserCheck } from 'lucide-react';
-
-// Quyền của Trưng bày: chỉ xem
-const TRUNGBAY_PERMISSIONS = {
-    allowView: true,
-    allowEdit: false,
-    allowDelete: false,
-    allowBulk: false,
-};
-
-const TRUNGBAY_FUNCTIONS = [
-    { id: 'khachhang', label: 'KHÁCH HÀNG', icon: UserCheck },
-];
-
-export default function PhongTrungBay() {
-    const { user: contextUser, loading: contextLoading } = useUser();
-    const [authLoading, setAuthLoading] = useState(true);
-    const [activeFunction, setActiveFunction] = useState<string>('khachhang');
-
-    useEffect(() => {
-        if (!contextLoading) setAuthLoading(false);
-    }, [contextLoading]);
-
-    if (authLoading) {
-        return (
-            <div className="min-h-[100dvh] bg-black flex items-center justify-center">
-                <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
-            </div>
-        );
-    }
-
-    let displayUser = contextUser;
-    if (!displayUser && typeof window !== 'undefined') {
-        try {
-            const stored = localStorage.getItem('USER_INFO');
-            displayUser = stored ? JSON.parse(stored) : null;
-        } catch (e) {
-            displayUser = null;
-        }
-    }
-
-    return (
-        <KhungTrangChuan
-            nguoiDung={displayUser}
-            loiChao="PHÒNG TRƯNG BÀY"
-            contentClassName="flex flex-col h-[100dvh] pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
-        >
-            <ThanhPhongChucNang
-                tenPhong="PHÒNG TRƯNG BÀY"
-                functions={TRUNGBAY_FUNCTIONS}
-                activeFunction={activeFunction}
-                onFunctionChange={setActiveFunction}
-            />
-
-            <div className="flex-1 w-full relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-[#050505]">
-                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none" />
-                
-                <div className="absolute inset-0 z-10">
-                    <div className="w-full h-full flex flex-col relative">
-                        {activeFunction === 'khachhang' && (
-                            <KhachHangChucNang permissions={TRUNGBAY_PERMISSIONS} />
-                        )}
-                    </div>
-                </div>
-            </div>
-        </KhungTrangChuan>
-    );
-}
-</file>
-
 <file path="app/GiaoDienTong/MenuTren/MenuTren.tsx">
 "use client";
 import React, { useState, useEffect, useRef } from "react";
@@ -18586,6 +17177,240 @@ export default function NhacNen() {
 }
 </file>
 
+<file path="app/phongparttime/page.tsx">
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useUser } from '@/app/ThuVien/UserContext';
+import KhungTrangChuan from '@/app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan';
+import ThanhPhongChucNang from '@/app/components/ThanhPhongChucNang';
+import { KhachHangChucNang } from '@/app/components/cacchucnang/khachhang';
+import { UserCheck } from 'lucide-react';
+
+// Quyền của Part-time: chỉ xem
+const PARTTIME_PERMISSIONS = {
+    allowView: true,
+    allowEdit: false,
+    allowDelete: false,
+    allowBulk: false,
+};
+
+const PARTTIME_FUNCTIONS = [
+    { id: 'khachhang', label: 'KHÁCH HÀNG', icon: UserCheck },
+];
+
+export default function PhongPartTime() {
+    const { user: contextUser, loading: contextLoading } = useUser();
+    const [authLoading, setAuthLoading] = useState(true);
+    const [activeFunction, setActiveFunction] = useState<string>('khachhang');
+
+    useEffect(() => {
+        if (!contextLoading) setAuthLoading(false);
+    }, [contextLoading]);
+
+    if (authLoading) {
+        return (
+            <div className="min-h-[100dvh] bg-black flex items-center justify-center">
+                <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
+
+    let displayUser = contextUser;
+    if (!displayUser && typeof window !== 'undefined') {
+        try {
+            const stored = localStorage.getItem('USER_INFO');
+            displayUser = stored ? JSON.parse(stored) : null;
+        } catch (e) {
+            displayUser = null;
+        }
+    }
+
+    return (
+        <KhungTrangChuan
+            nguoiDung={displayUser}
+            loiChao="PHÒNG PART-TIME"
+            contentClassName="flex flex-col h-[100dvh] pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
+        >
+            <ThanhPhongChucNang
+                tenPhong="PHÒNG PART-TIME"
+                functions={PARTTIME_FUNCTIONS}
+                activeFunction={activeFunction}
+                onFunctionChange={setActiveFunction}
+            />
+
+            <div className="flex-1 w-full relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-[#050505]">
+                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none" />
+                
+                <div className="absolute inset-0 z-10">
+                    <div className="w-full h-full flex flex-col relative">
+                        {activeFunction === 'khachhang' && (
+                            <KhachHangChucNang permissions={PARTTIME_PERMISSIONS} />
+                        )}
+                    </div>
+                </div>
+            </div>
+        </KhungTrangChuan>
+    );
+}
+</file>
+
+<file path="app/phongsales/page.tsx">
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useUser } from '@/app/ThuVien/UserContext';
+import KhungTrangChuan from '@/app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan';
+import ThanhPhongChucNang from '@/app/components/ThanhPhongChucNang';
+import { KhachHangChucNang } from '@/app/components/cacchucnang/khachhang';
+import { UserCheck } from 'lucide-react';
+
+// Quyền của Sales: xem, sửa - KHÔNG xóa, KHÔNG bulk
+const SALES_PERMISSIONS = {
+    allowView: true,
+    allowEdit: true,
+    allowDelete: false,
+    allowBulk: false,
+};
+
+const SALES_FUNCTIONS = [
+    { id: 'khachhang', label: 'KHÁCH HÀNG', icon: UserCheck },
+];
+
+export default function PhongSales() {
+    const { user: contextUser, loading: contextLoading } = useUser();
+    const [authLoading, setAuthLoading] = useState(true);
+    const [activeFunction, setActiveFunction] = useState<string>('khachhang');
+
+    useEffect(() => {
+        if (!contextLoading) setAuthLoading(false);
+    }, [contextLoading]);
+
+    if (authLoading) {
+        return (
+            <div className="min-h-[100dvh] bg-black flex items-center justify-center">
+                <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
+
+    let displayUser = contextUser;
+    if (!displayUser && typeof window !== 'undefined') {
+        try {
+            const stored = localStorage.getItem('USER_INFO');
+            displayUser = stored ? JSON.parse(stored) : null;
+        } catch (e) {
+            displayUser = null;
+        }
+    }
+
+    return (
+        <KhungTrangChuan
+            nguoiDung={displayUser}
+            loiChao="PHÒNG SALES"
+            contentClassName="flex flex-col h-[100dvh] pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
+        >
+            <ThanhPhongChucNang
+                tenPhong="PHÒNG SALES"
+                functions={SALES_FUNCTIONS}
+                activeFunction={activeFunction}
+                onFunctionChange={setActiveFunction}
+            />
+
+            <div className="flex-1 w-full relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-[#050505]">
+                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none" />
+                
+                <div className="absolute inset-0 z-10">
+                    <div className="w-full h-full flex flex-col relative">
+                        {activeFunction === 'khachhang' && (
+                            <KhachHangChucNang permissions={SALES_PERMISSIONS} />
+                        )}
+                    </div>
+                </div>
+            </div>
+        </KhungTrangChuan>
+    );
+}
+</file>
+
+<file path="app/phongtrungbay/page.tsx">
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useUser } from '@/app/ThuVien/UserContext';
+import KhungTrangChuan from '@/app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan';
+import ThanhPhongChucNang from '@/app/components/ThanhPhongChucNang';
+import { KhachHangChucNang } from '@/app/components/cacchucnang/khachhang';
+import { UserCheck } from 'lucide-react';
+
+// Quyền của Trưng bày: chỉ xem
+const TRUNGBAY_PERMISSIONS = {
+    allowView: true,
+    allowEdit: false,
+    allowDelete: false,
+    allowBulk: false,
+};
+
+const TRUNGBAY_FUNCTIONS = [
+    { id: 'khachhang', label: 'KHÁCH HÀNG', icon: UserCheck },
+];
+
+export default function PhongTrungBay() {
+    const { user: contextUser, loading: contextLoading } = useUser();
+    const [authLoading, setAuthLoading] = useState(true);
+    const [activeFunction, setActiveFunction] = useState<string>('khachhang');
+
+    useEffect(() => {
+        if (!contextLoading) setAuthLoading(false);
+    }, [contextLoading]);
+
+    if (authLoading) {
+        return (
+            <div className="min-h-[100dvh] bg-black flex items-center justify-center">
+                <div className="w-16 h-16 border-4 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
+
+    let displayUser = contextUser;
+    if (!displayUser && typeof window !== 'undefined') {
+        try {
+            const stored = localStorage.getItem('USER_INFO');
+            displayUser = stored ? JSON.parse(stored) : null;
+        } catch (e) {
+            displayUser = null;
+        }
+    }
+
+    return (
+        <KhungTrangChuan
+            nguoiDung={displayUser}
+            loiChao="PHÒNG TRƯNG BÀY"
+            contentClassName="flex flex-col h-[100dvh] pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
+        >
+            <ThanhPhongChucNang
+                tenPhong="PHÒNG TRƯNG BÀY"
+                functions={TRUNGBAY_FUNCTIONS}
+                activeFunction={activeFunction}
+                onFunctionChange={setActiveFunction}
+            />
+
+            <div className="flex-1 w-full relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-[#050505]">
+                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none" />
+                
+                <div className="absolute inset-0 z-10">
+                    <div className="w-full h-full flex flex-col relative">
+                        {activeFunction === 'khachhang' && (
+                            <KhachHangChucNang permissions={TRUNGBAY_PERMISSIONS} />
+                        )}
+                    </div>
+                </div>
+            </div>
+        </KhungTrangChuan>
+    );
+}
+</file>
+
 <file path="app/phongthietke/page.tsx">
 "use client";
 
@@ -18701,6 +17526,51 @@ export default function PhongThietKe() {
       </div>
     </KhungTrangChuan>
   );
+}
+</file>
+
+<file path="package.json">
+{
+  "name": "tommynghiem",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.1.0",
+    "@dnd-kit/sortable": "^8.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@monaco-editor/react": "^4.7.0",
+    "@supabase/ssr": "^0.3.0",
+    "@supabase/supabase-js": "^2.43.4",
+    "@tanstack/react-query": "^5.90.14",
+    "browser-image-compression": "^2.0.2",
+    "chart.js": "^4.4.3",
+    "date-fns": "^4.1.0",
+    "lucide-react": "^0.395.0",
+    "next": "14.2.4",
+    "postgres": "^3.4.7",
+    "react": "^18.3.1",
+    "react-chartjs-2": "^5.2.0",
+    "react-dom": "^18.3.1",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "@types/web-push": "^3.6.4",
+    "autoprefixer": "^10.4.19",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.4",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5"
+  }
 }
 </file>
 
@@ -18934,112 +17804,6 @@ export default function ForceFullScreen() {
         <CheckCircle2 size={14} />
         Đã cài đặt / Không hiện lại
       </button>
-    </div>
-  );
-}
-</file>
-
-<file path="package.json">
-{
-  "name": "tommynghiem",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "@dnd-kit/core": "^6.1.0",
-    "@dnd-kit/sortable": "^8.0.0",
-    "@dnd-kit/utilities": "^3.2.2",
-    "@monaco-editor/react": "^4.7.0",
-    "@supabase/ssr": "^0.3.0",
-    "@supabase/supabase-js": "^2.43.4",
-    "@tanstack/react-query": "^5.90.14",
-    "browser-image-compression": "^2.0.2",
-    "chart.js": "^4.4.3",
-    "date-fns": "^4.1.0",
-    "lucide-react": "^0.395.0",
-    "next": "14.2.4",
-    "postgres": "^3.4.7",
-    "react": "^18.3.1",
-    "react-chartjs-2": "^5.2.0",
-    "react-dom": "^18.3.1",
-    "web-push": "^3.6.7"
-  },
-  "devDependencies": {
-    "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
-    "@types/web-push": "^3.6.4",
-    "autoprefixer": "^10.4.19",
-    "eslint": "^8",
-    "eslint-config-next": "14.2.4",
-    "postcss": "^8.4.38",
-    "tailwindcss": "^3.4.4",
-    "typescript": "^5"
-  }
-}
-</file>
-
-<file path="app/GiaoDienTong/KhungGiaoDienTong.tsx">
-'use client';
-
-import React, { useState, useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
-
-// 🟢 CẬP NHẬT IMPORT
- 
-import CongDangNhap from '../CongDangNhap/CongDangNhap'; 
-import StaffPresence from '../components/StaffPresence';
-
-export default function KhungGiaoDienTong({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState<any>(null);
-
-  useEffect(() => {
-    const loadUser = () => {
-      // 1. Các trang tự quản lý auth -> Cho qua luôn
-      if (pathname === '/' || pathname === '/admin' || pathname === '/phongquanly' || pathname === '/phongparttime' || pathname === '/trangchu') {
-          setIsLoading(false);
-          return;
-      }
-
-      // 2. Load user từ localStorage
-      const storedUser = typeof window !== 'undefined' ? localStorage.getItem('USER_INFO') : null;
-      
-      if (storedUser) {
-        try {
-          setCurrentUser(JSON.parse(storedUser));
-        } catch (e) {
-          console.error('Error parsing user:', e);
-        }
-      }
-      
-      setIsLoading(false);
-    };
-
-    loadUser();
-  }, [pathname]);
-
-  if (isLoading) return (
-      <div className="h-[100dvh] bg-black flex flex-col items-center justify-center gap-4">
-          <Loader2 className="animate-spin text-[#C69C6D]" size={40}/>
-      </div>
-  );
- 
-  return (
-    <div className="flex flex-col min-h-[100dvh] bg-[#0a0a0a] text-gray-200 font-sans relative">
-        <main className="flex-1 w-full max-w-[1920px] mx-auto p-3 pb-20 md:p-6 md:pb-20">
-            {children}
-        </main>
- <StaffPresence />
- 
     </div>
   );
 }
@@ -19721,6 +18485,67 @@ export default function CongDangNhap({
           animation: fadeIn 0.3s ease-out;
         }
       `}</style>
+    </div>
+  );
+}
+</file>
+
+<file path="app/GiaoDienTong/KhungGiaoDienTong.tsx">
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
+
+// 🟢 CẬP NHẬT IMPORT
+ 
+import CongDangNhap from '../CongDangNhap/CongDangNhap'; 
+import StaffPresence from '../components/StaffPresence';
+
+export default function KhungGiaoDienTong({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    const loadUser = () => {
+      // 1. Các trang tự quản lý auth -> Cho qua luôn
+      if (pathname === '/' || pathname === '/admin' || pathname === '/phongquanly' || pathname === '/phongparttime' || pathname === '/trangchu') {
+          setIsLoading(false);
+          return;
+      }
+
+      // 2. Load user từ localStorage
+      const storedUser = typeof window !== 'undefined' ? localStorage.getItem('USER_INFO') : null;
+      
+      if (storedUser) {
+        try {
+          setCurrentUser(JSON.parse(storedUser));
+        } catch (e) {
+          console.error('Error parsing user:', e);
+        }
+      }
+      
+      setIsLoading(false);
+    };
+
+    loadUser();
+  }, [pathname]);
+
+  if (isLoading) return (
+      <div className="h-[100dvh] bg-black flex flex-col items-center justify-center gap-4">
+          <Loader2 className="animate-spin text-[#C69C6D]" size={40}/>
+      </div>
+  );
+ 
+  return (
+    <div className="flex flex-col min-h-[100dvh] bg-[#0a0a0a] text-gray-200 font-sans relative">
+        <main className="flex-1 w-full max-w-[1920px] mx-auto p-3 pb-20 md:p-6 md:pb-20">
+            {children}
+        </main>
+ <StaffPresence />
+ 
     </div>
   );
 }

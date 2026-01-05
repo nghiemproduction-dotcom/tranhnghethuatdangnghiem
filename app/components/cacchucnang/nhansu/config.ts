@@ -1,24 +1,23 @@
+"use client";
+
 /**
  * ============================================================
  * CHỨC NĂNG: NHÂN SỰ
  * Đường dẫn: phongchuan/cacchucnang/nhansu
  * ============================================================
- * 
- * Chức năng quản lý nhân sự dùng chung cho nhiều phòng.
+ * * Chức năng quản lý nhân sự dùng chung cho nhiều phòng.
  * Mỗi phòng gọi ra với quyền khác nhau thông qua props.
- * 
- * QUYỀN HẠN:
+ * * QUYỀN HẠN:
  * - allowView: Xem danh sách và chi tiết
  * - allowEdit: Sửa thông tin
  * - allowDelete: Xóa nhân sự
  * - allowBulk: Thao tác hàng loạt
- * 
- * SỬ DỤNG:
+ * * SỬ DỤNG:
  * import { NhanSuChucNang } from '@/app/components/cacchucnang/nhansu';
  * <NhanSuChucNang permissions={{ allowDelete: true }} />
  */
 
-import { Phone, Mail, Banknote, Clock, Percent, ShieldCheck } from 'lucide-react';
+import { Phone, Mail, Banknote, Clock, Percent, ShieldCheck, User } from 'lucide-react';
 import { ManagerConfig, FieldConfig, FilterTabConfig, TabConfig } from '../types';
 import { 
     getNhanSuDataAction, 
@@ -171,10 +170,32 @@ const filterTabs: FilterTabConfig[] = [
 // DETAIL TABS
 // ============================================================
 
-const detailTabs: TabConfig[] = [
-    { id: 'hoso', label: 'HỒ SƠ' },
-    { id: 'muctieu', label: 'MỤC TIÊU', searchable: true, sortable: true, sortOptions: [{ key: 'name', label: 'TÊN' }, { key: 'reward', label: 'THƯỞNG' }], showAddButton: true },
-    { id: 'thanhtich', label: 'THÀNH TÍCH', searchable: true },
+// 🟢 UPDATE: Thêm checkFields để Framework tự đếm số lượng thông tin
+const detailTabs: any[] = [
+    { 
+        id: 'hoso', 
+        label: 'HỒ SƠ', 
+        icon: User,
+        // Danh sách các trường cần đếm xem có dữ liệu hay không
+        checkFields: [
+            'email', 'so_dien_thoai', 'vi_tri', 
+            'luong_thang', 'luong_theo_gio', 'thuong_doanh_thu',
+            'ngan_hang', 'so_tai_khoan'
+        ]
+    },
+    { 
+        id: 'muctieu', 
+        label: 'MỤC TIÊU', 
+        searchable: true, 
+        sortable: true, 
+        sortOptions: [{ key: 'name', label: 'TÊN' }, { key: 'reward', label: 'THƯỞNG' }], 
+        showAddButton: true 
+    },
+    { 
+        id: 'thanhtich', 
+        label: 'THÀNH TÍCH', 
+        searchable: true 
+    },
 ];
 
 // ============================================================

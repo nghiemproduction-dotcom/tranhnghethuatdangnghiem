@@ -1,12 +1,3 @@
-/**
- * ============================================================
- * COMPONENT: KHÁCH HÀNG
- * ============================================================
- *
- * Sử dụng KhungGiaoDien để đồng bộ giao diện.
- * 3 chế độ view: List | Detail | Form (inline, không popup)
- */
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
@@ -101,13 +92,13 @@ export default function KhachHangChucNang({
   }>({ show: false, ids: [] });
 
   const [formData, setFormData] = useState<Partial<KhachHang>>({});
-  const [saving, setSaving] = useState(false);
+  
+  // 🟢 ĐÃ XÓA: const [saving, setSaving] = useState(false);
 
   // ========== FETCH DATA ==========
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // 🛠️ FIX: Kiểm tra dataSource và method tồn tại
       if (config.dataSource?.fetchList) {
         const res = await config.dataSource.fetchList(1, 50, "", "");
         if (res.success && res.data) setItems(res.data);
@@ -127,7 +118,6 @@ export default function KhachHangChucNang({
   const tabs = useMemo(() => {
     const counts: Record<string, number> = { all: items.length };
     config.filterTabs?.forEach((tab) => {
-      // 🛠️ FIX: Kiểm tra id và filterField
       if (tab.id && tab.filterField) {
         counts[tab.id] = items.filter(
           (i) => (i as any)[tab.filterField!] === tab.id
@@ -137,7 +127,7 @@ export default function KhachHangChucNang({
 
     const dynamicTabs =
       config.filterTabs?.map((t) => ({
-        id: t.id || "", // Fallback ID rỗng
+        id: t.id || "",
         label: t.label,
         count: t.id ? counts[t.id] || 0 : 0,
       })) || [];
@@ -194,30 +184,9 @@ export default function KhachHangChucNang({
     setSelectedItem(null);
   };
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      // 🛠️ FIX: Kiểm tra dataSource trước khi gọi
-      if (selectedItem?.id) {
-        if (config.dataSource?.update) {
-          await config.dataSource.update(selectedItem.id, formData);
-        }
-      } else {
-        if (config.dataSource?.create) {
-          await config.dataSource.create(formData);
-        }
-      }
-      await fetchData();
-      handleBackToList();
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setSaving(false);
-    }
-  };
+  // 🟢 ĐÃ XÓA: handleSave thủ công (Đã chuyển vào prop action của KhungForm)
 
   const handleDelete = async (ids: string[]) => {
-    // 🛠️ FIX: Kiểm tra delete method
     if (config.dataSource?.delete) {
       for (const id of ids) {
         await config.dataSource.delete(id);
@@ -255,7 +224,7 @@ export default function KhachHangChucNang({
           tabs={tabs}
           activeTab={activeTab}
           onTabChange={setActiveTab}
-          onSearch={setSearchTerm} // 🛠️ FIX: Đã xóa searchPlaceholder
+          onSearch={setSearchTerm}
           sortOptions={
             config.sortOptions?.map((s) => ({ key: s.key, label: s.label })) ||
             []
@@ -450,11 +419,32 @@ export default function KhachHangChucNang({
           data={formData}
           onClose={handleBackToList}
           title={selectedItem ? selectedItem.ho_ten : "THÊM KHÁCH HÀNG"}
-          avatar={selectedItem?.hinh_anh}
+          
+          avatar={formData.hinh_anh}
           avatarFallback={<User size={10} className="text-[#C69C6D]/50" />}
           showAvatarUpload={true}
-          onSubmit={handleSave}
-          loading={saving}
+          uploadBucket="avatar"
+          onUploadComplete={(url) => 
+            setFormData((prev) => ({ ...prev, hinh_anh: url }))
+          }
+          
+          // 🟢 SMART SAVE ACTION
+          action={{
+            validate: (data) => {
+               if (!data.ho_ten) return "Vui lòng nhập họ tên";
+               if (!data.so_dien_thoai) return "Vui lòng nhập số điện thoại";
+               return null;
+            },
+            onSave: async (data) => {
+                if (selectedItem?.id) {
+                    return await config.dataSource?.update?.(selectedItem.id, data);
+                } else {
+                    return await config.dataSource?.create?.(data);
+                }
+            },
+            onSuccess: () => fetchData()
+          }}
+          
           isDirty={Object.keys(formData).length > 0}
         >
           <div className="space-y-4">

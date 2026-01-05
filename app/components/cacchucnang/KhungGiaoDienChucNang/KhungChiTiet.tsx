@@ -8,9 +8,10 @@
  * - Row 1 Height: 45px (Compact Header)
  * - Row 2 Height: 40px (Compact Tabs)
  * - Tabs Style: Text-only (No background buttons), simple underline.
+ * 🟢 UPDATE: Tự động đếm số trường có dữ liệu cho từng tab
  */
 
-import React, { ReactNode, useState } from "react";
+import React, { ReactNode, useState, useMemo } from "react";
 import {
   X,
   User,
@@ -25,27 +26,36 @@ import {
 // TYPES
 // ============================================================
 
-export interface TabItem {
+export interface DetailTabDef {
   id: string;
   label: string;
   icon?: React.ElementType;
-  count?: number;
+  
+  // Mảng các tên trường cần kiểm tra để đếm (VD: ['email', 'phone'])
+  checkFields?: string[]; 
+  
+  // 🟢 FIX LỖI TS: Thêm thuộc tính count (optional) để TS hiểu đây là biến được tính toán thêm
+  count?: number; 
+
   searchable?: boolean;
   sortable?: boolean;
   sortOptions?: { key: string; label: string }[];
   showAddButton?: boolean;
 }
 
-export interface KhungChiTietProps {
-  data: any;
+// 🟢 UPDATE: Dùng Generic <T> thay vì any
+export interface KhungChiTietProps<T = any> {
+  data: T;
   onClose: () => void;
   avatar?: string;
   avatarFallback?: ReactNode;
   title?: string;
-  tabs?: TabItem[];
+  
+  tabDefs?: DetailTabDef[]; // Dùng tabDefs thay vì tabs cứng
+  
   activeTab?: string;
   onTabChange?: (tabId: string) => void;
-  tabCounts?: Record<string, number>;
+  
   searchTerm?: string;
   onSearch?: (term: string) => void;
   sortBy?: string;
@@ -64,16 +74,15 @@ export interface KhungChiTietProps {
 // COMPONENT
 // ============================================================
 
-export default function KhungChiTiet({
+export default function KhungChiTiet<T extends Record<string, any>>({
   data,
   onClose,
   avatar,
   avatarFallback,
   title,
-  tabs = [],
+  tabDefs = [], 
   activeTab,
   onTabChange,
-  tabCounts = {},
   searchTerm = "",
   onSearch,
   sortBy,
@@ -86,7 +95,7 @@ export default function KhungChiTiet({
   deleting = false,
   children,
   className = "",
-}: KhungChiTietProps) {
+}: KhungChiTietProps<T>) {
   const [showSearch, setShowSearch] = useState(false);
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
   const [showSortMenu, setShowSortMenu] = useState(false);
@@ -96,10 +105,29 @@ export default function KhungChiTiet({
   const [touchEndX, setTouchEndX] = useState<number | null>(null);
   const minSwipeDistance = 50;
 
+  // 🟢 LOGIC MỚI: Tự động đếm số trường có dữ liệu
+  const renderedTabs = useMemo(() => {
+    if (!data) return tabDefs;
+
+    return tabDefs.map(tab => {
+      let count = tab.count ?? 0; // Ưu tiên count truyền vào từ ngoài (nếu có)
+      
+      // Nếu chưa có count và có checkFields thì tự đếm
+      if (count === 0 && tab.checkFields && Array.isArray(tab.checkFields)) {
+        count = tab.checkFields.filter(field => {
+          const val = data[field];
+          // 🟢 FIX: Chấp nhận số 0 là dữ liệu hợp lệ. Chỉ loại bỏ null, undefined, string rỗng.
+          return val !== null && val !== undefined && val !== "";
+        }).length;
+      }
+      return { ...tab, count };
+    });
+  }, [data, tabDefs]);
+
   if (!data) return null;
 
-  const currentTabConfig = tabs.find((t) => t.id === activeTab);
-  const TAB_IDS = tabs.map((t) => t.id);
+  const currentTabConfig = renderedTabs.find((t) => t.id === activeTab);
+  const TAB_IDS = renderedTabs.map((t) => t.id);
 
   // Swipe handlers
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -138,11 +166,10 @@ export default function KhungChiTiet({
     >
       {/* ====== HEADER CONTAINER ====== */}
       <div className="shrink-0 flex flex-col bg-[#0a0a0a] border-b border-white/5 z-20 shadow-sm">
-        {/* --- ROW 1: INFO & ACTIONS (Height reduced to 45px) --- */}
+        {/* --- ROW 1: INFO & ACTIONS --- */}
         <div className="flex items-center justify-between px-4 h-[45px] border-b border-white/5">
           {/* LEFT: Avatar + Title */}
           <div className="flex items-center gap-3 min-w-0">
-            {/* Avatar nhỏ hơn chút (w-8 h-8) để hợp với thanh h-45 */}
             <div className="w-8 h-8 rounded-full border border-[#C69C6D]/30 overflow-hidden bg-[#1a1a1a] shrink-0 p-0.5 shadow-lg shadow-[#C69C6D]/5">
               {avatar ? (
                 <img
@@ -203,7 +230,7 @@ export default function KhungChiTiet({
           </div>
         </div>
 
-        {/* --- ROW 2: CLEAN TABS (Height reduced to 40px) --- */}
+        {/* --- ROW 2: CLEAN TABS --- */}
         <div className="flex items-center justify-between h-[40px] px-2 relative">
           {/* Spacer Left */}
           <div className="w-[60px] shrink-0 hidden md:block"></div>
@@ -219,7 +246,9 @@ export default function KhungChiTiet({
                 scrollbar-width: none;
               }
             `}</style>
-            {tabs.map((tab) => (
+            
+            {/* Render danh sách tab */}
+            {renderedTabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => onTabChange?.(tab.id)}
@@ -232,8 +261,9 @@ export default function KhungChiTiet({
                 `}
               >
                 {tab.label}
-                {(tabCounts[tab.id] !== undefined ||
-                  tab.count !== undefined) && (
+                
+                {/* 🟢 Hiển thị Count nếu có và > 0 */}
+                {tab.count !== undefined && tab.count > 0 && (
                   <span
                     className={`text-[9px] ${
                       activeTab === tab.id
@@ -241,11 +271,11 @@ export default function KhungChiTiet({
                         : "text-gray-600 group-hover:text-gray-400"
                     }`}
                   >
-                    ({tabCounts[tab.id] ?? tab.count ?? 0})
+                    ({tab.count})
                   </span>
                 )}
 
-                {/* Active Indicator Line (Simple Underline) */}
+                {/* Active Indicator Line */}
                 {activeTab === tab.id && (
                   <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#C69C6D] shadow-[0_0_8px_#C69C6D]" />
                 )}

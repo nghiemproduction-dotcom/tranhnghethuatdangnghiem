@@ -1,23 +1,28 @@
-/**
- * ============================================================
- * COMPONENT: NHÂN SỰ
- * ============================================================
- *
- * Sử dụng KhungGiaoDien để đồng bộ giao diện.
- * 3 chế độ view: List | Detail | Form (inline, không popup)
- */
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { User, Phone, Mail, Banknote, Briefcase, Trash2 } from "lucide-react";
+import {
+  User,
+  Phone,
+  Mail,
+  Briefcase,
+  Banknote,
+  Trash2,
+  Clock,     // Thêm icon
+  Percent,   // Thêm icon
+  CreditCard // Thêm icon
+} from "lucide-react";
 import {
   KhungDanhSach,
   KhungChiTiet,
   KhungForm,
 } from "@/app/components/cacchucnang/KhungGiaoDienChucNang";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
-import { NhanSu, NhanSuPermissions, createNhanSuConfig } from "./config";
+import {
+  NhanSu,
+  NhanSuPermissions,
+  createNhanSuConfig,
+} from "./config";
 
 // ============================================================
 // PROPS
@@ -29,25 +34,6 @@ interface Props {
 }
 
 // ============================================================
-// HELPER: Format tiền VNĐ
-// ============================================================
-
-const formatMoney = (value: number | undefined) => {
-  if (!value) return "0 ₫";
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-  }).format(value);
-};
-
-const toNonAccent = (str: string) =>
-  str
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, "")
-    .toLowerCase();
-
-// ============================================================
 // COMPONENT
 // ============================================================
 
@@ -55,48 +41,49 @@ export default function NhanSuChucNang({
   permissions = {},
   className = "",
 }: Props) {
-  console.log("🔴 NhanSuChucNang MOUNTED - new version with KhungDanhSach");
   const config = createNhanSuConfig(permissions);
+  
   const {
     allowView = true,
     allowEdit = true,
     allowDelete = false,
-    allowBulk = false,
-  } = permissions;
+    allowBulkSelect: allowBulk = false,
+  } = config.actions || {};
 
-  // ========== STATE ==========
-  const [items, setItems] = useState<NhanSu[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState("all");
-  const [sortBy, setSortBy] = useState("name");
-
-  // VIEW STATE: 'list' | 'detail' | 'form'
+  // --- STATE ---
   const [viewMode, setViewMode] = useState<"list" | "detail" | "form">("list");
+  const [listData, setListData] = useState<NhanSu[]>([]);
+  const [loading, setLoading] = useState(true);
+  
   const [selectedItem, setSelectedItem] = useState<NhanSu | null>(null);
-  const [detailTab, setDetailTab] = useState("hoso");
+  const [formData, setFormData] = useState<Partial<NhanSu>>({});
 
+  // List State
+  const [activeTab, setActiveTab] = useState("all");
+  const [activeSort, setSortBy] = useState(config.defaultSort || "name");
+  const [searchTerm, setSearchTerm] = useState("");
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Detail State
+  const [detailTab, setDetailTab] = useState("hoso");
+
+  // Confirm Dialog
   const [confirmDelete, setConfirmDelete] = useState<{
     show: boolean;
     ids: string[];
   }>({ show: false, ids: [] });
 
-  const [formData, setFormData] = useState<Partial<NhanSu>>({});
-  const [saving, setSaving] = useState(false);
-
-  // ========== FETCH DATA ==========
+  // --- DATA FETCHING ---
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // 🛠️ FIX: Kiểm tra kỹ dataSource.fetchList có tồn tại không
-      if (config.dataSource?.fetchList) {
-        const res = await config.dataSource.fetchList(1, 50, "", "");
-        if (res.success && res.data) setItems(res.data);
+      const res = await config.dataSource?.fetchList?.(1, 1000, "", ""); 
+      if (res?.success && res.data) {
+        setListData(res.data);
       }
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error("Lỗi tải dữ liệu:", error);
     } finally {
       setLoading(false);
     }
@@ -106,144 +93,132 @@ export default function NhanSuChucNang({
     fetchData();
   }, [fetchData]);
 
-  // ========== TABS với COUNT ==========
-  const tabs = useMemo(() => {
-    const counts: Record<string, number> = { all: items.length };
-    config.filterTabs?.forEach((tab) => {
-      // Kiểm tra an toàn trước khi truy cập
-      if (tab.id && tab.filterField) {
-        counts[tab.id] = items.filter(
-          (i) => (i as any)[tab.filterField!] === tab.id
-        ).length;
-      }
-    });
+  // --- HANDLERS ---
 
-    const dynamicTabs =
-      config.filterTabs?.map((t) => ({
-        id: t.id || "", // Fallback ID rỗng
-        label: t.label,
-        count: t.id ? counts[t.id] || 0 : 0,
-      })) || [];
-
-    return [{ id: "all", label: "TẤT CẢ", count: counts.all }, ...dynamicTabs];
-  }, [items, config.filterTabs]);
-
-  // ========== FILTERED & SORTED ==========
-  const filteredList = useMemo(() => {
-    let result = items;
-
-    // Filter by tab
-    if (activeTab !== "all") {
-      result = result.filter((i) => i.vi_tri_normalized === activeTab);
-    }
-
-    // Search
-    if (searchTerm) {
-      const term = toNonAccent(searchTerm);
-      result = result.filter((i) => {
-        const hoTen = toNonAccent(i.ho_ten || "");
-        const match =
-          hoTen.includes(term) ||
-          (i.so_dien_thoai || "").includes(term) ||
-          toNonAccent(i.email || "").includes(term);
-        return match;
-      });
-    }
-
-    // Sort
-    const sortOpt = config.sortOptions?.find((s) => s.key === sortBy);
-    if (sortOpt?.sortFn) {
-      result = [...result].sort(sortOpt.sortFn);
-    }
-
-    return result;
-  }, [items, activeTab, searchTerm, sortBy, config.sortOptions]);
-
-  // ========== HANDLERS ==========
   const handleOpenDetail = (item: NhanSu) => {
     setSelectedItem(item);
-    setDetailTab("hoso");
     setViewMode("detail");
   };
 
   const handleOpenForm = (item?: NhanSu) => {
-    setFormData(item ? { ...item } : {});
-    setSelectedItem(item || null);
+    if (item) {
+      setSelectedItem(item);
+      setFormData(item);
+    } else {
+      setSelectedItem(null);
+      setFormData({});
+    }
     setViewMode("form");
   };
 
   const handleBackToList = () => {
     setViewMode("list");
     setSelectedItem(null);
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      // 🛠️ FIX: Kiểm tra create/update có tồn tại không
-      if (selectedItem?.id) {
-        if (config.dataSource?.update) {
-          await config.dataSource.update(selectedItem.id, formData);
-        }
-      } else {
-        if (config.dataSource?.create) {
-          await config.dataSource.create(formData);
-        }
-      }
-      await fetchData();
-      handleBackToList();
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setSaving(false);
-    }
+    setFormData({});
   };
 
   const handleDelete = async (ids: string[]) => {
-    // 🛠️ FIX: Kiểm tra delete có tồn tại không
-    if (config.dataSource?.delete) {
+    if (ids.length === 0) return;
+    try {
       for (const id of ids) {
-        await config.dataSource.delete(id);
+        await config.dataSource?.delete?.(id);
       }
-      await fetchData();
-      setSelectedIds(new Set());
       setConfirmDelete({ show: false, ids: [] });
-      handleBackToList();
+      setSelectedIds(new Set());
+      setBulkMode(false);
+      if (viewMode === "detail") handleBackToList();
+      fetchData();
+    } catch (e) {
+      console.error(e);
+      alert("Lỗi khi xóa dữ liệu");
     }
   };
 
   const toggleSelect = (id: string) => {
-    const newSet = new Set(selectedIds);
-    if (newSet.has(id)) newSet.delete(id);
-    else newSet.add(id);
-    setSelectedIds(newSet);
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
   };
 
-  // ========== DETAIL TABS COUNT ==========
-  const detailTabCounts = useMemo(
-    () => ({
-      hoso: 3,
-      luong: 3,
-      nganhang: 2,
-    }),
-    []
-  );
+  // --- FILTER & SORT LOGIC ---
+  const filteredList = useMemo(() => {
+    let result = listData;
 
-  // ========== RENDER ==========
+    if (activeTab !== "all") {
+      const tabConfig = config.filterTabs.find((t) => t.id === activeTab);
+      if (tabConfig && tabConfig.filterField) {
+        result = result.filter(
+          (item: any) => item[tabConfig.filterField!] === activeTab
+        );
+      }
+    }
+
+    if (searchTerm) {
+      const lower = searchTerm.toLowerCase();
+      result = result.filter(
+        (item) =>
+          item.ho_ten.toLowerCase().includes(lower) ||
+          item.so_dien_thoai?.includes(lower) ||
+          item.email?.toLowerCase().includes(lower)
+      );
+    }
+
+    if (config.sortOptions) {
+      const sortConfig = config.sortOptions.find((o) => o.key === activeSort);
+      if (sortConfig) {
+        result = [...result].sort(sortConfig.sortFn);
+      }
+    }
+
+    return result;
+  }, [listData, activeTab, searchTerm, activeSort, config.filterTabs, config.sortOptions]);
+
+  // 🟢 CONFIG LIST TABS
+  const listTabDefs = useMemo(() => {
+    return config.filterTabs.map((t) => ({
+      id: t.id || "",
+      label: t.label,
+      filterField: t.filterField,
+    }));
+  }, [config.filterTabs]);
+
+  // 🟢 FIX LỖI TYPE: Map lại mảng tab để đảm bảo `id` luôn là string
+  const detailTabDefs = useMemo(() => {
+    return (config.detailTabs || []).map(tab => ({
+      ...tab,
+      id: tab.id || "" // Fallback nếu id bị undefined
+    }));
+  }, [config.detailTabs]);
+
+  const formatMoney = (val?: number) => {
+    if (!val) return "0 ₫";
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+    }).format(val);
+  };
+
+  if (!allowView) return <div className="p-4 text-white/50">Không có quyền truy cập</div>;
+
   return (
-    <div className={`h-full ${className}`}>
+    <div className={`w-full h-full bg-[#050505] flex flex-col ${className}`}>
+      
       {/* ====== CHẾ ĐỘ DANH SÁCH ====== */}
       {viewMode === "list" && (
         <KhungDanhSach
-          tabs={tabs}
+          data={listData}
+          tabDefs={listTabDefs}
+          
           activeTab={activeTab}
-          onTabChange={setActiveTab}
-          onSearch={setSearchTerm} // 🛠️ FIX: Đã xóa searchPlaceholder gây lỗi
-          sortOptions={
-            config.sortOptions?.map((s) => ({ key: s.key, label: s.label })) ||
-            []
-          }
-          activeSort={sortBy}
+          onTabChange={(id) => {
+            setActiveTab(id);
+            setBulkMode(false);
+            setSelectedIds(new Set());
+          }}
+          onSearch={setSearchTerm}
+          sortOptions={config.sortOptions}
+          activeSort={activeSort}
           onSortChange={setSortBy}
           showAddButton={allowEdit}
           onAdd={() => handleOpenForm()}
@@ -360,14 +335,12 @@ export default function NhanSuChucNang({
           avatar={selectedItem.hinh_anh}
           avatarFallback={<User size={10} className="text-[#C69C6D]/50" />}
           title={selectedItem.ho_ten}
-          tabs={[
-            { id: "hoso", label: "HỒ SƠ" },
-            { id: "luong", label: "LƯƠNG" },
-            { id: "nganhang", label: "NGÂN HÀNG" },
-          ]}
+          
+          // 🟢 ĐÃ SỬA: Truyền detailTabDefs đã được map
+          tabDefs={detailTabDefs}
+          
           activeTab={detailTab}
           onTabChange={setDetailTab}
-          tabCounts={detailTabCounts}
           showEditButton={allowEdit}
           showDeleteButton={allowDelete}
           onEdit={() => handleOpenForm(selectedItem)}
@@ -376,53 +349,36 @@ export default function NhanSuChucNang({
           }
         >
           <div className="p-4">
+            {/* 🟢 GIAO DIỆN HỢP NHẤT: Tất cả trong tab HỒ SƠ */}
             {detailTab === "hoso" && (
-              <div className="space-y-3">
-                <InfoRow icon={Mail} label="EMAIL" value={selectedItem.email} />
-                <InfoRow
-                  icon={Phone}
-                  label="SỐ ĐIỆN THOẠI"
-                  value={selectedItem.so_dien_thoai}
-                />
-                <InfoRow
-                  icon={Briefcase}
-                  label="VỊ TRÍ"
-                  value={selectedItem.vi_tri}
-                />
-              </div>
-            )}
-            {detailTab === "luong" && (
-              <div className="space-y-3">
-                <InfoRow
-                  icon={Banknote}
-                  label="LƯƠNG THÁNG"
-                  value={formatMoney(selectedItem.luong_thang)}
-                  highlight
-                />
-                <InfoRow
-                  icon={Banknote}
-                  label="LƯƠNG THEO GIỜ"
-                  value={formatMoney(selectedItem.luong_theo_gio)}
-                />
-                <InfoRow
-                  icon={Banknote}
-                  label="THƯỞNG DOANH SỐ"
-                  value={`${selectedItem.thuong_doanh_thu || 0}%`}
-                />
-              </div>
-            )}
-            {detailTab === "nganhang" && (
-              <div className="space-y-3">
-                <InfoRow
-                  icon={Banknote}
-                  label="NGÂN HÀNG"
-                  value={selectedItem.ngan_hang}
-                />
-                <InfoRow
-                  icon={Banknote}
-                  label="SỐ TÀI KHOẢN"
-                  value={selectedItem.so_tai_khoan}
-                />
+              <div className="space-y-6">
+                
+                {/* 1. THÔNG TIN LIÊN HỆ */}
+                <div className="space-y-3">
+                  <InfoRow icon={Briefcase} label="VỊ TRÍ" value={selectedItem.vi_tri} highlight />
+                  <InfoRow icon={Phone} label="SỐ ĐIỆN THOẠI" value={selectedItem.so_dien_thoai} />
+                  <InfoRow icon={Mail} label="EMAIL" value={selectedItem.email} />
+                </div>
+
+                {/* 2. CHẾ ĐỘ LƯƠNG */}
+                <div className="pt-4 border-t border-white/5 space-y-3">
+                  <label className="text-[10px] font-bold text-white/40 uppercase pl-1">Chế độ lương</label>
+                  <div className="space-y-2">
+                    <InfoRow icon={Banknote} label="LƯƠNG THÁNG" value={formatMoney(selectedItem.luong_thang)} highlight />
+                    <InfoRow icon={Clock} label="LƯƠNG THEO GIỜ" value={formatMoney(selectedItem.luong_theo_gio)} />
+                    <InfoRow icon={Percent} label="THƯỞNG DOANH SỐ" value={selectedItem.thuong_doanh_thu ? `${selectedItem.thuong_doanh_thu}%` : "0%"} />
+                  </div>
+                </div>
+
+                {/* 3. THANH TOÁN */}
+                <div className="pt-4 border-t border-white/5 space-y-3">
+                  <label className="text-[10px] font-bold text-white/40 uppercase pl-1">Thanh toán</label>
+                  <div className="space-y-2">
+                    <InfoRow icon={Banknote} label="NGÂN HÀNG" value={selectedItem.ngan_hang} />
+                    <InfoRow icon={CreditCard} label="SỐ TÀI KHOẢN" value={selectedItem.so_tai_khoan} />
+                  </div>
+                </div>
+
               </div>
             )}
           </div>
@@ -436,11 +392,33 @@ export default function NhanSuChucNang({
           data={formData}
           onClose={handleBackToList}
           title={selectedItem ? selectedItem.ho_ten : "THÊM NHÂN SỰ"}
-          avatar={selectedItem?.hinh_anh}
+          
+          avatar={formData.hinh_anh} 
           avatarFallback={<User size={10} className="text-[#C69C6D]/50" />}
           showAvatarUpload={true}
-          onSubmit={handleSave}
-          loading={saving}
+          uploadBucket="avatar"
+          onUploadComplete={(url) => 
+              setFormData((prev) => ({ ...prev, hinh_anh: url }))
+          }
+
+          // Smart Save
+          action={{
+            validate: (data) => {
+                if (!data.ho_ten || !data.vi_tri) {
+                    return "Vui lòng nhập đủ họ tên và vị trí";
+                }
+                return null;
+            },
+            onSave: async (data) => {
+                if (selectedItem?.id) {
+                    return await config.dataSource?.update?.(selectedItem.id, data);
+                } else {
+                    return await config.dataSource?.create?.(data);
+                }
+            },
+            onSuccess: () => fetchData(),
+          }}
+
           isDirty={Object.keys(formData).length > 0}
         >
           <div className="space-y-4">
@@ -480,6 +458,7 @@ export default function NhanSuChucNang({
                   placeholder="email@..."
                 />
               </FormField>
+
               <FormField label="Số điện thoại">
                 <input
                   type="tel"

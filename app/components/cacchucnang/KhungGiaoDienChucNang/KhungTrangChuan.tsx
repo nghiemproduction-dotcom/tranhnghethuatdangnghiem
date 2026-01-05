@@ -8,7 +8,8 @@ import { Z_INDEX } from "@/app/constants/zIndex";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const BASE_IMG_URL = `${SUPABASE_URL}/storage/v1/object/public/hinh-nen`;
 
-interface Props {
+// 🟢 UPDATE: Export interface và đổi tên cho chuẩn
+export interface KhungTrangChuanProps {
   children: ReactNode;
   nguoiDung: any;
   loiChao?: string;
@@ -20,7 +21,7 @@ export default function KhungTrangChuan({
   nguoiDung,
   loiChao,
   contentClassName = "max-w-[1920px] mx-auto p-3 pb-24 md:p-6 md:pb-24 pt-24",
-}: Props) {
+}: KhungTrangChuanProps) {
   const bgUrlMobile = `${BASE_IMG_URL}/trangchu-mobile.jpg`;
   const bgUrlTablet = `${BASE_IMG_URL}/trangchu-tablet.jpg`;
   const bgUrlDesktop = `${BASE_IMG_URL}/trangchu-desktop.jpg`;

@@ -9,6 +9,7 @@
  * 1. Giao diện Header/Footer chuẩn.
  * 2. Xác nhận khi đóng form nếu dữ liệu thay đổi (isDirty).
  * 3. Tự động Nén ảnh (<1MB) và Upload lên Supabase (nếu có prop uploadBucket).
+ * 4. [NEW] Smart Save: Tự động validate, gọi API và xử lý kết quả (nếu dùng prop action).
  */
 
 import React, { ReactNode, useState, useRef } from "react";
@@ -37,11 +38,18 @@ export interface KhungFormProps {
   onUploadComplete?: (url: string) => void; // Callback trả về URL sau khi upload xong
   onAvatarChange?: (file: File | null) => void; // (Legacy) Callback trả về file thô nếu muốn tự xử lý
 
-  // Form Actions
+  // 🟢 [NEW] SMART SAVE ACTION (Thay thế onSubmit thủ công)
+  action?: {
+    onSave: (data: any) => Promise<any>;      // Hàm gọi API (create/update)
+    validate?: (data: any) => string | null;  // Hàm check lỗi (trả về string lỗi hoặc null)
+    onSuccess?: () => void;                   // Hàm chạy khi lưu thành công (reload list)
+  };
+
+  // Form Actions (Legacy)
   onSubmit?: () => void | Promise<void>;
 
   // State
-  loading?: boolean; // Trạng thái đang lưu form
+  loading?: boolean; // Trạng thái đang lưu form (từ bên ngoài)
   isDirty?: boolean; // Trạng thái đã chỉnh sửa (để hiện confirm khi đóng)
 
   // Content
@@ -55,15 +63,20 @@ export interface KhungFormProps {
 
 export default function KhungForm({
   isEditing = false,
+  data, // Dữ liệu form hiện tại (cần cho Smart Save)
   onClose,
   title,
   avatar,
   avatarFallback,
   showAvatarUpload = false,
-  uploadBucket, // 🟢 Nhận tên bucket để kích hoạt auto-upload
+  uploadBucket,
   onUploadComplete,
   onAvatarChange,
+  
+  // Props hành động
+  action,
   onSubmit,
+  
   loading = false,
   isDirty = false,
   children,
@@ -73,12 +86,16 @@ export default function KhungForm({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  // 🟢 State nội bộ để quản lý trạng thái upload ảnh
-  const [isUploading, setIsUploading] = useState(false);
+  // State nội bộ
+  const [isUploading, setIsUploading] = useState(false); // Loading khi up ảnh
+  const [internalLoading, setInternalLoading] = useState(false); // Loading khi gọi API qua action
+
+  // Tổng hợp trạng thái loading
+  const isLoading = loading || isUploading || internalLoading;
 
   // Xử lý đóng form an toàn
   const handleClose = () => {
-    if (isUploading) return; // Không cho đóng khi đang upload dở
+    if (isLoading) return; // Không cho đóng khi đang bận
     if (isDirty) {
       setShowConfirm(true);
     } else {
@@ -91,15 +108,50 @@ export default function KhungForm({
     onClose();
   };
 
-  // Xử lý submit form
+  // 🟢 [UPDATED] Xử lý submit form (Smart Save Logic)
   const handleSubmit = async () => {
-    if (loading || isUploading) return; // Chặn nếu đang bận
-    await onSubmit?.();
+    if (isLoading) return;
+
+    // CÁCH 1: Dùng Action (Thông minh)
+    if (action) {
+      // 1. Validate
+      if (action.validate) {
+        const errorMsg = action.validate(data);
+        if (errorMsg) {
+          alert(errorMsg);
+          return;
+        }
+      }
+
+      // 2. Call API
+      setInternalLoading(true);
+      try {
+        const res = await action.onSave(data);
+
+        // 3. Kiểm tra kết quả (Giả định format { success: boolean, error?: string })
+        if (res && res.success === false) {
+          alert(res.error || "Thao tác thất bại!");
+        } else {
+          // Thành công
+          if (action.onSuccess) action.onSuccess();
+          onClose(); // Tự động đóng form
+        }
+      } catch (err) {
+        console.error("Smart Save Error:", err);
+        alert("Đã có lỗi xảy ra khi lưu dữ liệu.");
+      } finally {
+        setInternalLoading(false);
+      }
+    } 
+    // CÁCH 2: Dùng onSubmit cũ (Legacy)
+    else {
+      await onSubmit?.();
+    }
   };
 
   // Kích hoạt input file
   const handleAvatarClick = () => {
-    if (!isUploading) fileInputRef.current?.click();
+    if (!isLoading) fileInputRef.current?.click();
   };
 
   // 🟢 CORE LOGIC: XỬ LÝ ẢNH (Nén -> Upload -> Lấy URL)
@@ -107,28 +159,20 @@ export default function KhungForm({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 1. Preview ngay lập tức cho mượt
+    // 1. Preview ngay lập tức
     const reader = new FileReader();
     reader.onloadend = () => setAvatarPreview(reader.result as string);
     reader.readAsDataURL(file);
 
-    // 2. Nếu có cấu hình bucket -> Tự động Nén & Upload
+    // 2. Auto Upload
     if (uploadBucket) {
       try {
-        setIsUploading(true); // Bật loading
-
-        // A. Nén ảnh (Giảm dung lượng để tiết kiệm băng thông và Storage)
-        // Quality 0.7, Max width 1200px là đủ nét cho web
+        setIsUploading(true);
         const compressedFile = await compressImage(file, 0.7, 1200);
-
-        // B. Tạo tên file an toàn (Timestamp + Random + Extension)
-        // Thay thế các ký tự đặc biệt để tránh lỗi URL
+        
         const safeName = file.name.replace(/[^a-zA-Z0-9]/g, "_");
-        const fileName = `img_${Date.now()}_${Math.floor(
-          Math.random() * 1000
-        )}_${safeName}.jpg`;
+        const fileName = `img_${Date.now()}_${Math.floor(Math.random() * 1000)}_${safeName}.jpg`;
 
-        // C. Upload lên Supabase
         const { error: uploadError } = await supabase.storage
           .from(uploadBucket)
           .upload(fileName, compressedFile, {
@@ -138,56 +182,44 @@ export default function KhungForm({
 
         if (uploadError) throw uploadError;
 
-        // D. Lấy URL công khai
         const { data: urlData } = supabase.storage
           .from(uploadBucket)
           .getPublicUrl(fileName);
 
-        // E. Trả về URL cho form cha để lưu vào DB
         if (onUploadComplete) {
           onUploadComplete(urlData.publicUrl);
         }
       } catch (error: any) {
         console.error("🔥 Upload failed:", error);
         alert(`Lỗi tải ảnh: ${error.message || "Vui lòng kiểm tra kết nối"}`);
-        setAvatarPreview(null); // Reset preview nếu lỗi
+        setAvatarPreview(null);
       } finally {
-        setIsUploading(false); // Tắt loading dù thành công hay thất bại
+        setIsUploading(false);
       }
-    }
-    // 3. Nếu không cấu hình bucket -> Trả file thô về cho cha tự xử lý (Legacy support)
-    else {
+    } else {
       onAvatarChange?.(file);
     }
   };
 
-  // Ảnh hiển thị: Ưu tiên Preview mới chọn > Ảnh cũ từ DB
   const displayAvatar = avatarPreview || avatar;
 
   return (
-    <div
-      className={`w-full h-full flex flex-col bg-[#050505] overflow-hidden ${className}`}
-    >
+    <div className={`w-full h-full flex flex-col bg-[#050505] overflow-hidden ${className}`}>
       {/* ====== HEADER BAR ====== */}
       <div className="shrink-0 h-[45px] flex items-center border-b border-white/5 bg-[#0a0a0a]">
         {/* TRÁI: Nút đóng + Info */}
         <div className="shrink-0 flex items-center gap-3 px-3 border-r border-white/5">
           <button
             onClick={handleClose}
-            disabled={loading || isUploading}
+            disabled={isLoading}
             className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-all disabled:opacity-50"
           >
             <X size={16} />
           </button>
           <div className="flex items-center gap-2 pr-2">
-            {/* Avatar Mini trên thanh header */}
             <div className="relative w-7 h-7 rounded-full border border-[#C69C6D]/50 overflow-hidden bg-[#1a1a1a] shrink-0">
               {displayAvatar ? (
-                <img
-                  src={displayAvatar}
-                  alt=""
-                  className="w-full h-full object-cover"
-                />
+                <img src={displayAvatar} alt="" className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-[#C69C6D]/50">
                   <User size={12} />
@@ -206,24 +238,23 @@ export default function KhungForm({
         <div className="shrink-0 flex items-center gap-2 px-3 border-l border-white/5">
           <button
             onClick={handleClose}
-            disabled={loading || isUploading}
+            disabled={isLoading}
             className="hidden md:block px-4 py-1.5 bg-white/5 hover:bg-white/10 text-white/60 rounded-lg text-[10px] font-bold uppercase transition-all"
           >
             HỦY BỎ
           </button>
           <button
             onClick={handleSubmit}
-            disabled={loading || isUploading}
+            disabled={isLoading}
             className={`
-                            px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all flex items-center gap-2
-                            ${
-                              loading || isUploading
-                                ? "bg-white/10 text-white/50 cursor-not-allowed"
-                                : "bg-[#C69C6D] hover:bg-[#b58b5d] text-black shadow-[0_0_10px_rgba(198,156,109,0.3)]"
-                            }
-                        `}
+                px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all flex items-center gap-2
+                ${isLoading
+                    ? "bg-white/10 text-white/50 cursor-not-allowed"
+                    : "bg-[#C69C6D] hover:bg-[#b58b5d] text-black shadow-[0_0_10px_rgba(198,156,109,0.3)]"
+                }
+            `}
           >
-            {loading || isUploading ? (
+            {isLoading ? (
               <Loader2 size={14} className="animate-spin" />
             ) : (
               <Save size={14} />
@@ -231,7 +262,7 @@ export default function KhungForm({
             <span>
               {isUploading
                 ? "ĐANG TẢI ẢNH..."
-                : loading
+                : internalLoading || loading
                 ? "ĐANG LƯU..."
                 : "LƯU LẠI"}
             </span>
@@ -258,13 +289,12 @@ export default function KhungForm({
             <div
               onClick={handleAvatarClick}
               className={`
-                                relative w-28 h-28 rounded-full border-2 overflow-hidden bg-[#1a1a1a] group transition-all
-                                ${
-                                  isUploading
-                                    ? "border-[#C69C6D] cursor-wait scale-95"
-                                    : "border-[#C69C6D]/30 hover:border-[#C69C6D] cursor-pointer hover:shadow-lg"
-                                }
-                            `}
+                    relative w-28 h-28 rounded-full border-2 overflow-hidden bg-[#1a1a1a] group transition-all
+                    ${isUploading
+                        ? "border-[#C69C6D] cursor-wait scale-95"
+                        : "border-[#C69C6D]/30 hover:border-[#C69C6D] cursor-pointer hover:shadow-lg"
+                    }
+                `}
             >
               {displayAvatar ? (
                 <img
@@ -285,16 +315,12 @@ export default function KhungForm({
                 {isUploading ? (
                   <div className="text-[#C69C6D] flex flex-col items-center gap-1">
                     <Loader2 size={24} className="animate-spin" />
-                    <span className="text-[8px] font-bold uppercase">
-                      Uploading...
-                    </span>
+                    <span className="text-[8px] font-bold uppercase">Uploading...</span>
                   </div>
                 ) : (
                   <div className="text-white flex flex-col items-center gap-1">
                     <Camera size={24} />
-                    <span className="text-[8px] font-bold uppercase">
-                      Thay đổi
-                    </span>
+                    <span className="text-[8px] font-bold uppercase">Thay đổi</span>
                   </div>
                 )}
               </div>
@@ -310,9 +336,7 @@ export default function KhungForm({
       {showConfirm && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 max-w-xs w-full text-center shadow-2xl">
-            <h3 className="text-white font-bold text-lg mb-2">
-              Dữ liệu chưa lưu
-            </h3>
+            <h3 className="text-white font-bold text-lg mb-2">Dữ liệu chưa lưu</h3>
             <p className="text-white/60 text-sm mb-6">
               Bạn có chắc muốn đóng không? Mọi thay đổi sẽ bị mất.
             </p>

@@ -7,26 +7,30 @@
  *
  * Khung giao diện chuẩn cho trang danh sách.
  * Style: Tab bar ngang + Actions góc phải (giống GenericManager)
+ * 🟢 UPDATE: Tự động tính toán Count cho các Tab (Đã tối ưu hiệu năng)
  */
 
-import React, { useState, ReactNode } from "react";
+import React, { useState, ReactNode, useMemo } from "react";
 import {
   Search,
   X,
   Plus,
   ArrowUpDown,
   CheckSquare,
-  Trash2,
 } from "lucide-react";
 
 // ============================================================
 // TYPES
 // ============================================================
 
-export interface TabItem {
+// 🟢 MỚI: Định nghĩa cấu hình Tab (chỉ cần ID và Tên cột lọc)
+export interface ListTabDef {
   id: string;
   label: string;
-  count?: number;
+  filterField?: string; // Tên cột trong DB để lọc (VD: 'phan_loai')
+  matchValue?: any;     // Giá trị để so sánh (Mặc định sẽ so sánh với id)
+  // 🟢 UPDATE: Thêm thuộc tính count cho phép truyền thủ công
+  count?: number; 
 }
 
 export interface SortOption {
@@ -42,9 +46,12 @@ export interface BulkAction {
   onClick: (selectedIds: string[]) => void;
 }
 
-export interface KhungDanhSachProps {
-  // Tabs
-  tabs?: TabItem[];
+// 🟢 UPDATE: Dùng Generic <T> thay vì any
+export interface KhungDanhSachProps<T = any> {
+  // 🟢 THAY ĐỔI: Nhận Data gốc và Cấu hình Tab để tự tính toán
+  data: T[]; 
+  tabDefs: ListTabDef[]; 
+
   activeTab?: string;
   onTabChange?: (tabId: string) => void;
 
@@ -59,7 +66,6 @@ export interface KhungDanhSachProps {
   // Actions
   showAddButton?: boolean;
   onAdd?: () => void;
-  // 🟢 THÊM: Cho phép chèn nút tùy chỉnh (vd: Sync User)
   extraActions?: ReactNode; 
 
   // Bulk mode
@@ -84,8 +90,9 @@ export interface KhungDanhSachProps {
 // COMPONENT
 // ============================================================
 
-export default function KhungDanhSach({
-  tabs = [],
+export default function KhungDanhSach<T extends Record<string, any>>({
+  data = [], // 🟢 Dữ liệu thô
+  tabDefs = [], // 🟢 Cấu hình tab
   activeTab = "all",
   onTabChange,
   onSearch,
@@ -94,7 +101,7 @@ export default function KhungDanhSach({
   onSortChange,
   showAddButton = true,
   onAdd,
-  extraActions, // 🟢 Nhận prop này
+  extraActions,
   bulkMode = false,
   onBulkModeToggle,
   selectedCount = 0,
@@ -104,10 +111,52 @@ export default function KhungDanhSach({
   loading = false,
   children,
   className = "",
-}: KhungDanhSachProps) {
+}: KhungDanhSachProps<T>) {
   const [showSearch, setShowSearch] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [showSortMenu, setShowSortMenu] = useState(false);
+
+  // 🟢 LOGIC MỚI (TỐI ƯU): Tự động tính toán số lượng (Count) bằng 1 vòng lặp duy nhất
+  const renderedTabs = useMemo(() => {
+    // 1. Khởi tạo map đếm
+    const countMap: Record<string, number> = { all: data.length };
+    
+    // Khởi tạo
+    tabDefs.forEach((t) => (countMap[t.id] = 0));
+
+    // 2. Chạy 1 vòng lặp qua Data để phân loại (O(N))
+    data.forEach((item) => {
+      tabDefs.forEach((tab) => {
+        if (tab.filterField) {
+          const itemValue = item[tab.filterField];
+          // Giá trị so sánh: nếu không truyền matchValue thì so sánh với id của tab
+          const targetValue = tab.matchValue !== undefined ? tab.matchValue : tab.id;
+          
+          if (itemValue === targetValue) {
+            countMap[tab.id] = (countMap[tab.id] || 0) + 1;
+          }
+        }
+      });
+    });
+
+    // 3. Map lại vào structure để render
+    const allTab = { id: "all", label: "TẤT CẢ", count: countMap.all };
+    
+    const dynamicTabs = tabDefs.map((def) => {
+      // 🟢 Ưu tiên: Nếu tab không có filterField nhưng có count truyền vào -> Dùng count đó
+      let finalCount = countMap[def.id];
+      if (!def.filterField && def.count !== undefined) {
+        finalCount = def.count;
+      }
+      
+      return {
+        ...def,
+        count: finalCount,
+      };
+    });
+
+    return [allTab, ...dynamicTabs];
+  }, [data, tabDefs]);
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
@@ -124,7 +173,7 @@ export default function KhungDanhSach({
     <div
       className={`w-full h-full flex flex-col bg-[#050505] overflow-hidden ${className}`}
     >
-      {/* ====== TAB BAR - Style giống GenericManager ====== */}
+      {/* ====== TAB BAR ====== */}
       <div className="shrink-0 h-[40px] flex items-center border-b border-white/5 bg-[#0a0a0a]">
         {/* Tabs - cuộn được */}
         <div className="flex-1 flex items-center gap-1 px-2 overflow-x-auto min-w-0 scrollbar-hide">
@@ -137,7 +186,9 @@ export default function KhungDanhSach({
               scrollbar-width: none;
             }
           `}</style>
-          {tabs.map((tab) => (
+          
+          {/* 🟢 Render danh sách tab đã tính toán */}
+          {renderedTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => onTabChange?.(tab.id)}
@@ -148,17 +199,15 @@ export default function KhungDanhSach({
               }`}
             >
               {tab.label}
-              {tab.count !== undefined && (
-                <span
-                  className={`px-1 py-0.5 rounded text-[8px] ${
-                    activeTab === tab.id
-                      ? "bg-[#C69C6D] text-black"
-                      : "bg-white/10 text-gray-400"
-                  }`}
-                >
-                  {tab.count}
-                </span>
-              )}
+              <span
+                className={`px-1 py-0.5 rounded text-[8px] ${
+                  activeTab === tab.id
+                    ? "bg-[#C69C6D] text-black"
+                    : "bg-white/10 text-gray-400"
+                }`}
+              >
+                {tab.count}
+              </span>
             </button>
           ))}
         </div>
@@ -235,7 +284,7 @@ export default function KhungDanhSach({
             </div>
           )}
 
-          {/* 🟢 EXTRA ACTIONS (Nút Sync, Export...) */}
+          {/* EXTRA ACTIONS */}
           {extraActions && (
             <div className="flex items-center gap-1 pl-1 border-l border-white/5 ml-1">
                {extraActions}

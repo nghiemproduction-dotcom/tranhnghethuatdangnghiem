@@ -8,8 +8,7 @@ import { MauThietKe, createMauThietKeConfig } from "./config";
 interface Props {
   data: MauThietKe | null; // null = Tạo mới
   onClose: () => void;
-  onSubmit: (formData: any) => Promise<void>;
-  loading: boolean;
+  onSuccess: () => void;
 }
 
 // 1. Định nghĩa kiểu dữ liệu cho file thiết kế
@@ -26,8 +25,7 @@ interface FormState extends Omit<Partial<MauThietKe>, "file_thiet_ke"> {
 export default function MauThietKeForm({
   data,
   onClose,
-  onSubmit,
-  loading,
+  onSuccess,
 }: Props) {
   const config = createMauThietKeConfig();
 
@@ -90,53 +88,62 @@ export default function MauThietKeForm({
     setFormData((prev) => ({ ...prev, file_thiet_ke: newFiles }));
   };
 
-  const handleSubmit = async () => {
-    // 1. Validate thông tin chung
-    if (!formData.mo_ta?.trim()) {
-      alert("Vui lòng nhập Tên mẫu thiết kế!");
-      return;
-    }
-    if (!formData.phan_loai) {
-      alert("Vui lòng chọn Phân loại!");
-      return;
-    }
-
-    // 2. Validate file
-    const validFiles = formData.file_thiet_ke.filter(
-      (f) => f.ten.trim() !== "" || f.url.trim() !== ""
-    );
-    const hasError = validFiles.some(
-      (f) => f.ten.trim() === "" || f.url.trim() === ""
-    );
-
-    if (hasError) {
-      alert(
-        "Vui lòng nhập đầy đủ TÊN HIỂN THỊ và ĐƯỜNG DẪN cho file thiết kế!"
-      );
-      return;
-    }
-
-    // 3. Submit (GỬI MẢNG TRỰC TIẾP - Backend sẽ tự lo Stringify)
-    // 🟢 SỬA: Không JSON.stringify ở đây nữa
-    const finalData = {
-      ...formData,
-      file_thiet_ke: validFiles,
-    };
-
-    await onSubmit(finalData);
-  };
-
   return (
     <KhungForm
+      isEditing={!!data}
+      data={formData}
       onClose={onClose}
       title={data ? "SỬA MẪU" : "THÊM MẪU MỚI"}
-      onSubmit={handleSubmit}
-      loading={loading}
-      isDirty={true}
+      
+      // 🟢 Cấu hình Upload
       showAvatarUpload={true}
       uploadBucket="images"
       avatar={formData.hinh_anh}
       onUploadComplete={(url: string) => handleChange("hinh_anh", url)}
+
+      // 🟢 SMART SAVE ACTION
+      action={{
+        validate: (currData: FormState) => {
+            // 1. Validate thông tin chung
+            if (!currData.mo_ta?.trim()) return "Vui lòng nhập Tên mẫu thiết kế!";
+            if (!currData.phan_loai) return "Vui lòng chọn Phân loại!";
+
+            // 2. Validate file
+            const validFiles = currData.file_thiet_ke.filter(
+                (f) => f.ten.trim() !== "" || f.url.trim() !== ""
+            );
+            const hasError = validFiles.some(
+                (f) => f.ten.trim() === "" || f.url.trim() === ""
+            );
+
+            if (hasError) {
+                return "Vui lòng nhập đầy đủ TÊN HIỂN THỊ và ĐƯỜNG DẪN cho file thiết kế!";
+            }
+            return null;
+        },
+        onSave: async (currData: FormState) => {
+            // Lọc bỏ các dòng file rỗng
+            const validFiles = currData.file_thiet_ke.filter(
+                (f) => f.ten.trim() !== "" || f.url.trim() !== ""
+            );
+
+            // 🟢 FIX LỖI TYPE: Ép kiểu as any để TS không bắt lỗi FileItem[] vs string[]
+            // Đồng thời JSON.stringify để lưu vào DB an toàn
+            const finalData = {
+                ...currData,
+                file_thiet_ke: JSON.stringify(validFiles) as any, 
+            };
+
+            if (data?.id) {
+                return await config.dataSource?.update?.(data.id, finalData);
+            } else {
+                return await config.dataSource?.create?.(finalData);
+            }
+        },
+        onSuccess: onSuccess
+      }}
+
+      isDirty={true}
     >
       <div className="space-y-4">
         {/* Tên mẫu */}

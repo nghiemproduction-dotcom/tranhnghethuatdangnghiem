@@ -107,11 +107,14 @@ export default function MauThietKeDetail({
 
   return (
     <KhungChiTiet
-      data={data}
+   data={data}
       onClose={onClose}
       avatar={item.hinh_anh}
       title={item.ten || item.mo_ta || "Chi tiết mẫu"}
-      tabs={tabs}
+      
+      // 🔴 SỬA: Đổi 'tabs' thành 'tabDefs'
+      tabDefs={tabs} 
+      
       activeTab={activeTab}
       onTabChange={setActiveTab}
       showEditButton={allowEdit}
