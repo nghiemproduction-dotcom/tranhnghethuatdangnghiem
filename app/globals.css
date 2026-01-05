@@ -21,6 +21,12 @@
 
   /* Biến chiều cao dynamic cho Mobile - Mặc định 100vh */
   --app-height: 100vh;
+
+  /* 🟢 FIX LỖI FONT BÉ & SCALE TRÊN MOBILE (QUAN TRỌNG NHẤT) */
+  /* Đặt chuẩn 1 rem = 16px. Các class text-sm, text-xs của Tailwind sẽ tính theo cái này */
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%; /* Ngăn iOS tự phóng to/thu nhỏ chữ khi xoay */
+  text-size-adjust: 100%;
 }
 
 .dark-theme {
@@ -48,6 +54,16 @@ body {
   position: fixed; /* Khóa cứng body */
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
+}
+
+/* 🟢 FIX RIÊNG CHO PWA (KHI ĐÃ CÀI APP) */
+@media all and (display-mode: standalone) {
+  body {
+    /* Sử dụng 100dvh để tính cả phần ẩn dưới thanh điều hướng ảo */
+    height: 100vh;
+    height: 100dvh;
+    overscroll-behavior-y: none; /* Chặn tuyệt đối việc kéo nảy trang */
+  }
 }
 
 /* Class thay thế h-[100dvh] để tương thích biến dynamic */

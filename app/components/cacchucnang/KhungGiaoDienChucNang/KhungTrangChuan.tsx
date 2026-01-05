@@ -29,7 +29,10 @@ export default function KhungTrangChuan({
   const displayLoiChao = loiChao || `Xin chào, ${nguoiDung?.ho_ten || "User"}`;
 
   return (
-    <div className="relative w-full min-h-[100dvh] bg-[#050505] text-[#F5F5F5] font-sans overflow-x-hidden selection:bg-[#C69C6D] selection:text-black text-[14px]">
+    <div
+      // 🟢 FIX 10/10: Bỏ text-[14px], dùng text-base (mobile) và text-sm (desktop)
+      className="relative w-full min-h-[100dvh] bg-[#050505] text-[#F5F5F5] font-sans overflow-x-hidden selection:bg-[#C69C6D] selection:text-black text-base md:text-sm"
+    >
       {/* LAYER 0: HÌNH NỀN CHUẨN */}
       <div className="fixed inset-0 w-full h-full z-0 pointer-events-none select-none bg-black">
         <img

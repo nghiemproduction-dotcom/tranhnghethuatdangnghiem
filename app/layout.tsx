@@ -47,6 +47,7 @@ export const metadata: Metadata = {
   },
 };
 
+// 🟢 UPDATE: Cấu hình Viewport chuẩn PWA & Android
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
@@ -55,7 +56,8 @@ export const viewport: Viewport = {
   userScalable: false,
   viewportFit: "cover",
   themeColor: "#000000",
-  interactiveWidget: "resizes-visual", // Giúp bàn phím ảo không che input
+  colorScheme: "dark", // 🟢 Browser UI sẽ mặc định tối, tránh chớp trắng
+  interactiveWidget: "resizes-visual", // 🟢 Fix lỗi bàn phím che input trên Android
 };
 
 export default function RootLayout({
@@ -66,7 +68,8 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body
-        className={`${inter.variable} ${playfair.variable} bg-black h-app w-full overflow-hidden font-sans`}
+        // 🟢 UPDATE: Thêm 'antialiased' để chữ nét hơn, đỡ mỏi mắt
+        className={`${inter.variable} ${playfair.variable} bg-black h-app w-full overflow-hidden font-sans antialiased`}
       >
         <UserProvider>
           <AppSettingsProvider>
