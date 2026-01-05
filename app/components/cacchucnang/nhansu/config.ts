@@ -155,10 +155,14 @@ const fields: FieldConfig[] = [
 ];
 
 // ============================================================
-// FILTER TABS
+// FILTER TABS (Kết hợp Tab chức năng & Tab lọc)
 // ============================================================
 
 const filterTabs: FilterTabConfig[] = [
+     
+ 
+
+    // 3. Các Tab lọc theo vai trò (để lọc trong danh sách)
     { id: 'quanly', label: 'QUẢN LÝ', filterField: 'vi_tri_normalized' },
     { id: 'sales', label: 'SALES', filterField: 'vi_tri_normalized' },
     { id: 'thosanxuat', label: 'THỢ', filterField: 'vi_tri_normalized' },

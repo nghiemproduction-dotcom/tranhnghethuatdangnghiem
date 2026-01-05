@@ -79,6 +79,9 @@ export interface KhungDanhSachProps<T = any> {
   // Loading
   loading?: boolean;
 
+  // 🟢 MỚI: Hàm để render giao diện riêng cho các Tab chức năng
+  renderCustomContent?: (tabId: string) => ReactNode | null;
+
   // Content
   children: ReactNode;
 
@@ -109,6 +112,7 @@ export default function KhungDanhSach<T extends Record<string, any>>({
   onClearSelection,
   bulkActions = [],
   loading = false,
+  renderCustomContent, // 🟢 Lấy prop mới vào
   children,
   className = "",
 }: KhungDanhSachProps<T>) {
@@ -168,6 +172,9 @@ export default function KhungDanhSach<T extends Record<string, any>>({
     onSearch?.("");
     setShowSearch(false);
   };
+
+  // 🟢 LOGIC MỚI: Kiểm tra xem Tab hiện tại có phải là Tab chức năng không?
+  const customContent = renderCustomContent ? renderCustomContent(activeTab) : null;
 
   return (
     <div
@@ -365,7 +372,14 @@ export default function KhungDanhSach<T extends Record<string, any>>({
             <div className="w-8 h-8 border-2 border-[#C69C6D] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          children
+          // 🟢 QUAN TRỌNG: Nếu có customContent thì hiện nó, ngược lại hiện danh sách (children)
+          customContent ? (
+            <div className="w-full h-full animate-in fade-in zoom-in-95 duration-300">
+              {customContent}
+            </div>
+          ) : (
+            children 
+          )
         )}
       </div>
     </div>

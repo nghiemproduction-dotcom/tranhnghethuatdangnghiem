@@ -33,8 +33,26 @@ interface Props {
   className?: string;
 }
 
+// 🟢 COMPONENT TẠM THỜI (Placeholder) CHO CÁC TAB CHỨC NĂNG KHÁC
+// Bạn có thể tách ra file riêng sau này (VD: NhanSuChamCong.tsx)
+const GiaoDienChamCong = () => (
+  <div className="w-full h-full flex flex-col items-center justify-center text-white/50 space-y-4">
+    <Clock size={48} className="text-[#C69C6D] opacity-50" />
+    <h3 className="text-lg font-bold uppercase tracking-widest text-[#C69C6D]">Bảng Chấm Công</h3>
+    <p className="text-sm">Tính năng đang được phát triển...</p>
+  </div>
+);
+
+const GiaoDienBangLuong = () => (
+  <div className="w-full h-full flex flex-col items-center justify-center text-white/50 space-y-4">
+    <Banknote size={48} className="text-green-500 opacity-50" />
+    <h3 className="text-lg font-bold uppercase tracking-widest text-green-500">Bảng Tính Lương</h3>
+    <p className="text-sm">Tính năng đang được phát triển...</p>
+  </div>
+);
+
 // ============================================================
-// COMPONENT
+// COMPONENT CHÍNH
 // ============================================================
 
 export default function NhanSuChucNang({
@@ -147,6 +165,7 @@ export default function NhanSuChucNang({
 
     if (activeTab !== "all") {
       const tabConfig = config.filterTabs.find((t) => t.id === activeTab);
+      // Chỉ lọc nếu tab đó CÓ filterField (các tab chức năng như chamcong sẽ ko lọc)
       if (tabConfig && tabConfig.filterField) {
         result = result.filter(
           (item: any) => item[tabConfig.filterField!] === activeTab
@@ -191,6 +210,19 @@ export default function NhanSuChucNang({
     }));
   }, [config.detailTabs]);
 
+  // 🟢 LOGIC MỚI: QUYẾT ĐỊNH RENDER GIAO DIỆN TÙY CHỈNH THEO TAB
+  const renderTabContent = (tabId: string) => {
+    switch (tabId) {
+      case 'chamcong':
+        return <GiaoDienChamCong />;
+      case 'tinhluong':
+        return <GiaoDienBangLuong />;
+      default:
+        // Trả về null nghĩa là "Hãy hiện danh sách nhân sự mặc định"
+        return null; 
+    }
+  };
+
   const formatMoney = (val?: number) => {
     if (!val) return "0 ₫";
     return new Intl.NumberFormat("vi-VN", {
@@ -216,6 +248,10 @@ export default function NhanSuChucNang({
             setBulkMode(false);
             setSelectedIds(new Set());
           }}
+          
+          // 🟢 TRUYỀN HÀM RENDER CUSTOM VÀO ĐÂY
+          renderCustomContent={renderTabContent}
+
           onSearch={setSearchTerm}
           sortOptions={config.sortOptions}
           activeSort={activeSort}
@@ -250,7 +286,7 @@ export default function NhanSuChucNang({
           }
           loading={loading}
         >
-          {/* Cards */}
+          {/* Cards (Sẽ tự ẩn nếu renderCustomContent trả về nội dung khác null) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-4">
             {filteredList.map((item) => (
               <div
