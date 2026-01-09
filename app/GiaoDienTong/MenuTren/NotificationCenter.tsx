@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, X, Check, CheckCircle2, MessageCircle, Heart, Users, Zap, AlertCircle, ShoppingBag, Calendar, Award } from 'lucide-react';
 import { Notification, NotificationGroup, NOTIFICATION_CONFIG, NotificationType } from './NotificationTypes';
-import { useAppSettings } from '@/app/ThuVien/AppSettingsContext';
+import { useAppSettings } from '@/lib/AppSettingsContext';
 
 interface Props {
   notifications: Notification[];

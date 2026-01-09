@@ -7,22 +7,20 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useUser } from "@/app/ThuVien/UserContext";
+import { useUser } from "@/lib/UserContext";
 import {
   Users,
   BookUser,
   LayoutDashboard,
-  Database,
-  Settings,
-  Palette, // 🟢 THÊM: Import icon cho thiết kế
+  Palette, // 🟢 THÊM: Icon cho thiết kế
 } from "lucide-react";
-import KhungTrangChuan from "@/app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan"; // Kiểm tra lại đường dẫn này cho đúng với dự án
-import ThanhPhongChucNang from "@/app/components/ThanhPhongChucNang";
+import KhungTrangChuan from "@/app/components/cacchucnang/KhungGiaoDienChucNang/KhungTrangChuan";
+import ThanhPhongChucNang from "@/components/ThanhPhongChucNang";
 
-// Import chức năng từ cacchucnang
+// Import chức năng từ thư viện
 import { NhanSuChucNang } from "@/app/components/cacchucnang";
 import { KhachHangChucNang } from "@/app/components/cacchucnang/khachhang";
-// Import chức năng Mẫu Thiết Kế
+// 🟢 THÊM: Import chức năng Mẫu Thiết Kế
 import { MauThietKeChucNang } from "@/app/components/cacchucnang/mauthietke";
 
 // ============================================================
@@ -52,13 +50,17 @@ const ADMIN_PERMISSIONS = {
 };
 
 // ============================================================
-// DANH SÁCH CHỨC NĂNG
+// DANH SÁCH CHỨC NĂNG (MENU)
 // ============================================================
 
 const ADMIN_FUNCTIONS = [
+  // Dashboard Tổng quan
+  { id: "dashboard", label: "DASHBOARD", icon: LayoutDashboard },
+  
   // Quản lý người dùng
   { id: "nhansu", label: "NHÂN SỰ", icon: Users },
   { id: "khachhang", label: "KHÁCH HÀNG", icon: BookUser },
+  
   // 🟢 THÊM: Mục menu Mẫu thiết kế
   { id: "mauthietke", label: "KHO THIẾT KẾ", icon: Palette },
 ];
@@ -85,7 +87,7 @@ export default function PhongAdminPage() {
     );
   }
 
-  // Get user info
+  // Fallback: Lấy user từ localStorage nếu context chưa kịp load
   let displayUser = contextUser;
   if (!displayUser && typeof window !== "undefined") {
     try {
@@ -106,7 +108,7 @@ export default function PhongAdminPage() {
       loiChao="ADMIN COMMAND CENTER"
       contentClassName="flex flex-col h-[100dvh] pt-[70px] pb-0 px-0 overflow-hidden bg-[#050505]"
     >
-      {/* Thanh Phòng + Chức Năng */}
+      {/* Thanh Phòng + Chức Năng (Menu ngang dưới cùng hoặc trên) */}
       <ThanhPhongChucNang
         tenPhong="PHÒNG ADMIN"
         functions={ADMIN_FUNCTIONS}
@@ -120,26 +122,27 @@ export default function PhongAdminPage() {
 
         <div className="absolute inset-0 z-10">
           <div className="w-full h-full flex flex-col relative">
+            
             {/* ====== RENDER CÁC CHỨC NĂNG ====== */}
 
-            {/* Nhân sự */}
+            {/* 1. Dashboard (Mặc định) */}
+            {activeFunction === "dashboard" && <DashboardPlaceholder />}
+
+            {/* 2. Nhân sự */}
             {activeFunction === "nhansu" && (
               <NhanSuChucNang permissions={ADMIN_PERMISSIONS.nhansu} />
             )}
 
-            {/* Khách hàng */}
+            {/* 3. Khách hàng */}
             {activeFunction === "khachhang" && (
               <KhachHangChucNang permissions={ADMIN_PERMISSIONS.khachhang} />
             )}
 
-            {/* 🟢 THÊM: Hiển thị chức năng Mẫu thiết kế */}
+            {/* 4. 🟢 THÊM: Mẫu thiết kế */}
             {activeFunction === "mauthietke" && (
               <MauThietKeChucNang permissions={ADMIN_PERMISSIONS.mauthietke} />
             )}
             
-             {/* Dashboard (Mặc định) */}
-             {activeFunction === "dashboard" && <DashboardPlaceholder />}
-
           </div>
         </div>
       </div>
@@ -153,10 +156,10 @@ export default function PhongAdminPage() {
 
 function DashboardPlaceholder() {
   return (
-    <div className="h-full flex flex-col items-center justify-center text-white/30">
-      <LayoutDashboard size={64} className="mb-4 opacity-30" />
-      <p className="font-bold uppercase">Dashboard Tổng Quan</p>
-      <p className="text-sm mt-2">Đang phát triển...</p>
+    <div className="h-full flex flex-col items-center justify-center text-white/30 animate-in fade-in duration-500">
+      <LayoutDashboard size={64} className="mb-4 opacity-30 text-[#C69C6D]" />
+      <p className="font-bold uppercase tracking-widest text-lg text-[#C69C6D]/50">Dashboard Tổng Quan</p>
+      <p className="text-sm mt-2 font-mono">System Status: Online</p>
     </div>
   );
 }

@@ -17,7 +17,7 @@ import {
   KhungChiTiet,
   KhungForm,
 } from "@/app/components/cacchucnang/KhungGiaoDienChucNang";
-import ConfirmDialog from "@/app/components/ConfirmDialog";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import {
   NhanSu,
   NhanSuPermissions,

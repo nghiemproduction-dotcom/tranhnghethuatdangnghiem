@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Trash2 } from "lucide-react";
 import { KhungDanhSach } from "@/app/components/cacchucnang/KhungGiaoDienChucNang";
-import ConfirmDialog from "@/app/components/ConfirmDialog";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import {
   MauThietKe,
   MauThietKePermissions,

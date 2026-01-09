@@ -5,11 +5,11 @@ import {
   ChevronRight, LogOut, ChevronLeft, Settings, Trophy,
   Globe, Moon, Sun, Palette, Check
 } from 'lucide-react';
-import { OrderService, Order } from '@/app/ThuVien/OrderService';
+import { OrderService, Order } from '@/lib/OrderService';
 import { Z_INDEX } from '@/app/constants/zIndex';
-import { LoggerService } from '@/app/ThuVien/LoggerService';
+import { LoggerService } from '@/lib/LoggerService';
 import { xuLyDangXuat } from './ChucNang';
-import { useAppSettings, ThemeMode, LanguageCode } from '@/app/ThuVien/AppSettingsContext';
+import { useAppSettings, ThemeMode, LanguageCode } from '@/lib/AppSettingsContext';
 
 // Inline ConfirmDialog component
 interface ConfirmDialogProps {

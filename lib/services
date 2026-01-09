@@ -1,0 +1,14 @@
+// app/lib/services/nhan-su.service.ts
+import { createClient } from "@/app/ThuVien/supabase/server";
+import { toUserDTO } from "@/app/lib/dtos/user.dto";
+
+export async function getCurrentUserProfile() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data } = await supabase.from('nhan_su').select('*').eq('id', user.id).single();
+  
+  // Chỉ trả về DTO, loại bỏ dữ liệu thừa/nhạy cảm
+  return toUserDTO(data);
+}

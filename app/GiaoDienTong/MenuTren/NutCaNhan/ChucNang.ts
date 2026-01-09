@@ -1,5 +1,5 @@
-import { supabase } from "@/app/ThuVien/ketNoiSupabase";
-import { LoggerService } from "@/app/ThuVien/LoggerService";
+import { supabase } from "@/utils/supabase/client";
+import { LoggerService } from "@/lib/LoggerService";
 
 const logger = LoggerService.createScoped("xuLyDangXuat");
 

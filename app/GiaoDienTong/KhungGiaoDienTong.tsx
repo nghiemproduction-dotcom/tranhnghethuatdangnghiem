@@ -6,8 +6,8 @@ import { Loader2 } from 'lucide-react';
 
 // 🟢 CẬP NHẬT IMPORT
  
-import CongDangNhap from '../CongDangNhap/CongDangNhap'; 
-import StaffPresence from '../components/StaffPresence';
+import CongDangNhap from '../components/CongDangNhap/CongDangNhap'; 
+import StaffPresence from '../../components/StaffPresence';
 
 export default function KhungGiaoDienTong({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

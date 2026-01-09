@@ -6,7 +6,7 @@ import {
     Music, Play, Pause, Volume2, VolumeX, Upload, Loader2, X, 
     SkipForward, Trash2, Repeat1, Shuffle, AlertCircle, Volume1, ChevronUp, ChevronDown, Square
 } from 'lucide-react';
-import { supabase } from '@/app/ThuVien/ketNoiSupabase'; 
+import { supabase } from '@/utils/supabase/client'; 
 
 interface BaiHat {
     id: string;
@@ -81,6 +81,22 @@ export default function NhacNen() {
             }
         }
         fetchDanhSachNhac();
+    }, []);
+
+    // Allow external UI (MenuTren) to toggle the player via a custom event
+    useEffect(() => {
+        const handler = (e: any) => {
+            const detail = e?.detail;
+            if (detail && detail.openModal) {
+                setIsOpen(true);
+                setShowQuickControls(false);
+            } else {
+                setShowQuickControls(s => !s);
+            }
+            setMounted(true);
+        };
+        window.addEventListener('toggle-music', handler as EventListener);
+        return () => window.removeEventListener('toggle-music', handler as EventListener);
     }, []);
 
     const fetchDanhSachNhac = async () => {
@@ -431,7 +447,7 @@ export default function NhacNen() {
                 {!isOpen && (
                     <button 
                         onClick={() => setShowQuickControls(!showQuickControls)}
-                        className={`w-10 h-10 rounded-full flex items-center justify-center relative active:scale-95 transition-all border shadow-lg ${
+                        className={`hidden w-10 h-10 rounded-full flex items-center justify-center relative active:scale-95 transition-all border shadow-lg ${
                             isPlaying 
                                 ? 'bg-[#C69C6D] border-[#C69C6D] text-black shadow-[0_0_15px_rgba(198,156,109,0.4)] animate-[spin_4s_linear_infinite]' 
                                 : 'bg-black/40 border-white/20 text-white hover:bg-white/10 backdrop-blur-md'

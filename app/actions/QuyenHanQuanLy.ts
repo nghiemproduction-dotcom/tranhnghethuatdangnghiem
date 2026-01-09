@@ -533,3 +533,9 @@ export async function getFinishedArtworksAction(limit: number = 50) {
     return { success: false, error: error.message };
   }
 }
+// Thêm đoạn này vào cuối file QuyenHanQuanLy.ts
+export async function updateProfileSelfAction(formData: any) {
+  // Logic cập nhật profile
+  console.log("Update profile:", formData);
+  return { success: true };
+}

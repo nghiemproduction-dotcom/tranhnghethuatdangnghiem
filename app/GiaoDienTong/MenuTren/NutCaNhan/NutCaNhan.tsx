@@ -5,7 +5,7 @@ import { UserCircle } from 'lucide-react';
 
  
 import ModalProfile from '@/app/GiaoDienTong/MenuTren/NutCaNhan/ModalProfile';
-import { useAppSettings } from '@/app/ThuVien/AppSettingsContext';
+import { useAppSettings } from '@/lib/AppSettingsContext';
 
 interface Props {
     nguoiDung: any; 

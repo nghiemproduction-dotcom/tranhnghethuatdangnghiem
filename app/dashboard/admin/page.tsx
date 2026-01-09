@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser } from '@/app/ThuVien/UserContext';
+import { useUser } from '@/lib/UserContext';
 import { BarChart3, Users, Settings, AlertCircle } from 'lucide-react';
 
 /**

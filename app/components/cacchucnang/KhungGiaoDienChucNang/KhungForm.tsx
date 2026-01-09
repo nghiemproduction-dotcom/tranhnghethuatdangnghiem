@@ -14,8 +14,8 @@
 
 import React, { ReactNode, useState, useRef } from "react";
 import { X, Save, Loader2, User, Camera } from "lucide-react";
-import { supabase } from "@/app/ThuVien/ketNoiSupabase";
-import { compressImage } from "@/app/ThuVien/compressImage";
+import { supabase } from "@/utils/supabase/client";
+import { compressImage } from "@/lib/compressImage";
 
 // ============================================================
 // TYPES
