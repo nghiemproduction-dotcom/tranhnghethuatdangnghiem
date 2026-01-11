@@ -97,7 +97,7 @@ export interface ChatMessage {
     type: 'image' | 'file';
     name?: string;
   }>;
-  created_at: string;
+  tao_luc: string;
   updated_at: string;
   reply_to_id?: string;
   reply_to?: ChatMessage;

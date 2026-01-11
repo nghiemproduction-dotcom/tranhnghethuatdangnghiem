@@ -101,10 +101,10 @@ export default function NhacNen() {
 
     const fetchDanhSachNhac = async () => {
         try {
-            // 'tao_luc' không phải column chuẩn của Storage -> gây 400. Dùng created_at luôn.
+            // 'tao_luc' không phải column chuẩn của Storage -> gây 400. Dùng tao_luc luôn.
             const { data, error } = await supabase.storage
                 .from('nhac-nen')
-                .list('', { sortBy: { column: 'created_at', order: 'asc' } });
+                .list('', { sortBy: { column: 'tao_luc', order: 'asc' } });
 
             if (error) {
                 console.warn("Không thể load playlist nhạc:", error);
@@ -447,7 +447,7 @@ export default function NhacNen() {
                 {!isOpen && (
                     <button 
                         onClick={() => setShowQuickControls(!showQuickControls)}
-                        className={`hidden w-10 h-10 rounded-full flex items-center justify-center relative active:scale-95 transition-all border shadow-lg ${
+                        className={`hidden w-10 h-10 rounded-full  items-center justify-center relative active:scale-95 transition-all border shadow-lg ${
                             isPlaying 
                                 ? 'bg-[#C69C6D] border-[#C69C6D] text-black shadow-[0_0_15px_rgba(198,156,109,0.4)] animate-[spin_4s_linear_infinite]' 
                                 : 'bg-black/40 border-white/20 text-white hover:bg-white/10 backdrop-blur-md'

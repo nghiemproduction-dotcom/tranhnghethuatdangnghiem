@@ -113,7 +113,7 @@ export async function getTableDataPaginatedAction(tableName: string, page: numbe
         
         let sortCol = 'id';
         if (colNames.includes('tao_luc')) sortCol = 'tao_luc';
-        else if (colNames.includes('created_at')) sortCol = 'created_at';
+        else if (colNames.includes('tao_luc')) sortCol = 'tao_luc';
         else if (!colNames.includes('id') && colNames.length > 0) sortCol = colNames[0];
 
         const offset = (page - 1) * pageSize;

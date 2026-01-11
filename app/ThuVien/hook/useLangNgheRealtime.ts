@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { createClient } from '@/app/ThuVien/supabase/client';
+import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 

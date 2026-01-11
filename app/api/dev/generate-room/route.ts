@@ -97,7 +97,7 @@ async function automateDatabase(tableName: string, permissions: Record<string, s
       );
 
       -- 3. Auto Indexing (Performance)
-      CREATE INDEX IF NOT EXISTS idx_${tableName}_created_at ON public.${tableName} (created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_${tableName}_tao_luc ON public.${tableName} (tao_luc DESC);
       -- Check if created_by exists before indexing (Dynamic check hard in raw sql block without plpgsql, skipping for safety or assuming standard fields)
     `;
 
@@ -248,7 +248,7 @@ export default async function Page() {
              name: col.column_name, ...mapType(col.data_type), 
              label: col.column_name.charAt(0).toUpperCase() + col.column_name.slice(1).replace(/_/g, ' ') 
         }));
-        const formFields = fields.filter((f: any) => !['id', 'created_at', 'updated_at'].includes(f.name));
+        const formFields = fields.filter((f: any) => !['id', 'tao_luc', 'updated_at'].includes(f.name));
         const tableFields = fields.filter((f: any) => !['password', 'metadata', 'json'].includes(f.name) && f.inputType !== 'textarea');
 
         const typesContent = `import { z } from 'zod'; export type ${featureName}DTO = { ${fields.map((f:any) => `${f.name}: ${f.tsType};`).join('\n')} }; export const ${featureName}Schema = z.object({ ${formFields.map((f:any) => `${f.name}: ${f.zodType},`).join('\n')} }); export type ${featureName}FormValues = z.infer<typeof ${featureName}Schema>;`;

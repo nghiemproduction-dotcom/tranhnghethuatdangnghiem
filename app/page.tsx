@@ -46,7 +46,7 @@ export default function TrangChaoMung() {
         } else {
           localStorage.removeItem('USER_INFO');
           localStorage.setItem('USER_ROLE', role);
-          router.replace('/trangchu');
+          router.replace('/phongtrungbay');
         }
       } catch (err) {
         console.warn('Session redirect check failed', err);
@@ -115,7 +115,7 @@ export default function TrangChaoMung() {
         {/* CỤM NÚT BẤM */}
         <div className="flex flex-row items-center justify-center gap-4 md:gap-16 w-full mb-2">
           {/* Nút KHÁCH */}
-          <Link href="/trangchu" className="group flex flex-col items-center gap-2 opacity-90 hover:opacity-100 transition-opacity">
+          <Link href="/phongtrungbay" className="group flex flex-col items-center gap-2 opacity-90 hover:opacity-100 transition-opacity">
             <div className="w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center bg-white/5 text-white group-hover:bg-yellow-500 group-hover:text-black transition-all duration-500 ease-out shadow-lg border border-white/20 hover:border-yellow-400">
               <ArrowRight size={20} className="group-hover:-rotate-45 transition-transform duration-500" />
             </div>

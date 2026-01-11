@@ -1,141 +1,82 @@
-import React from 'react';
-import { createClient } from '@/utils/supabase/server';
+// lib/dal.ts
+import 'server-only' // 🛡️ Tiêu chuẩn 3: Chặn import vào Client Component
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+import { cache } from 'react'
 
-// Safely use React.cache when available; otherwise, fall back to a no-op wrapper
-const maybeCache = (React as any).cache ?? ((fn: any) => fn);
+// --- 1. Khởi tạo Client (Hỗ trợ Next.js 15 Async Cookies) ---
+const createClient = async () => {
+  const cookieStore = await cookies() // 🛡️ Tiêu chuẩn 3: await cookies()
+  
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return cookieStore.getAll() },
+        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+          // Server Component (Read-only) không cần set cookie, để trống.
+        },
+      },
+    }
+  )
+}
 
-/**
- * Shared Data Access Layer (DAL)
- * - Exposes small, focused, cached helpers for common queries
- * - Uses React `cache` to avoid duplicate queries within a render / request
- * - Centralizes permission checks so business logic isn't spread across the app
- */
+// --- 2. Hàm lấy User (Memoization) ---
+// ⚡ Tiêu chuẩn 2: Dùng cache để không gọi lại auth nhiều lần trong 1 render
+export const getSessionUser = cache(async () => {
+  const supabase = await createClient()
+  // 🛡️ Tiêu chuẩn 3: Dùng getUser() thay vì getSession() để chống giả mạo
+  const { data: { user } } = await supabase.auth.getUser()
+  return user
+})
 
-export type Profile = {
-  id?: string;
-  email?: string;
-  role?: string | null;
-  [key: string]: any;
-};
+// --- 3. Định nghĩa Generics cho Query ---
+interface FetchOptions {
+  select?: string
+  filter?: { column: string; value: any }[]
+  sort?: { column: string; ascending?: boolean }
+  limit?: number
+}
 
-// Get current session user (from Supabase session)
-export const getSessionUser = maybeCache(async (): Promise<any | null> => {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  return user ?? null;
-});
+// --- 4. Hàm Fetch Data Tổng Quát (Core) ---
+// ⚡ Tiêu chuẩn 2: Cache kết quả query
+export const fetchTableData = cache(async <T>(
+  table: string,
+  options: FetchOptions = {}
+): Promise<T[]> => {
+  const supabase = await createClient()
 
-// Lookup profile by email (case-insensitive)
-export const getProfileByEmail = maybeCache(async (email: string): Promise<Profile | null> => {
-  if (!email) return null;
-  const supabase = await createClient();
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .ilike('email', email)
-    .single();
+  // 🛡️ Tiêu chuẩn 5: RLS sẽ tự lo việc lọc dữ liệu theo user.
+  // Chúng ta chỉ kiểm tra user có tồn tại để tránh lỗi connection thôi.
+  const user = await getSessionUser()
+  if (!user) return [] // Hoặc throw error tùy logic
 
-  return profile ?? null;
-});
+  let query = supabase.from(table).select(options.select || '*')
 
-// Get current user's profile (includes user from session + profile row)
-export const getCurrentUserProfile = maybeCache(async (): Promise<{ user: any; profile: Profile | null } | null> => {
-  const user = await getSessionUser();
-  if (!user?.email) return null;
-  const profile = await getProfileByEmail(user.email);
-  return { user, profile };
-});
-
-// Check whether current user has a given role (string or list)
-export const hasRole = maybeCache(async (roles: string | string[]): Promise<boolean> => {
-  const rList = Array.isArray(roles) ? roles : [roles];
-  const cur = await getCurrentUserProfile();
-  const role = cur?.profile?.role ?? null;
-  if (!role) return false;
-  return rList.includes(role);
-});
-
-// Convenience guard: throw an error or return false depending on use-case
-export const requireRole = maybeCache(async (roles: string | string[]) => {
-  const ok = await hasRole(roles);
-  if (!ok) throw new Error('FORBIDDEN: missing required role');
-  return true;
-});
-
-// Lightweight helper usable when a Supabase client is already available (eg. middleware)
-export const getProfileByEmailUsingClient = async (supabase: any, email: string): Promise<Profile | null> => {
-  if (!email) return null;
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .ilike('email', email)
-    .single();
-
-  return profile ?? null;
-};
-
-// Identify a user by email (tries `nhan_su`, `khach_hang`, then `profiles`).
-// This is cached for server-side usage to avoid duplicated DB lookups.
-export const identifyUserByEmail = maybeCache(async (email: string) => {
-  if (!email) return null;
-  const supabase = await createClient();
-  const cleanEmail = email.trim().toLowerCase();
-
-  // 1) Try nhan_su
-  const { data: nhanSu } = await supabase
-    .from('nhan_su')
-    .select('id, email, ho_ten, so_dien_thoai, hinh_anh, vi_tri_normalized')
-    .eq('email', cleanEmail)
-    .single();
-
-  if (nhanSu) {
-    const roleCode = nhanSu.vi_tri_normalized || 'parttime';
-    return {
-      id: nhanSu.id,
-      email: nhanSu.email,
-      ho_ten: nhanSu.ho_ten,
-      so_dien_thoai: nhanSu.so_dien_thoai,
-      hinh_anh: nhanSu.hinh_anh,
-      userType: 'nhan_su',
-      role: roleCode,
-      permissions: { isAdmin: roleCode === 'admin' || roleCode === 'quanly' },
-    } as any;
+  // Áp dụng Filter dynamic
+  if (options.filter) {
+    options.filter.forEach((f) => {
+      query = query.eq(f.column, f.value)
+    })
   }
 
-  // 2) Try khach_hang
-  const { data: khachHang } = await supabase
-    .from('khach_hang')
-    .select('id, email, ho_ten, so_dien_thoai, phan_loai_normalized')
-    .eq('email', cleanEmail)
-    .single();
-
-  if (khachHang) {
-    const roleCode = khachHang.phan_loai_normalized || 'moi';
-    return {
-      id: khachHang.id,
-      email: khachHang.email,
-      ho_ten: khachHang.ho_ten,
-      so_dien_thoai: khachHang.so_dien_thoai,
-      userType: 'khach_hang',
-      role: roleCode,
-      permissions: { isAdmin: false },
-    } as any;
+  // Áp dụng Sort
+  if (options.sort) {
+    query = query.order(options.sort.column, { ascending: options.sort.ascending ?? true })
   }
 
-  // 3) Fallback: profiles table
-  const profile = await getProfileByEmail(cleanEmail);
-  if (profile) {
-    const roleCode = profile.role || 'user';
-    return {
-      id: profile.id,
-      email: profile.email,
-      userType: roleCode === 'admin' ? 'nhan_su' : 'khach_hang',
-      role: roleCode,
-      permissions: { isAdmin: roleCode === 'admin' },
-    } as any;
+  // Áp dụng Limit
+  if (options.limit) {
+    query = query.limit(options.limit)
   }
 
-  return null;
-});
+  const { data, error } = await query
 
-// TODO: add more domain-specific cached helpers (orders, rooms, inventory, ...)
+  if (error) {
+    console.error(`[DAL Error] Table: ${table}`, error.message)
+    throw new Error(error.message)
+  }
+
+  return data as T[]
+})

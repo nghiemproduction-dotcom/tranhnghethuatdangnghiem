@@ -40,7 +40,7 @@ export default function NotificationCenter({
     return Object.entries(groups).map(([category, notifs]) => ({
       category: category as any,
       label: getCategoryLabel(category),
-      notifications: notifs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
+      notifications: notifs.sort((a, b) => new Date(b.tao_luc).getTime() - new Date(a.tao_luc).getTime()),
       unread_count: notifs.filter(n => !n.is_read).length,
       icon: getCategoryIcon(category),
       color: getCategoryColor(category)
@@ -49,7 +49,7 @@ export default function NotificationCenter({
 
   const displayedNotifications = filteredCategory 
     ? groupedNotifications.find(g => g.category === filteredCategory)?.notifications || []
-    : notifications.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    : notifications.sort((a, b) => new Date(b.tao_luc).getTime() - new Date(a.tao_luc).getTime());
 
   return (
     <div className="relative">
@@ -238,7 +238,7 @@ function NotificationItem({
               {notification.title}
             </p>
             <span className="text-[10px] text-gray-400 flex-shrink-0">
-              {formatTime(notification.created_at)}
+              {formatTime(notification.tao_luc)}
             </span>
           </div>
           

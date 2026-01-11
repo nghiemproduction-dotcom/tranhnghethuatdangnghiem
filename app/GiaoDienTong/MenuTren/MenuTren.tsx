@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { ShoppingCart, QrCode, UserCircle, KeyRound } from "lucide-react"; // Đổi icon List thành KeyRound cho hợp logic login
+import { ShoppingCart, QrCode, UserCircle, KeyRound } from "lucide-react"; 
 import NhacNen from "@/app/Music/NhacNen";
 import NotificationCenter from "./NotificationCenter";
 import { NotificationService } from "./NotificationService";
@@ -10,10 +10,8 @@ import { useUser } from "@/lib/UserContext";
 import { Z_INDEX } from "@/app/constants/zIndex";
 import { useAppSettings } from "@/lib/AppSettingsContext";
 import ModalProfile from "@/app/GiaoDienTong/MenuTren/NutCaNhan/ModalProfile";
-// Import Component Đăng Nhập Mới
 import CongDangNhap from "@/app/components/CongDangNhap/CongDangNhap";
 
-// ... (Giữ nguyên hook useNotificationSound) ...
 const useNotificationSound = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => {
@@ -39,16 +37,12 @@ export default function MenuTren({
   const { t } = useAppSettings();
   const playSound = useNotificationSound();
 
-  // ... (Giữ nguyên logic user) ...
   const nguoiDung = contextUser
     ? {
         id: contextUser.id,
         ho_ten: contextUser.ho_ten || t("profile.user"),
         email: contextUser.email,
-        role:
-          contextUser.userType === "nhan_su"
-            ? contextUser.vi_tri_normalized
-            : contextUser.phan_loai_normalized,
+        role: contextUser.userType === "nhan_su" ? contextUser.vi_tri_normalized : contextUser.phan_loai_normalized,
         permissions: contextUser.permissions,
         vi_tri: contextUser.vi_tri,
         userType: contextUser.userType,
@@ -57,28 +51,20 @@ export default function MenuTren({
       }
     : fallbackUser;
 
-  const isVisitor =
-    !nguoiDung ||
-    nguoiDung?.userType === "guest" ||
-    nguoiDung?.role === "visitor";
+  const isVisitor = !nguoiDung || nguoiDung?.userType === "guest" || nguoiDung?.role === "visitor";
   const isNhanSu = nguoiDung?.userType === "nhan_su";
 
-  // State
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [cartCount, setCartCount] = useState(0);
   const [showProfile, setShowProfile] = useState(false);
-  
-  // State mới cho Login Modal
   const [showLogin, setShowLogin] = useState(false);
-  
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // ... (Giữ nguyên logic getDisplayName, Cart, Notification) ...
   const getDisplayName = () => {
     if (isVisitor) return { full: "Quý Khách", short: "KHÁCH" };
     const fullName = nguoiDung?.ho_ten || "";
@@ -146,9 +132,7 @@ export default function MenuTren({
   }, [nguoiDung?.id, isVisitor]);
 
   const handleMarkAsRead = async (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
-    );
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
     setUnreadCount((prev) => Math.max(0, prev - 1));
     await NotificationService.markAsRead(id);
   };
@@ -177,49 +161,33 @@ export default function MenuTren({
   return (
     <>
       <div
-        className={`fixed top-0 left-0 right-0 h-[65px] md:h-[85px] px-3 md:px-6 flex justify-between items-center bg-transparent transition-all duration-300 pointer-events-none`}
+        // 🟢 CHỈNH LẠI HEIGHT CỐ ĐỊNH: 60px (mobile) / 80px (desktop)
+        className={`fixed top-0 left-0 right-0 h-[60px] md:h-[80px] px-3 md:px-6 flex justify-between items-center bg-transparent transition-all duration-300 pointer-events-none`}
         style={{ zIndex: Z_INDEX.menuTren }}
       >
-        {/* ... (Góc trái giữ nguyên) ... */}
-        <div className="flex-1 min-w-0 flex items-center gap-2 animate-slide-down pointer-events-auto mr-2">
-          <div className="hidden md:flex flex-col">
-            <span className="text-xs font-medium italic text-gray-300 drop-shadow-md">
+        <div className="flex-1 min-w-0 flex items-center gap-3 animate-slide-down pointer-events-auto mr-2">
+          
+          {/* ✅ SỬA LOGIC HIỂN THỊ: LUÔN LÀ 1 DÒNG (FLEX-ROW) CHO CẢ MOBILE VÀ DESKTOP */}
+          <div className="flex flex-row items-baseline gap-2 overflow-hidden">
+            <span className="text-xs md:text-sm font-medium italic text-gray-300 drop-shadow-md whitespace-nowrap">
               {isVisitor ? "Chào mừng," : "Xin chào,"}
             </span>
             <span
-              className="font-black text-white uppercase tracking-wider drop-shadow-lg shadow-black truncate max-w-[200px] lg:max-w-none"
-              style={{ fontSize: "20px" }}
+              className="font-black text-white uppercase tracking-wider drop-shadow-lg shadow-black truncate"
+              style={{ fontSize: "16px" }} 
             >
               {displayName.full}
             </span>
           </div>
-          <div className="md:hidden flex items-baseline gap-1 overflow-hidden">
-            <span className="text-[10px] text-gray-300 italic whitespace-nowrap">
-              Chào
-            </span>
-            <span className="font-bold text-[#C69C6D] uppercase truncate text-sm drop-shadow-md">
-              {displayName.short}
-            </span>
-          </div>
+
         </div>
 
-        {/* 🟢 GÓC PHẢI */}
         {!isVisitor && (
           <div className="shrink-0 flex gap-1.5 md:gap-3 animate-slide-down delay-100 pointer-events-auto items-center">
-            {/* Nhạc nền */}
             {nguoiDung?.id && <NhacNen />}
-
-            {/* Giỏ hàng */}
             {!isNhanSu && cartCount > 0 && (
-              <NutVuong
-                icon={ShoppingCart}
-                badge={cartCount}
-                onClick={() => {}}
-                className="animate-bounce-slow"
-              />
+              <NutVuong icon={ShoppingCart} badge={cartCount} onClick={() => {}} className="animate-bounce-slow" />
             )}
-
-            {/* Thông báo */}
             {nguoiDung?.id && (
               <NotificationCenter
                 notifications={notifications}
@@ -230,48 +198,21 @@ export default function MenuTren({
                 onNotificationClick={handleNotificationClick}
               />
             )}
-
-            {/* QR Code */}
-            <div className="hidden md:block">
-              <NutVuong icon={QrCode} />
-            </div>
-
-            {/* 🔥 NÚT NỘI BỘ (SỬA Ở ĐÂY) */}
-            <NutVuong
-              icon={KeyRound} // Đổi icon thành KeyRound cho hợp ngữ cảnh Login
-              onClick={() => setShowLogin(true)} // Mở modal login
-              title="Cổng Nội Bộ"
-            />
-
-            {/* Cá Nhân */}
-            <NutVuong
-              icon={UserCircle}
-              onClick={() => setShowProfile(true)}
-              isActive={showProfile}
-            />
+            <div className="hidden md:block"><NutVuong icon={QrCode} /></div>
+            <NutVuong icon={KeyRound} onClick={() => setShowLogin(true)} title="Cổng Nội Bộ" />
+            <NutVuong icon={UserCircle} onClick={() => setShowProfile(true)} isActive={showProfile} />
           </div>
         )}
       </div>
 
-      {/* Render Modal Login */}
-      {mounted && showLogin && createPortal(
-        <CongDangNhap isOpen={showLogin} onClose={() => setShowLogin(false)} />,
-        document.body
-      )}
-
+      {mounted && showLogin && createPortal(<CongDangNhap isOpen={showLogin} onClose={() => setShowLogin(false)} />, document.body)}
       {mounted && showProfile && nguoiDung && !isVisitor && createPortal(
-          <ModalProfile
-            isOpen={true}
-            onClose={() => setShowProfile(false)}
-            nguoiDung={nguoiDung}
-          />,
-          document.body
+          <ModalProfile isOpen={true} onClose={() => setShowProfile(false)} nguoiDung={nguoiDung} />, document.body
       )}
     </>
   );
 }
 
-// ... (Giữ nguyên Component NutVuong) ...
 function NutVuong({ icon: Icon, badge, onClick, isActive, className = "", title }: any) {
   return (
     <button

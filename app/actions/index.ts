@@ -13,7 +13,7 @@ export * from './QuyenHanAdmin'; // Đã bao gồm các hàm quản lý DB, Tabl
 export * from './QuyenHanBaoCao';
 export * from './QuyenHanCTV';
 export * from './QuyenHanKeToan';
-export * from './QuyenHanKhachVip'; // Đã fix lỗi file rỗng
+
 export * from './QuyenHanKho';
 export * from './QuyenHanQuanLy'; // Đã bao gồm: Nhân sự, Khách hàng, Chat (Trùng với admindb cũ)
 export * from './QuyenHanSales';

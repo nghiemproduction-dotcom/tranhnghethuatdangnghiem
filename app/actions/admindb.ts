@@ -144,7 +144,7 @@ export async function getTableDataPaginatedAction(tableName: string, page: numbe
         
         // Ưu tiên các cột thời gian phổ biến
         if (colNames.includes('tao_luc')) sortCol = 'tao_luc';
-        else if (colNames.includes('created_at')) sortCol = 'created_at';
+        else if (colNames.includes('tao_luc')) sortCol = 'tao_luc';
         else if (colNames.includes('date_created')) sortCol = 'date_created';
         
         // Nếu không có id luôn (hiếm gặp), lấy cột đầu tiên

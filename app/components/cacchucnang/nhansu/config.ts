@@ -1,50 +1,23 @@
 "use client";
 
-/**
- * ============================================================
- * CHỨC NĂNG: NHÂN SỰ
- * Đường dẫn: phongchuan/cacchucnang/nhansu
- * ============================================================
- * * Chức năng quản lý nhân sự dùng chung cho nhiều phòng.
- * Mỗi phòng gọi ra với quyền khác nhau thông qua props.
- * * QUYỀN HẠN:
- * - allowView: Xem danh sách và chi tiết
- * - allowEdit: Sửa thông tin
- * - allowDelete: Xóa nhân sự
- * - allowBulk: Thao tác hàng loạt
- * * SỬ DỤNG:
- * import { NhanSuChucNang } from '@/app/components/cacchucnang/nhansu';
- * <NhanSuChucNang permissions={{ allowDelete: true }} />
- */
-
+// 1. Import Types
 import { Phone, Mail, Banknote, Clock, Percent, ShieldCheck, User } from 'lucide-react';
-import { ManagerConfig, FieldConfig, FilterTabConfig, TabConfig } from '../types';
+import { FieldConfig, ListTabDef, DetailTabDef } from "@/app/types/core"; 
+
 import { 
-    getNhanSuDataAction, 
-    createNhanSuAction, 
-    updateNhanSuAction, 
-    deleteNhanSuAction,
-    getDistinctValuesAction 
-} from '@/app/actions/QuyenHanQuanLy';
+    getNhanSuList, 
+    createNhanSu, 
+    updateNhanSu, 
+    deleteNhanSu,
+    getDistinctViTri,
+    // Import NhanSu từ DAL
+    NhanSu as NhanSuDAL // Đổi tên tạm để extend
+} from './dal';
 
-// ============================================================
-// INTERFACE
-// ============================================================
-
-export interface NhanSu {
-    id: string;
-    ho_ten: string;
-    vi_tri: string;
-    vi_tri_normalized: string;
-    so_dien_thoai: string;
-    email: string;
-    hinh_anh?: string;
-    trang_thai?: string;
-    luong_thang?: number;
-    luong_theo_gio?: number;
-    thuong_doanh_thu?: number;
-    ngan_hang?: string;
-    so_tai_khoan?: string;
+// 🟢 CẬP NHẬT INTERFACE: Đồng bộ với DB
+export interface NhanSu extends Omit<NhanSuDAL, 'vi_tri'> {
+    phan_loai?: string; // Sửa tên cột cho đúng DB
+    // Các trường khác giữ nguyên từ DAL
 }
 
 export interface NhanSuPermissions {
@@ -54,221 +27,152 @@ export interface NhanSuPermissions {
     allowBulk?: boolean;
 }
 
-// ============================================================
-// CONSTANTS
-// ============================================================
-
+// 2. Constants
 const VN_BANKS = [
     "Vietcombank", "VietinBank", "BIDV", "Agribank", "Techcombank", "MBBank", 
     "ACB", "VPBank", "TPBank", "Sacombank", "HDBank", "VIB", "MSB", "SHB", 
     "SeABank", "OCB", "Eximbank", "LienVietPostBank", "Nam A Bank", "Viet Capital Bank"
 ];
 
-// ============================================================
-// FIELDS CONFIG
-// ============================================================
-
-const fields: FieldConfig[] = [
-    {
-        key: 'hinh_anh',
-        label: 'Ảnh đại diện',
-        type: 'image',
+// 🟢 GENERIC HELPER
+function createField(
+    key: keyof NhanSu, 
+    label: string, 
+    type: FieldConfig['type'], 
+    options: Partial<FieldConfig> = {}
+): FieldConfig {
+    return {
+        key: key as string,
+        label,
+        type,
+        showInList: true, 
         showInForm: true,
-        showInDetail: false,
-        showInCard: true,
-    },
-    {
-        key: 'ho_ten',
-        label: 'Họ và Tên',
-        type: 'text',
-        placeholder: 'Nhập họ tên đầy đủ...',
+        showInDetail: true,
+        ...options 
+    };
+}
+
+// 3. CẤU HÌNH FIELDS
+const fields: FieldConfig[] = [
+    createField('hinh_anh', 'Ảnh đại diện', 'image', { 
+        showInDetail: false 
+    }),
+    
+    createField('ho_ten', 'Họ và Tên', 'text', { 
+        required: true, 
+        placeholder: 'Nhập họ tên đầy đủ...' 
+    }),
+
+    // 🔴 SỬA Ở ĐÂY: Đổi key 'vi_tri' thành 'phan_loai'
+    createField('phan_loai', 'Vị trí / Chức vụ', 'select-add', {
         required: true,
-    },
-    {
-        key: 'vi_tri',
-        label: 'Vị trí / Chức vụ',
-        type: 'select-add',
         placeholder: 'Chọn chức vụ...',
-        required: true,
         optionsLoader: async () => {
-            const res = await getDistinctValuesAction('nhan_su', 'vi_tri');
-            return (res.success && res.data) ? res.data as string[] : [];
-        },
-    },
-    {
-        key: 'email',
-        label: 'Email liên hệ',
-        type: 'email',
-        placeholder: 'email@example.com',
-        required: true,
-        icon: Mail,
-        colSpan: 2,
-    },
-    {
-        key: 'so_dien_thoai',
-        label: 'Số điện thoại',
-        type: 'phone',
-        placeholder: '09xxxxxxxxx',
-        icon: Phone,
-    },
-    {
-        key: 'luong_thang',
-        label: 'Lương cứng (VNĐ)',
-        type: 'money',
-        placeholder: '0',
-        icon: Banknote,
-        highlight: true,
-    },
-    {
-        key: 'luong_theo_gio',
-        label: 'Lương theo giờ',
-        type: 'readonly',
-        icon: Clock,
+            const res = await getDistinctViTri(); // Đảm bảo hàm này trả về list string các chức vụ
+            return (res.success && Array.isArray(res.data)) ? res.data : [];
+        }
+    }),
+
+    createField('email', 'Email liên hệ', 'email', { 
+        required: true, 
+        colSpan: 2, 
+        placeholder: 'email@example.com' 
+    }),
+
+    createField('so_dien_thoai', 'Điện thoại', 'phone', { 
+        placeholder: '09xxxxxxxxx' 
+    }),
+
+    createField('luong_thang', 'Lương cứng', 'money', { 
+        highlight: true, 
+        placeholder: '0' 
+    }),
+
+    createField('luong_theo_gio', 'Lương theo giờ', 'readonly', {
+        showInList: false, 
         computeFrom: 'luong_thang',
         computeFn: (luongThang: any) => {
             const value = Number(luongThang) || 0;
             if (value <= 0) return '0';
             return Math.round((value / 24 / 8) / 1000) * 1000;
         },
-    },
-    {
-        key: 'thuong_doanh_thu',
-        label: 'Thưởng doanh số (%)',
-        type: 'percent',
+    }),
+
+    createField('thuong_doanh_thu', 'Thưởng doanh số (%)', 'percent', {
         placeholder: '0 - 30',
-        maxValue: 30,
-        icon: Percent,
-    },
-    {
-        key: 'ngan_hang',
-        label: 'Ngân hàng',
-        type: 'select',
-        options: VN_BANKS,
-        icon: ShieldCheck,
-    },
-    {
-        key: 'so_tai_khoan',
-        label: 'Số tài khoản',
-        type: 'text',
-        placeholder: 'Nhập số tài khoản...',
-    },
+        maxValue: 30
+    }),
+
+    createField('ngan_hang', 'Ngân hàng', 'select', {
+        showInList: false,
+        options: VN_BANKS.map(b => ({ value: b, label: b }))
+    }),
+
+    createField('so_tai_khoan', 'Số tài khoản', 'text', {
+        showInList: false,
+        placeholder: 'Nhập số tài khoản...'
+    }),
 ];
 
-// ============================================================
-// FILTER TABS (Kết hợp Tab chức năng & Tab lọc)
-// ============================================================
-
-const filterTabs: FilterTabConfig[] = [
-     
- 
-
-    // 3. Các Tab lọc theo vai trò (để lọc trong danh sách)
-    { id: 'quanly', label: 'QUẢN LÝ', filterField: 'vi_tri_normalized' },
-    { id: 'sales', label: 'SALES', filterField: 'vi_tri_normalized' },
-    { id: 'thosanxuat', label: 'THỢ', filterField: 'vi_tri_normalized' },
-    { id: 'parttime', label: 'PART-TIME', filterField: 'vi_tri_normalized' },
-    { id: 'congtacvien', label: 'CTV', filterField: 'vi_tri_normalized' },
+// 4. CẤU HÌNH TABS (Sửa lại filterField cho đúng cột DB)
+// Lưu ý: matchValue phải khớp với dữ liệu thực tế trong cột phan_loai
+const filterTabs: ListTabDef[] = [
+    { id: 'all', label: 'TẤT CẢ' },
+    { id: 'quanly', label: 'QUẢN LÝ', filterField: 'phan_loai', matchValue: 'Quản lý' }, 
+    { id: 'sales', label: 'SALES', filterField: 'phan_loai', matchValue: 'Sales' },
+    { id: 'thosanxuat', label: 'THỢ', filterField: 'phan_loai', matchValue: 'Thợ sản xuất' },
+    // Nếu DB lưu là 'admin', 'sales'... thì sửa matchValue lại cho khớp
 ];
 
-// ============================================================
-// DETAIL TABS
-// ============================================================
-
-// 🟢 UPDATE: Thêm checkFields để Framework tự đếm số lượng thông tin
-const detailTabs: any[] = [
+const detailTabs: DetailTabDef[] = [
     { 
         id: 'hoso', 
         label: 'HỒ SƠ', 
         icon: User,
-        // Danh sách các trường cần đếm xem có dữ liệu hay không
-        checkFields: [
-            'email', 'so_dien_thoai', 'vi_tri', 
-            'luong_thang', 'luong_theo_gio', 'thuong_doanh_thu',
-            'ngan_hang', 'so_tai_khoan'
-        ]
+        // Sửa vi_tri -> phan_loai trong checkFields
+        checkFields: ['email', 'so_dien_thoai', 'phan_loai', 'luong_thang', 'ngan_hang']
     },
-    { 
-        id: 'muctieu', 
-        label: 'MỤC TIÊU', 
-        searchable: true, 
-        sortable: true, 
-        sortOptions: [{ key: 'name', label: 'TÊN' }, { key: 'reward', label: 'THƯỞNG' }], 
-        showAddButton: true 
-    },
-    { 
-        id: 'thanhtich', 
-        label: 'THÀNH TÍCH', 
-        searchable: true 
-    },
+    { id: 'chamcong', label: 'CHẤM CÔNG', icon: Clock },
+    { id: 'tinhluong', label: 'TÍNH LƯƠNG', icon: Banknote },
 ];
 
-// ============================================================
-// DATA SOURCE
-// ============================================================
-
+// ... (DataSource giữ nguyên, chỉ cần đảm bảo API trả về đúng cột phan_loai)
 const dataSource = {
     fetchList: async (page: number, limit: number, search: string, filter: string) => {
-        const res = await getNhanSuDataAction(page, limit, search, filter);
-        return { success: res.success, data: res.data as NhanSu[] | undefined, error: res.error };
+        const data = await getNhanSuList(page, limit, search, filter);
+        return { success: true, data: data, error: null };
     },
     create: async (data: Partial<NhanSu>) => {
-        if (data.vi_tri) {
-            (data as any).vi_tri_normalized = data.vi_tri.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "").toLowerCase();
-        }
-        const res = await createNhanSuAction(data as any);
-        return { success: res.success, data: (res as any).data as NhanSu, error: res.error };
+        const res = await createNhanSu(data);
+        return { success: res.success, data: res.data as any, error: res.error || null };
     },
     update: async (id: string, data: Partial<NhanSu>) => {
-        if (data.vi_tri) {
-            (data as any).vi_tri_normalized = data.vi_tri.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "").toLowerCase();
-        }
-        const res = await updateNhanSuAction(id, data as any);
-        return { success: res.success, data: (res as any).data as NhanSu, error: res.error };
+        const res = await updateNhanSu(id, data);
+        return { success: res.success, data: res.data as any, error: res.error || null };
     },
     delete: async (id: string) => {
-        const res = await deleteNhanSuAction(id);
-        return { success: res.success, error: res.error };
+        const res = await deleteNhanSu(id);
+        return { success: res.success, error: res.error || null };
     },
 };
 
-// ============================================================
-// CREATE CONFIG FUNCTION
-// ============================================================
-
-export function createNhanSuConfig(permissions: NhanSuPermissions = {}): ManagerConfig<NhanSu> {
-    const { 
-        allowView = true, 
-        allowEdit = true, 
-        allowDelete = false, 
-        allowBulk = false 
-    } = permissions;
+// 5. Factory Function Main
+export function createNhanSuConfig(permissions: NhanSuPermissions = {}): any {
+    const { allowView = true, allowEdit = true, allowDelete = false, allowBulk = false } = permissions;
 
     return {
         entityName: 'nhân sự',
         entityNamePlural: 'nhân sự',
         idField: 'id',
-        fields,
-        cardConfig: {
-            avatarField: 'hinh_anh',
-            titleField: 'ho_ten',
-            subtitleField: 'vi_tri',
-            infoFields: [{ field: 'so_dien_thoai', icon: Phone }],
-        },
+        fields, 
         filterTabs,
         detailTabs,
-        actions: {
-            allowView,
-            allowEdit,
-            allowDelete,
-            allowBulkSelect: allowBulk,
-            allowBulkDelete: allowBulk && allowDelete,
-        },
+        actions: { allowView, allowEdit, allowDelete, allowBulkSelect: allowBulk, allowBulkDelete: allowBulk && allowDelete },
         dataSource,
         searchFields: ['ho_ten', 'so_dien_thoai', 'email'],
         sortOptions: [
-            { key: 'name', label: 'TÊN', sortFn: (a: NhanSu, b: NhanSu) => a.ho_ten.localeCompare(b.ho_ten) },
-            { key: 'vitri', label: 'VỊ TRÍ', sortFn: (a: NhanSu, b: NhanSu) => (a.vi_tri || '').localeCompare(b.vi_tri || '') },
-            { key: 'luong', label: 'LƯƠNG', sortFn: (a: NhanSu, b: NhanSu) => (b.luong_thang || 0) - (a.luong_thang || 0) },
+            { key: 'name', label: 'TÊN' },
+            { key: 'vitri', label: 'VỊ TRÍ' },
         ],
         defaultSort: 'name',
         uploadConfig: { bucket: 'avatar', fileNamePrefix: 'ns' },

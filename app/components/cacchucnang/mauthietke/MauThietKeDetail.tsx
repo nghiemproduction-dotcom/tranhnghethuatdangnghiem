@@ -220,8 +220,8 @@ export default function MauThietKeDetail({
             icon={<Calendar size={18} />}
             label="Ngày tạo mẫu"
             value={
-              item.tao_luc || item.created_at
-                ? new Date(item.tao_luc || item.created_at).toLocaleDateString(
+              item.tao_luc || item.tao_luc
+                ? new Date(item.tao_luc || item.tao_luc).toLocaleDateString(
                     "vi-VN"
                   )
                 : "---"

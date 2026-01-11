@@ -87,7 +87,7 @@ export async function sendNotificationToRoles(
       message: message,
       action_url: url,
       is_read: false,
-      created_at: new Date().toISOString(),
+      tao_luc: new Date().toISOString(),
       from_user_name: senderName,
       from_user_avatar: avatarUrl,
     }));

@@ -1,0 +1,235 @@
+{
+  "folderName": "nhansu3",
+  "featureLabel": "Nhân Sự 3",
+  "tableName": "nhan_su",
+  "columns": [
+    {
+      "key": "id",
+      "originalType": "uuid",
+      "label": "Id",
+      "inputType": "text",
+      "showInList": false,
+      "showInForm": false,
+      "required": false,
+      "isOwnerField": false,
+      "placeholder": ""
+    },
+    {
+      "key": "tao_luc",
+      "originalType": "timestamp with time zone",
+      "label": "Taoluc",
+      "inputType": "text",
+      "showInList": true,
+      "showInForm": false,
+      "required": false,
+      "isOwnerField": false,
+      "placeholder": ""
+    },
+    {
+      "key": "ho_ten",
+      "originalType": "text",
+      "label": "Hoten",
+      "inputType": "text",
+      "showInList": true,
+      "showInForm": true,
+      "required": false,
+      "isOwnerField": false,
+      "placeholder": ""
+    },
+    {
+      "key": "so_dien_thoai",
+      "originalType": "text",
+      "label": "Sodienthoai",
+      "inputType": "text",
+      "showInList": true,
+      "showInForm": true,
+      "required": false,
+      "isOwnerField": false,
+      "placeholder": ""
+    },
+    {
+      "key": "email",
+      "originalType": "text",
+      "label": "Email",
+      "inputType": "text",
+      "showInList": true,
+      "showInForm": true,
+      "required": false,
+      "isOwnerField": false,
+      "placeholder": ""
+    },
+    {
+      "key": "phan_loai",
+      "originalType": "text",
+      "label": "Phanloai",
+      "inputType": "text",
+      "showInList": true,
+      "showInForm": true,
+      "required": false,
+      "isOwnerField": false,
+      "placeholder": ""
+    },
+    {
+      "key": "madangnhap",
+      "originalType": "text",
+      "label": "Madangnhap",
+      "inputType": "text",
+      "showInList": true,
+      "showInForm": true,
+      "required": false,
+      "isOwnerField": false,
+      "placeholder": ""
+    },
+    {
+      "key": "hinh_anh",
+      "originalType": "text",
+      "label": "Hinhanh",
+      "inputType": "image",
+      "showInList": true,
+      "showInForm": true,
+      "required": false,
+      "isOwnerField": false,
+      "placeholder": ""
+    },
+    {
+      "key": "trang_thai",
+      "originalType": "text",
+      "label": "Trangthai",
+      "inputType": "select",
+      "showInList": true,
+      "showInForm": true,
+      "required": false,
+      "isOwnerField": false,
+      "placeholder": ""
+    },
+    {
+      "key": "ngan_hang",
+      "originalType": "text",
+      "label": "Nganhang",
+      "inputType": "text",
+      "showInList": true,
+      "showInForm": true,
+      "required": false,
+      "isOwnerField": false,
+      "placeholder": ""
+    },
+    {
+      "key": "so_tai_khoan",
+      "originalType": "text",
+      "label": "Sotaikhoan",
+      "inputType": "text",
+      "showInList": true,
+      "showInForm": true,
+      "required": false,
+      "isOwnerField": false,
+      "placeholder": ""
+    },
+    {
+      "key": "diem_cong_hien",
+      "originalType": "integer",
+      "label": "Diemconghien",
+      "inputType": "number",
+      "showInList": true,
+      "showInForm": true,
+      "required": false,
+      "isOwnerField": false,
+      "placeholder": ""
+    },
+    {
+      "key": "cap_bac_game",
+      "originalType": "text",
+      "label": "Capbacgame",
+      "inputType": "text",
+      "showInList": true,
+      "showInForm": true,
+      "required": false,
+      "isOwnerField": false,
+      "placeholder": ""
+    }
+  ],
+  "roles": [
+    {
+      "roleName": "admin",
+      "permissions": [
+        "read",
+        "create",
+        "update",
+        "delete"
+      ],
+      "canViewAll": true
+    },
+    {
+      "roleName": "quanly",
+      "permissions": [
+        "read",
+        "create",
+        "update",
+        "delete"
+      ],
+      "canViewAll": true
+    },
+    {
+      "roleName": "sales",
+      "permissions": [
+        "read"
+      ],
+      "canViewAll": false
+    },
+    {
+      "roleName": "thosanxuat",
+      "permissions": [
+        "read"
+      ],
+      "canViewAll": false
+    },
+    {
+      "roleName": "thietke",
+      "permissions": [
+        "read"
+      ],
+      "canViewAll": false
+    },
+    {
+      "roleName": "kho",
+      "permissions": [
+        "read"
+      ],
+      "canViewAll": false
+    },
+    {
+      "roleName": "parttime",
+      "permissions": [
+        "read"
+      ],
+      "canViewAll": false
+    },
+    {
+      "roleName": "ketoan",
+      "permissions": [
+        "read"
+      ],
+      "canViewAll": false
+    }
+  ],
+  "actionConfig": {
+    "create": true,
+    "update": true,
+    "delete": true,
+    "bulkDelete": true
+  },
+  "dalConfig": {
+    "sortColumn": "id",
+    "sortOrder": "desc"
+  },
+  "ownerColumn": "",
+  "tabFilterColumn": "trang_thai",
+  "displaySettings": {
+    "colTitle": "ho_ten",
+    "colSubTitle": "so_dien_thoai",
+    "colImage": "hinh_anh"
+  },
+  "storageBucket": "avatar",
+  "isGameMode": true,
+  "savedTabSettings": [],
+  "linkedModules": []
+}

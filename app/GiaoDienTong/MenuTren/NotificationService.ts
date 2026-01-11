@@ -17,7 +17,7 @@ export const NotificationService = {
         .select("*")
         .eq("user_id", userId)
         .eq("is_read", false) // Chỉ lấy tin chưa đọc để tối ưu
-        .order("created_at", { ascending: false })
+        .order("tao_luc", { ascending: false })
         .limit(20);
 
       // 2. Xử lý lỗi nhẹ nhàng hơn

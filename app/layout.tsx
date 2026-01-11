@@ -2,20 +2,19 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 
-// --- IMPORT PROVIDER ---
+// Import Providers
 import QueryProvider from "./QueryProvider";
 import { UserProvider } from "@/lib/UserContext";
 import { AppSettingsProvider } from "@/lib/AppSettingsContext";
 
-// --- IMPORT UI & LOGIC ---
+// Import Components
 import { Toaster } from "react-hot-toast";
 import StaffPresence from "@/components/StaffPresence";
 import PushManager from "@/components/PushManager";
 import { cookies } from "next/headers";
 import { AuthService } from "@/app/components/CongDangNhap/AuthService";
-import NavigationWrapper from "@/components/NavigationWrapper"; // <--- IMPORT MỚI
+import NavigationWrapper from "@/app/components/NavigationWrapper"; 
 
-// ... (Giữ nguyên phần Fonts, Metadata, Viewport cũ của bạn) ...
 const inter = Inter({ subsets: ["latin", "vietnamese"], display: "swap", variable: "--font-inter" });
 const playfair = Playfair_Display({ subsets: ["latin", "vietnamese"], display: "swap", variable: "--font-playfair", weight: ["400", "500", "600", "700", "800", "900"] });
 
@@ -27,29 +26,44 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // --- LOGIC LẤY USER (GIỮ NGUYÊN) ---
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const sessionCookie = cookieStore.get('staff_session');
-  const supabaseUser = await AuthService.getUser();
-
-  let staffUser = null;
-  if (sessionCookie) {
-    try {
-      const parsed = JSON.parse(sessionCookie.value);
-      staffUser = {
-        id: parsed.id,
-        ho_ten: parsed.name,
-        hinh_anh: parsed.avatar,
-        email: parsed.email || 'staff@internal',
-        userType: 'nhan_su',
-        role: parsed.role,
-        phan_loai: parsed.role,
-        vi_tri: parsed.role,
-        permissions: { allowView: true, allowEdit: true }
-      };
-    } catch (e) {}
+  
+  // 🛡️ LẤY USER TỪ SUPABASE (BẢO VỆ 1)
+  let supabaseUser = null;
+  try {
+     supabaseUser = await AuthService.getUser();
+  } catch (e) {
+     console.warn("AuthService error ignored");
   }
 
+  // 🛡️ LẤY USER TỪ COOKIE (BẢO VỆ 2 - CHỐNG CRASH)
+  let staffUser = null;
+  if (sessionCookie?.value) {
+    try {
+      // Chỉ parse nếu chuỗi có vẻ là JSON hợp lệ
+      const val = sessionCookie.value;
+      if (val && val !== "undefined" && val !== "null" && val.startsWith("{")) {
+        const parsed = JSON.parse(val);
+        staffUser = {
+          id: parsed.id,
+          ho_ten: parsed.name,
+          hinh_anh: parsed.avatar,
+          email: parsed.email || 'staff@internal',
+          userType: 'nhan_su',
+          role: parsed.role,
+          phan_loai: parsed.role,
+          vi_tri: parsed.role,
+          permissions: { allowView: true, allowEdit: true }
+        };
+      }
+    } catch (e) {
+      // 🔇 IM LẶNG TUYỆT ĐỐI NẾU LỖI: Không throw error để tránh sập web
+      // console.error("Cookie parse error ignored"); 
+    }
+  }
+
+  // Merge dữ liệu an toàn
   const finalUser: any = staffUser ? { ...(supabaseUser || {}), ...staffUser } : supabaseUser;
   const isNhanSu = finalUser?.userType === 'nhan_su';
 
@@ -59,22 +73,20 @@ export default async function RootLayout({
         <QueryProvider>
           <AppSettingsProvider>
             <UserProvider initialUser={finalUser}>
-              
               <main className="min-h-screen relative flex flex-col">
                 
-                {/* --- SỬ DỤNG NAVIGATION WRAPPER (THAY THẾ CODE CŨ) --- */}
-                {/* Nó sẽ tự động ẩn menu khi ở trang chủ */}
+                {/* Wrapper điều hướng an toàn */}
                 <NavigationWrapper user={finalUser} isNhanSu={isNhanSu}>
                   {children}
                 </NavigationWrapper>
 
                 {/* Các tiện ích chạy ngầm */}
                 <PushManager />
-                {isNhanSu && <StaffPresence userId={finalUser?.id} />}
+                {/* Chỉ hiện StaffPresence nếu có user, tránh lỗi render */}
+                {isNhanSu && finalUser?.id && <StaffPresence userId={finalUser.id} />}
                 <Toaster position="bottom-right" />
                 
               </main>
-
             </UserProvider>
           </AppSettingsProvider>
         </QueryProvider>

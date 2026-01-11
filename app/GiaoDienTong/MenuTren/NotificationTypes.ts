@@ -64,7 +64,7 @@ export interface Notification {
   
   // Trạng thái
   is_read: boolean;
-  created_at: string;
+  tao_luc: string;
   updated_at: string;
   
   // Hành động

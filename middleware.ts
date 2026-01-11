@@ -1,10 +1,10 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { getProfileByEmailUsingClient } from '@/lib/dal';
 
 // 1. CÁC ROUTE CÔNG KHAI
 const PUBLIC_ROUTES = [
   '/', 
+  '/phongtrungbay', 
   '/trangchu', 
   '/dathang', 
   '/CongDangNhap',
@@ -39,7 +39,7 @@ export async function middleware(request: NextRequest) {
       cookies: {
         getAll() { return request.cookies.getAll(); },
         setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value));
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
           response = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
         },
@@ -47,108 +47,46 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // ============================================================
-  // [CẬP NHẬT MỚI]: KIỂM TRA COOKIE NỘI BỘ (STAFF SESSION)
-  // ============================================================
-  const staffSession = request.cookies.get('staff_session');
-
-  if (staffSession) {
-    // SỬA: Bỏ chặn trang chủ ('/'). Chỉ redirect nếu họ cố vào lại trang đăng nhập.
-    if (path === '/CongDangNhap' || path === '/login') {
-      try {
-        const sessionData = JSON.parse(staffSession.value);
-        let dest = '/dashboard';
-        
-        switch (sessionData.role) {
-            case 'admin': dest = '/phongadmin'; break;
-            case 'sales': dest = '/dathang'; break;
-            case 'thosanxuat': dest = '/sanxuat'; break;
-            case 'thietke': dest = '/thietke'; break;
-            case 'kho': dest = '/kho'; break;
-            case 'ketoan': dest = '/ketoan'; break;
-            default: dest = '/dashboard';
-        }
-        return NextResponse.redirect(new URL(dest, request.url));
-      } catch (e) {
-        return NextResponse.redirect(new URL('/dashboard', request.url));
-      }
-    }
-    
-    // Nếu có cookie nhân viên -> CHO PHÉP ĐI TIẾP (Bypass Supabase Auth check)
-    return response;
-  }
-  // ============================================================
-
-
-  // --- BƯỚC 3: LẤY THÔNG TIN USER (LOGIC CŨ - SUPABASE AUTH) ---
+  // --- BƯỚC 3: REFRESH TOKEN ---
   const { data: { user } } = await supabase.auth.getUser();
 
-  // --- BƯỚC 4: XỬ LÝ ĐIỀU HƯỚNG ---
+
+  // --- BƯỚC 4: XỬ LÝ CHUYỂN HƯỚNG VỀ PHONGLAMVIEC ---
   
-  // TRƯỜNG HỢP A: CHƯA ĐĂNG NHẬP
-  if (!user) {
-    if (!PUBLIC_ROUTES.includes(path)) {
-      const loginUrl = new URL('/', request.url);
-      return NextResponse.redirect(loginUrl);
+  // Kiểm tra cookie staff_session (Logic cũ của bạn)
+  const staffSession = request.cookies.get('staff_session');
+
+  // Logic chuyển hướng chung: Bất kể là ai, hễ đang ở trang login mà đã đăng nhập thì về /phonglamviec
+  const isLoginPage = path === '/CongDangNhap' || path === '/login' || path === '/auth/callback';
+
+  if (staffSession) {
+    if (isLoginPage) {
+      // ✅ THAY ĐỔI: Không switch case nữa, chuyển thẳng về /phonglamviec
+      return NextResponse.redirect(new URL('/phonglamviec', request.url));
     }
-    return response; 
+    // Nếu ở các trang khác thì cho đi tiếp
+    return response;
   }
 
-  // TRƯỜNG HỢP B: ĐÃ ĐĂNG NHẬP
+  // Logic dự phòng với User của Supabase (nếu không dùng staff_session)
   if (user) {
-    // 1. Lấy quyền
-    const appMetadata = user.app_metadata || {};
-    let userRole = appMetadata.app_role; 
-    let userPerm = appMetadata.app_permission || 'khach';
-
-    if (!userRole && user.email) {
-      try {
-        const profile = await getProfileByEmailUsingClient(supabase, user.email);
-        if (profile?.role) {
-          if (profile.role === 'admin') {
-            userRole = 'nhan_su';
-            userPerm = 'admin';
-          } else {
-            userRole = 'khach_hang';
-            userPerm = profile.role || 'khach';
-          }
-        }
-      } catch (e) { }
+    if (isLoginPage) {
+      // ✅ THAY ĐỔI: Có user Supabase cũng chuyển thẳng về /phonglamviec
+      return NextResponse.redirect(new URL('/phonglamviec', request.url));
     }
+    return response;
+  }
 
-    // 2. Định nghĩa trang đích
-    let destination = '/trangchu';
+  // --- BƯỚC 5: BẢO VỆ ROUTE ---
+  // Nếu chưa đăng nhập (không có user và không có staff_session)
+  const isPublicRoute = PUBLIC_ROUTES.some(route => 
+    path === route || path.startsWith(`${route}/`)
+  );
 
-    if (userRole === 'nhan_su') {
-        switch (userPerm) {
-            case 'admin':
-            case 'quan_tri': destination = '/phongadmin'; break;
-            case 'thietke': destination = '/phongthietke'; break;
-            case 'ketoan': destination = '/phongketoan'; break;
-            case 'thukho': destination = '/phongkho'; break;
-            case 'parttime':
-            case 'thosanxuat':
-            case 'tho': destination = '/phongsanxuat'; break;
-            case 'congtacvien': destination = '/phongctv'; break;
-            default: destination = '/dashboard'; 
-        }
-    } else if (userRole === 'khach_hang') {
-        destination = '/khach-hang/tong-quan'; 
-    }
-
-    // 3. Logic Redirect "Thông Minh"
-    // SỬA: Bỏ chặn trang chủ ('/'). Để user có thể ở lại trang chủ sau khi login/logout.
-    if (path === '/CongDangNhap' || path === '/auth/callback') {
-        return NextResponse.redirect(new URL(destination, request.url));
-    }
-
-    // 4. Logic Bảo vệ
-    if (userPerm === 'admin' || userPerm === 'quan_tri') {
-        return response;
-    }
-
-    if (path.startsWith('/phong') && !path.startsWith(destination)) {
-         return NextResponse.redirect(new URL(destination, request.url));
+  if (!user && !staffSession) {
+    if (!isPublicRoute) {
+      // Nếu cố vào trang nội bộ mà chưa login -> Về trang chủ
+      return NextResponse.redirect(new URL('/', request.url));
     }
   }
 
